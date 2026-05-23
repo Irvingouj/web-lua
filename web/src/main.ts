@@ -2,6 +2,71 @@ import './styles.css';
 import { Cell, Notebook, createCell, createNotebook, serializeNotebook, deserializeNotebook } from './notebook';
 import type { WorkerRunResult, CellError } from './types';
 
+// ─── IndexedDB Auto-Save ────────────────────────────────────────
+const DB_NAME = 'web-lua-notebook';
+const DB_VERSION = 1;
+const STORE_NAME = 'notebooks';
+const NOTEBOOK_KEY = 'default';
+
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveToIndexedDB(nb: Notebook): Promise<void> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(serializeNotebook(nb), NOTEBOOK_KEY);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch (e) {
+    console.warn('[auto-save] failed:', e);
+  }
+}
+
+async function loadFromIndexedDB(): Promise<Notebook | null> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(NOTEBOOK_KEY);
+    const result = await new Promise<string | undefined>((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result as string | undefined);
+      req.onerror = () => reject(req.error);
+    });
+    db.close();
+    if (result) {
+      return deserializeNotebook(result);
+    }
+    return null;
+  } catch (e) {
+    console.warn('[auto-load] failed:', e);
+    return null;
+  }
+}
+
+/** Debounced auto-save: saves 500ms after the last call. */
+function scheduleAutoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    saveToIndexedDB(notebook);
+  }, 500);
+}
+
 // ─── State ───────────────────────────────────────────────────────
 let notebook: Notebook = createNotebook();
 let worker: Worker | null = null;
@@ -289,6 +354,7 @@ function loadNotebook() {
 
 // ─── UI Rendering ───────────────────────────────────────────────
 function renderCells() {
+  scheduleAutoSave();
   const container = document.getElementById('cells-container')!;
   container.innerHTML = '';
 
@@ -483,7 +549,7 @@ async function handleHostCallAction(action: string, params: any): Promise<any> {
 }
 
 // ─── Event Wiring ───────────────────────────────────────────────
-function init() {
+async function init() {
   // Toolbar buttons
   document.getElementById('btn-add-cell')!.addEventListener('click', () => addCell());
   document.getElementById('btn-run-all')!.addEventListener('click', runAllCells);
@@ -515,6 +581,16 @@ function init() {
     }
   });
 
+  // Auto-load from IndexedDB
+  const saved = await loadFromIndexedDB();
+  if (saved && saved.cells.length > 0) {
+    notebook = saved;
+    // Reset statuses since the kernel isn't running yet
+    notebook.cells.forEach(c => {
+      c.status = 'idle';
+    });
+  }
+
   // Initial render
   renderCells();
   updateKernelStatusUI();
@@ -526,3 +602,14 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+
+// Save on page unload so we don't lose work on tab close/refresh
+window.addEventListener('beforeunload', () => {
+  // Sync save — beforeunload allows sync IndexedDB in some browsers,
+  // but we also save editor contents first
+  notebook.cells.forEach(c => {
+    const editor = document.getElementById(`editor-${c.id}`) as HTMLTextAreaElement;
+    if (editor) c.source = editor.value;
+  });
+  saveToIndexedDB(notebook);
+});
