@@ -182,11 +182,133 @@ impl RunResult {
     }
 }
 
+// ─── Plugin Trait ────────────────────────────────────────────────
+
+/// A plugin that extends the Lua runtime with custom globals.
+///
+/// Implement this trait to register Rust callbacks as Lua globals.
+/// Plugins are registered via [`SessionBuilder::plugin`].
+///
+/// # Example
+///
+/// ```rust,ignore
+/// struct MathPlugin;
+///
+/// impl LuaPlugin for MathPlugin {
+///     fn name(&self) -> &str { "math_extra" }
+///     fn register(&self, ctx: Context, _host_state: Rc<RefCell<HostState>>) {
+///         let t = Table::new(&ctx);
+///         // ... register callbacks ...
+///         ctx.set_global("math_extra", t);
+///     }
+/// }
+/// ```
+pub trait LuaPlugin: 'static {
+    /// Plugin name, for debugging purposes.
+    fn name(&self) -> &str;
+
+    /// Register custom Lua globals into the session.
+    /// Called inside `Lua::enter()`, so you can create `Callback`, `Table`, etc.
+    fn register(&self, ctx: Context, host_state: Rc<RefCell<HostState>>);
+}
+
+// ─── Session Builder ────────────────────────────────────────────
+
+/// Builder for creating a [`NotebookSession`] with custom configuration.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// let session = NotebookSession::build()
+///     .fuel_limit(4096)
+///     .plugin(Box::new(MyPlugin))
+///     .lua_library("utils", "function utils.id(x) return x end")
+///     .finish();
+/// ```
+pub struct SessionBuilder {
+    fuel_limit: i32,
+    plugins: Vec<Box<dyn LuaPlugin>>,
+    lua_libraries: Vec<(String, String)>,
+}
+
+impl Default for SessionBuilder {
+    fn default() -> Self {
+        Self {
+            fuel_limit: 8192,
+            plugins: Vec::new(),
+            lua_libraries: Vec::new(),
+        }
+    }
+}
+
+impl SessionBuilder {
+    /// Set the fuel limit for execution.
+    pub fn fuel_limit(mut self, limit: i32) -> Self {
+        self.fuel_limit = limit;
+        self
+    }
+
+    /// Register a Rust plugin.
+    pub fn plugin(mut self, plugin: Box<dyn LuaPlugin>) -> Self {
+        self.plugins.push(plugin);
+        self
+    }
+
+    /// Register a pure Lua library by source code.
+    /// The code will be executed during session initialization.
+    /// Any globals defined become available to subsequent cells.
+    pub fn lua_library(mut self, name: &str, source: &str) -> Self {
+        self.lua_libraries.push((name.to_string(), source.to_string()));
+        self
+    }
+
+    /// Build the session with the configured options.
+    pub fn finish(self) -> NotebookSession {
+        let fuel_limit = self.fuel_limit;
+        let mut lua = Lua::core();
+        let host_state = Rc::new(RefCell::new(HostState::default()));
+
+        lua.enter(|ctx| {
+            register_host_globals(ctx, host_state.clone());
+            disable_dangerous_globals(ctx);
+
+            // Register Rust plugins
+            for plugin in &self.plugins {
+                plugin.register(ctx, host_state.clone());
+            }
+        });
+
+        let mut session = NotebookSession {
+            lua,
+            executor: None,
+            execution_count: 0,
+            fuel_limit,
+            host_state,
+        };
+
+        // Load Lua libraries (needs run_cell, so after session creation)
+        for (_name, source) in &self.lua_libraries {
+            let result = session.run_cell(source, "");
+            // If a library fails to load, that's a programming error.
+            // We silently continue — the cell error will surface when the
+            // user tries to use the library.
+            let _ = result;
+        }
+
+        // Reset execution count after library loading so user cells start at 1
+        session.execution_count = 0;
+
+        session
+    }
+}
+
 // ─── Internal State ─────────────────────────────────────────────
 
 /// Internal state shared between Lua closures and the host.
+/// Plugin authors can use `host_state.borrow_mut()` to set `pending_async_command`
+/// for async callbacks.
 #[derive(Debug, Default)]
-struct HostState {
+pub struct HostState {
     stdout: Vec<String>,
     stderr: Vec<String>,
     commands: Vec<serde_json::Value>,
@@ -221,26 +343,17 @@ impl Default for NotebookSession {
 impl NotebookSession {
     /// Create a new notebook session with a fresh Lua state.
     pub fn new() -> Self {
-        Self::with_fuel_limit(8192)
+        Self::build().finish()
     }
 
     /// Create a new notebook session with a custom fuel limit.
     pub fn with_fuel_limit(fuel_limit: i32) -> Self {
-        let mut lua = Lua::core();
-        let host_state = Rc::new(RefCell::new(HostState::default()));
+        Self::build().fuel_limit(fuel_limit).finish()
+    }
 
-        lua.enter(|ctx| {
-            register_host_globals(ctx, host_state.clone());
-            disable_dangerous_globals(ctx);
-        });
-
-        Self {
-            lua,
-            executor: None,
-            execution_count: 0,
-            fuel_limit,
-            host_state,
-        }
+    /// Start building a session with custom configuration.
+    pub fn build() -> SessionBuilder {
+        SessionBuilder::default()
     }
 
     /// Set the fuel limit for execution.
@@ -1521,6 +1634,46 @@ fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     web_table.set_field(ctx, "clipboard", clipboard_table);
 
     ctx.set_global("web", web_table);
+
+    // ── host.call(action, params) — generic async bridge for JS handlers ──
+    let hs_host = host_state.clone();
+    let host_table = Table::new(&ctx);
+
+    let host_call_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let action = if stack.len() > 0 {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => {
+                    let msg = format!("host.call expects action name (string), got {}", other.type_name());
+                    return Err(msg.into_value(ctx).into());
+                }
+            }
+        } else {
+            return Err("host.call requires an action name".into_value(ctx).into());
+        };
+
+        let params = if stack.len() > 1 {
+            lua_value_to_json(ctx, stack.get(1)).unwrap_or(serde_json::Value::Null)
+        } else {
+            serde_json::json!({})
+        };
+
+        let mut hs = hs_host.borrow_mut();
+        hs.async_call_counter += 1;
+        let call_id = hs.async_call_counter;
+        let command = AsyncCommand {
+            call_id,
+            action: format!("host_{}", action),
+            params,
+        };
+        hs.pending_async_command = Some(command);
+
+        stack.clear();
+        Ok(CallbackReturn::Yield { to_thread: None, then: None })
+    });
+
+    host_table.set_field(ctx, "call", host_call_cb);
+    ctx.set_global("host", host_table);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
@@ -2850,5 +3003,312 @@ mod tests {
         assert_eq!(resume_result.status, CellStatus::Done);
         // pcall catches the error, so ok=false, not ok=true
         assert!(resume_result.stdout[0].contains("true"), "got: {:?}", resume_result.stdout);
+    }
+
+    // ── Phase 1: Plugin system tests ────────────────────────────────
+
+    #[test]
+    fn test_plugin_sync_callback() {
+        struct TestPlugin;
+        impl LuaPlugin for TestPlugin {
+            fn name(&self) -> &str { "test" }
+            fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
+                let t = Table::new(&ctx);
+                let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+                    let val = if stack.len() > 0 {
+                        match stack.get(0) {
+                            Value::Integer(i) => i * 2,
+                            other => {
+                                let msg = format!("test.double expects an integer, got {}", other.type_name());
+                                return Err(msg.into_value(ctx).into());
+                            }
+                        }
+                    } else {
+                        0i64
+                    };
+                    stack.clear();
+                    stack.push_back(val.into());
+                    Ok(CallbackReturn::Return)
+                });
+                t.set_field(ctx, "double", cb);
+                ctx.set_global("testlib", t);
+            }
+        }
+
+        let mut session = NotebookSession::build()
+            .plugin(Box::new(TestPlugin))
+            .finish();
+
+        let result = session.run_cell("print(testlib.double(21))", "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["42"]);
+    }
+
+    #[test]
+    fn test_plugin_async_callback() {
+        struct AsyncTestPlugin;
+        impl LuaPlugin for AsyncTestPlugin {
+            fn name(&self) -> &str { "async_test" }
+            fn register(&self, ctx: Context, hs: Rc<RefCell<HostState>>) {
+                let hs_async = hs.clone();
+                let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+                    let label = if stack.len() > 0 {
+                        match stack.get(0) {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            _ => "default".to_string(),
+                        }
+                    } else {
+                        "default".to_string()
+                    };
+
+                    let mut hs = hs_async.borrow_mut();
+                    hs.async_call_counter += 1;
+                    let command = AsyncCommand {
+                        call_id: hs.async_call_counter,
+                        action: format!("plugin_action_{}", label),
+                        params: serde_json::json!({ "label": label }),
+                    };
+                    hs.pending_async_command = Some(command);
+
+                    stack.clear();
+                    Ok(CallbackReturn::Yield { to_thread: None, then: None })
+                });
+                ctx.set_global("plugin_async", cb);
+            }
+        }
+
+        let mut session = NotebookSession::build()
+            .plugin(Box::new(AsyncTestPlugin))
+            .finish();
+
+        let result = session.run_cell(r#"
+            local result = plugin_async("hello")
+            print(result)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "plugin_action_hello");
+
+        // Resume with a value
+        let resume = session.resume_cell(r#"{"ok": true, "value": "world"}"#);
+        assert_eq!(resume.status, CellStatus::Done);
+        assert_eq!(resume.stdout, vec!["world"]);
+    }
+
+    #[test]
+    fn test_lua_library_loading() {
+        let mut session = NotebookSession::build()
+            .lua_library("mymath", r#"
+                mymath = {}
+                function mymath.double(x) return x * 2 end
+                function mymath.triple(x) return x * 3 end
+            "#)
+            .finish();
+
+        let result = session.run_cell("print(mymath.double(21))", "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["42"]);
+
+        let result2 = session.run_cell("print(mymath.triple(7))", "");
+        assert_eq!(result2.stdout, vec!["21"]);
+    }
+
+    #[test]
+    fn test_plugin_coexists_with_builtins() {
+        struct HelperPlugin;
+        impl LuaPlugin for HelperPlugin {
+            fn name(&self) -> &str { "helper" }
+            fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
+                let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+                    stack.clear();
+                    stack.push_back(ctx.intern("from_plugin".as_bytes()).into());
+                    Ok(CallbackReturn::Return)
+                });
+                ctx.set_global("helper", cb);
+            }
+        }
+
+        let mut session = NotebookSession::build()
+            .plugin(Box::new(HelperPlugin))
+            .lua_library("utils", r#"
+                utils = {}
+                function utils.greet(name) return 'hello ' .. name end
+            "#)
+            .finish();
+
+        // Built-in still works
+        let r1 = session.run_cell("print(json.encode({a = 1}))", "");
+        assert!(r1.error.is_none());
+
+        // Plugin works
+        let r2 = session.run_cell("print(helper())", "");
+        assert_eq!(r2.stdout, vec!["from_plugin"]);
+
+        // Lua library works
+        let r3 = session.run_cell("print(utils.greet('world'))", "");
+        assert_eq!(r3.stdout, vec!["hello world"]);
+    }
+
+    #[test]
+    fn test_builder_fuel_limit() {
+        let mut session = NotebookSession::build()
+            .fuel_limit(100)
+            .finish();
+
+        let result = session.run_cell("while true do end", "");
+        assert!(result.fuel_exhausted);
+    }
+
+    #[test]
+    fn test_multiple_plugins() {
+        struct Plugin1;
+        impl LuaPlugin for Plugin1 {
+            fn name(&self) -> &str { "p1" }
+            fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
+                let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+                    stack.clear();
+                    stack.push_back(ctx.intern("plugin1".as_bytes()).into());
+                    Ok(CallbackReturn::Return)
+                });
+                ctx.set_global("p1", cb);
+            }
+        }
+
+        struct Plugin2;
+        impl LuaPlugin for Plugin2 {
+            fn name(&self) -> &str { "p2" }
+            fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
+                let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+                    stack.clear();
+                    stack.push_back(ctx.intern("plugin2".as_bytes()).into());
+                    Ok(CallbackReturn::Return)
+                });
+                ctx.set_global("p2", cb);
+            }
+        }
+
+        let mut session = NotebookSession::build()
+            .plugin(Box::new(Plugin1))
+            .plugin(Box::new(Plugin2))
+            .finish();
+
+        let result = session.run_cell("print(p1(), p2())", "");
+        assert_eq!(result.stdout, vec!["plugin1\tplugin2"]);
+    }
+
+    #[test]
+    fn test_session_new_still_works() {
+        // Backward compatibility: NotebookSession::new() still works
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("print('hello')", "");
+        assert_eq!(result.stdout, vec!["hello"]);
+    }
+
+    // ── Phase 2: host.call() tests ──────────────────────────────────
+
+    #[test]
+    fn test_host_call_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local result = host.call("my_action", {key = "value"})
+            print(result)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "host_my_action");
+        assert_eq!(cmd.params["key"], "value");
+    }
+
+    #[test]
+    fn test_host_call_no_params() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local result = host.call("ping")
+            print(result)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "host_ping");
+    }
+
+    #[test]
+    fn test_host_call_resume_with_value() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local result = host.call("my_action", {})
+            print(result.status)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume = session.resume_cell(
+            r#"{"ok": true, "value": {"status": "ok", "count": 5}}"#
+        );
+        assert_eq!(resume.status, CellStatus::Done);
+        assert!(resume.stdout.iter().any(|s| s.contains("ok")),
+            "got: {:?}", resume.stdout);
+    }
+
+    #[test]
+    fn test_host_call_resume_with_error() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                host.call("missing", {})
+            end)
+            print("caught:", not ok)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume = session.resume_cell(
+            r#"{"ok": false, "error": {"message": "No handler registered for 'missing'", "code": "ENOHANDLER"}}"#
+        );
+        assert_eq!(resume.status, CellStatus::Done);
+        assert!(resume.stdout[0].contains("true"), "got: {:?}", resume.stdout);
+    }
+
+    #[test]
+    fn test_host_call_requires_string_action() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                host.call(123, {})
+            end)
+            print("caught:", not ok)
+        "#, "");
+        assert!(result.error.is_none(), "unexpected error: {:?}", result.error);
+        assert!(result.stdout[0].contains("true"), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_host_call_no_args() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                host.call()
+            end)
+            print("caught:", not ok)
+        "#, "");
+        assert!(result.error.is_none(), "unexpected error: {:?}", result.error);
+        assert!(result.stdout[0].contains("true"), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_host_call_multiple_in_one_cell() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local a = host.call("first", {n = 1})
+            local b = host.call("second", {n = 2})
+            print(a .. b)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        // Resume first
+        let r1 = session.resume_cell(r#"{"ok": true, "value": "A"}"#);
+        assert_eq!(r1.status, CellStatus::AsyncPending);
+
+        // Resume second
+        let r2 = session.resume_cell(r#"{"ok": true, "value": "B"}"#);
+        assert_eq!(r2.status, CellStatus::Done);
+        assert_eq!(r2.stdout, vec!["AB"]);
     }
 }

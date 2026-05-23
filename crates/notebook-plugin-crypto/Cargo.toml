@@ -1,0 +1,12 @@
+[package]
+name = "notebook-plugin-crypto"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+piccolo-notebook-core = { path = "../piccolo-notebook-core" }
+piccolo = { path = "../../vendor/piccolo" }
+sha2 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+hex = "0.4"

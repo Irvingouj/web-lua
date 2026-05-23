@@ -424,10 +424,61 @@ async function executeMainThreadCommand(command: any): Promise<any> {
       }
     }
     default:
+      // host.call() custom handlers — check registered handlers
+      if (command.action.startsWith('host_')) {
+        return handleHostCallAction(command.action.slice(5), command.params);
+      }
       return {
         ok: false,
         error: { message: `Unknown main-thread action: ${command.action}`, code: 'EUNKNOWN', category: 'unknown' },
       };
+  }
+}
+
+// ─── Custom host.call() Handlers ─────────────────────────────────
+
+// Host app registers custom handlers by setting this object.
+// Example: window.__notebookHostHandlers = { greet: async (params) => "Hello, " + params.name }
+const hostHandlers: Record<string, (params: any) => Promise<any>> = {};
+
+/**
+ * Register a custom handler for host.call() from Lua.
+ * @param action The action name (without "host_" prefix)
+ * @param handler Async function that receives params and returns a value
+ */
+export function registerHostHandler(action: string, handler: (params: any) => Promise<any>) {
+  hostHandlers[action] = handler;
+}
+
+/**
+ * Register multiple handlers at once.
+ */
+export function registerHostHandlers(handlers: Record<string, (params: any) => Promise<any>>) {
+  Object.assign(hostHandlers, handlers);
+}
+
+async function handleHostCallAction(action: string, params: any): Promise<any> {
+  // Check internal handlers first, then window.__hostHandlers (for testing/dynamic registration)
+  const handler = hostHandlers[action]
+    || (window as any).__hostHandlers?.[action];
+  if (!handler) {
+    return {
+      ok: false,
+      error: {
+        message: `No handler registered for "${action}". Register one with registerHostHandler("${action}", async (params) => { ... })`,
+        code: 'ENOHANDLER',
+        category: 'host',
+      },
+    };
+  }
+  try {
+    const value = await handler(params);
+    return { ok: true, value };
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: { message: err.message || String(err), code: 'EHOSTCALL', category: 'host' },
+    };
   }
 }
 

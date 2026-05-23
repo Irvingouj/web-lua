@@ -64,6 +64,26 @@ impl WasmSession {
     pub fn set_fuel_limit(&mut self, limit: i32) {
         self.inner.set_fuel_limit(limit);
     }
+
+    /// Load a Lua library by executing its source code.
+    /// Any globals defined become available to subsequent cells.
+    /// Returns a JSON string with the result.
+    pub fn load_library(&mut self, source: &str) -> String {
+        let result = self.inner.run_cell(source, "");
+        serde_json::to_string(&result).unwrap_or_else(|e| {
+            serde_json::json!({
+                "error": { "kind": "internal", "message": format!("Serialization error: {}", e) },
+                "stdout": [],
+                "stderr": [],
+                "result": null,
+                "commands": [],
+                "fuel_exhausted": false,
+                "execution_count": 0,
+                "status": "done",
+                "pending_command": null
+            }).to_string()
+        })
+    }
 }
 
 impl Default for WasmSession {

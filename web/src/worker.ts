@@ -7,6 +7,10 @@ import type { WorkerRunResult } from './types';
 let session: WasmSession | null = null;
 let initialized = false;
 
+// Custom host.call() handlers registered by the host app.
+// Key is the action name (without "host_" prefix), value is an async function.
+const customHandlers: Record<string, (params: any) => Promise<any>> = {};
+
 async function initWasm() {
   if (initialized) return;
   try {
@@ -37,7 +41,8 @@ export type WorkerMessage =
   | { type: 'stop' }
   | { type: 'setFuelLimit'; limit: number }
   | { type: 'asyncRelayResult'; id: string; result: string }
-  | { type: 'setTestChromeApis'; apis: any };
+  | { type: 'setTestChromeApis'; apis: any }
+  | { type: 'registerHandler'; action: string };
 
 export type WorkerResponse =
   | { type: 'ready' }
@@ -79,6 +84,11 @@ async function executeCell(id: string, code: string, stdin: string) {
  * Returns an AsyncResponse: { ok: true, value: ... } or { ok: false, error: { message, code, category } }
  */
 async function handleAsyncCommand(command: AsyncCommand): Promise<any> {
+  // Check for host.call() custom handlers first (action starts with "host_")
+  if (command.action.startsWith('host_')) {
+    return handleHostCall(command);
+  }
+
   switch (command.action) {
     case 'fetch': {
       return handleFetch(command.params);
@@ -235,6 +245,14 @@ function handleMainThreadRelay(command: AsyncCommand): Promise<any> {
 function isExtensionContext(): boolean {
   if ((self as any).__testChromeApis) return true;
   return !!(globalThis as any).chrome?.runtime?.id;
+}
+
+/**
+ * Handle host.call() actions by relaying to the main thread.
+ * The main thread has access to the host app's custom handlers.
+ */
+function handleHostCall(command: AsyncCommand): Promise<any> {
+  return handleMainThreadRelay(command);
 }
 
 /**
@@ -412,6 +430,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     case 'setTestChromeApis': {
       // Test-only: inject mock chrome APIs into the worker
       (self as any).__testChromeApis = msg.apis;
+      break;
+    }
+
+    case 'registerHandler': {
+      // Handlers can't be sent via postMessage (functions aren't serializable).
+      // Instead, the host app uses the main thread relay pattern:
+      // Worker sees host_* action → posts asyncRelay to main thread → main thread runs handler → returns result
+      // This message type is reserved for future use with inline handler code.
       break;
     }
   }

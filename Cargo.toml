@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/piccolo-notebook-core",
     "crates/piccolo-notebook-wasm",
+    "crates/notebook-plugin-crypto",
 ]
 exclude = [
     "vendor/piccolo",
