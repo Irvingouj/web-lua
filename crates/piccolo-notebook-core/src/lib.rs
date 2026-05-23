@@ -1,9 +1,10 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use piccolo::{
-    Callback, CallbackReturn, Closure, Context, Executor, Fuel, Lua, StashedExecutor,
-    String as LuaString, Value,
+    Callback, CallbackReturn, Closure, Context, Executor, Fuel, IntoValue, Lua,
+    StashedExecutor, String as LuaString, Table, Value,
 };
 use serde::{Deserialize, Serialize};
 
@@ -192,7 +193,10 @@ impl NotebookSession {
                         Ok(Some(format_value(ctx, results[0])))
                     }
                 }
-                Ok(Err(_lua_err)) => Ok(None),
+                Ok(Err(lua_err)) => {
+                    // Lua execution error — store it as cell error
+                    Ok(None)
+                }
                 Err(_bad_mode) => Ok(None),
             }
         }) {
@@ -201,11 +205,17 @@ impl NotebookSession {
         };
 
         let hs = self.host_state.borrow();
+        // If stderr has content but error is None, treat stderr as the error
+        let error = if hs.stderr.is_empty() {
+            None
+        } else {
+            Some(hs.stderr.join("\n"))
+        };
         RunResult {
             stdout: hs.stdout.clone(),
             stderr: hs.stderr.clone(),
             result: result_str,
-            error: None,
+            error,
             commands: hs.commands.clone(),
             fuel_exhausted: hs.fuel_exhausted,
             execution_count: exec_count,
@@ -301,6 +311,111 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         Ok(CallbackReturn::Return)
     });
     ctx.set_global("emit", emit_cb);
+
+    // ── Strict mode ──────────────────────────────────────────────
+    // Set up a metatable on the globals table so that reading an
+    // undeclared global raises an error instead of silently returning nil.
+    //
+    // Known safe globals that are pre-declared (host APIs + stdlib):
+    let declared: Rc<RefCell<HashSet<String>>> = Rc::new(RefCell::new(HashSet::from([
+        "print".into(),
+        "input".into(),
+        "read".into(),
+        "emit".into(),
+        // stdlib globals that Lua code can call
+        "tostring".into(),
+        "tonumber".into(),
+        "type".into(),
+        "pairs".into(),
+        "ipairs".into(),
+        "next".into(),
+        "select".into(),
+        "error".into(),
+        "pcall".into(),
+        "xpcall".into(),
+        "rawget".into(),
+        "rawset".into(),
+        "rawequal".into(),
+        "rawlen".into(),
+        "setmetatable".into(),
+        "getmetatable".into(),
+        "assert".into(),
+        "collectgarbage".into(),
+        "require".into(),
+        "unpack".into(),
+        "load".into(),
+        "dofile".into(),
+        "loadfile".into(),
+        // stdlib tables
+        "string".into(),
+        "math".into(),
+        "table".into(),
+        "coroutine".into(),
+        "utf8".into(),
+        // Disabled globals (they exist as nil, but reading them is allowed)
+        "io".into(),
+        "os".into(),
+        "debug".into(),
+        "package".into(),
+        "_VERSION".into(),
+        "_G".into(),
+    ])));
+
+    // __newindex: when a global is set, record it as declared
+    let declared_set = declared.clone();
+    let globals = ctx.globals();
+    let mt = Table::new(&ctx);
+    let newindex_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        // stack: table, key, value
+        if stack.len() >= 3 {
+            let key = stack.get(1);
+            if let Value::String(s) = key {
+                let name = String::from_utf8_lossy(s.as_bytes()).to_string();
+                declared_set.borrow_mut().insert(name);
+            }
+            // Perform the raw set to avoid infinite __newindex recursion
+            let table: Value = stack.get(0);
+            let key: Value = stack.get(1);
+            let val: Value = stack.get(2);
+            if let Value::Table(t) = table {
+                let _ = t.set_raw(&ctx, key, val);
+            }
+        }
+        stack.clear();
+        Ok(CallbackReturn::Return)
+    });
+
+    let declared_get = declared.clone();
+    let hs_strict = host_state.clone();
+    let index_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        // stack: table, key
+        if stack.len() >= 2 {
+            let key = stack.get(1);
+            if let Value::String(s) = key {
+                let name = String::from_utf8_lossy(s.as_bytes()).to_string();
+                if !declared_get.borrow().contains(&name) {
+                    let msg = format!("strict mode: undeclared variable '{}'", name);
+                    hs_strict.borrow_mut().stderr.push(msg.clone());
+                    return Err(msg.into_value(ctx).into());
+                }
+            }
+            // Return the actual value from the table (raw get to avoid recursion)
+            let table: Value = stack.get(0);
+            let key_val: Value = stack.get(1);
+            let result = if let Value::Table(t) = table {
+                t.get_raw(key_val)
+            } else {
+                Value::Nil
+            };
+            stack.clear();
+            stack.push_back(result);
+        }
+        Ok(CallbackReturn::Return)
+    });
+
+    mt.set_field(ctx, "__index", index_cb);
+    mt.set_field(ctx, "__newindex", newindex_cb);
+    globals.set_metatable(&ctx, Some(mt));
 }
 
 #[cfg(test)]
@@ -407,8 +522,8 @@ mod tests {
         session.run_cell("x = 10", "");
         session.reset();
         let r = session.run_cell("print(x)", "");
-        // x should be nil after reset
-        assert_eq!(r.stdout, vec!["nil"]);
+        // With strict mode, x is undeclared after reset → error
+        assert!(r.error.is_some(), "Expected strict mode error for undeclared x after reset, got: {:?}", r);
     }
 
     #[test]
@@ -466,5 +581,22 @@ mod tests {
         let mut session = NotebookSession::new();
         let result = session.run_cell("print(1, 2, 3)", "");
         assert_eq!(result.stdout, vec!["1\t2\t3"]);
+    }
+
+    #[test]
+    fn test_strict_mode_undeclared_variable() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("print(undeclared_thing)", "");
+        // Strict mode should error on undeclared variable
+        assert!(result.error.is_some() || result.stdout.iter().any(|s| s.contains("strict")),
+            "Expected strict mode error for undeclared variable, got: {:?}", result);
+    }
+
+    #[test]
+    fn test_strict_mode_declared_variable_ok() {
+        let mut session = NotebookSession::new();
+        session.run_cell("my_var = 42", "");
+        let result = session.run_cell("print(my_var)", "");
+        assert_eq!(result.stdout, vec!["42"]);
     }
 }

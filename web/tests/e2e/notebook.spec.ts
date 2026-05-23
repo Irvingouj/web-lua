@@ -184,11 +184,17 @@ end`;
     // Restart kernel
     await restartKernel(page);
 
-    // x should be nil after restart
+    // Strict mode: x is undeclared after restart, should error
     await setCellCode(page, 0, "print(x)");
     await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "nil");
+    await waitForCellStatus(page, 0, "error");
+
+    // Error could be in the cell-error or cell-output element
+    const cellOutput = getCellOutput(page, 0);
+    const cellError = getCellError(page, 0);
+    const hasStrictError = await cellError.count().then(c => c > 0 && cellError.first().textContent().then(t => /strict|undeclared|error/i.test(t || "")));
+    const hasErrorInOutput = await cellOutput.textContent().then(t => /strict|undeclared|error/i.test(t || ""));
+    expect(hasStrictError || hasErrorInOutput).toBeTruthy();
   });
 
   test("8: clear outputs", async ({ page }) => {
