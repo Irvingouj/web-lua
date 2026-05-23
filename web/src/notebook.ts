@@ -1,8 +1,10 @@
 // Notebook state and logic
 
+export type CellKind = 'code' | 'markdown';
+
 export interface Cell {
   id: string;
-  kind: 'code';
+  kind: CellKind;
   source: string;
   outputs: string[];
   errors: string[];
@@ -19,10 +21,10 @@ export interface Notebook {
   };
 }
 
-export function createCell(source = ''): Cell {
+export function createCell(source = '', kind: CellKind = 'code'): Cell {
   return {
     id: crypto.randomUUID(),
-    kind: 'code',
+    kind,
     source,
     outputs: [],
     errors: [],
@@ -34,7 +36,9 @@ export function createCell(source = ''): Cell {
 export function createNotebook(): Notebook {
   return {
     version: 1,
-    cells: [createCell()],
+    cells: [
+      createCell('print("Hello, Lua! 🌙")'),
+    ],
     metadata: {
       runtime: 'piccolo',
       language: 'lua-like',
@@ -50,6 +54,10 @@ export function deserializeNotebook(json: string): Notebook | null {
   try {
     const obj = JSON.parse(json);
     if (obj.version === 1 && Array.isArray(obj.cells)) {
+      // Ensure every cell has a kind field (backwards compat)
+      for (const cell of obj.cells) {
+        if (!cell.kind) cell.kind = 'code';
+      }
       return obj as Notebook;
     }
     return null;

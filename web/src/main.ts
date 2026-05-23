@@ -1,6 +1,7 @@
 import './styles.css';
-import { Cell, Notebook, createCell, createNotebook, serializeNotebook, deserializeNotebook } from './notebook';
+import { Cell, CellKind, Notebook, createCell, createNotebook, serializeNotebook, deserializeNotebook } from './notebook';
 import type { WorkerRunResult, CellError } from './types';
+import { marked } from 'marked';
 
 // ─── IndexedDB Auto-Save ────────────────────────────────────────
 const DB_NAME = 'web-lua-notebook';
@@ -300,8 +301,8 @@ function clearOutputs() {
   renderCells();
 }
 
-function addCell(afterId?: string) {
-  const cell = createCell();
+function addCell(afterId?: string, kind: CellKind = 'code') {
+  const cell = createCell('', kind);
   if (afterId) {
     const idx = notebook.cells.findIndex(c => c.id === afterId);
     notebook.cells.splice(idx + 1, 0, cell);
@@ -329,6 +330,21 @@ function moveCell(cellId: string, direction: 'up' | 'down') {
   if (newIdx < 0 || newIdx >= notebook.cells.length) return;
   [notebook.cells[idx], notebook.cells[newIdx]] = [notebook.cells[newIdx], notebook.cells[idx]];
   renderCells();
+}
+
+function toggleCellKind(cellId: string) {
+  const cell = notebook.cells.find(c => c.id === cellId);
+  if (!cell) return;
+  cell.kind = cell.kind === 'code' ? 'markdown' : 'code';
+  cell.outputs = [];
+  cell.errors = [];
+  cell.executionCount = null;
+  cell.status = 'idle';
+  renderCells();
+  setTimeout(() => {
+    const editor = document.getElementById(`editor-${cell.id}`) as HTMLTextAreaElement;
+    editor?.focus();
+  }, 50);
 }
 
 function saveNotebook() {
@@ -372,62 +388,118 @@ function renderCells() {
 
   notebook.cells.forEach((cell, idx) => {
     const el = document.createElement('div');
-    el.className = `cell cell-${cell.status}`;
+    el.className = `cell cell-${cell.kind} cell-${cell.status}`;
     el.dataset.cellId = cell.id;
     el.dataset.testid = 'cell';
 
-    const execLabel = cell.executionCount !== null ? `In [${cell.executionCount}]` : `In [ ]`;
-    const statusClass = `status-${cell.status}`;
-    const statusText = cell.status;
-
-    el.innerHTML = `
-      <div class="cell-rail"></div>
-      <div class="cell-header">
-        <span class="exec-label" data-testid="cell-execution-count">${execLabel}</span>
-        <span class="cell-status ${statusClass}" data-testid="cell-status">${statusText}</span>
-        <div class="cell-actions">
-          <button class="btn btn-sm btn-exec" data-action="run" data-testid="cell-run-button" data-cell-id="${cell.id}" title="Run cell (Ctrl+Enter)">▶ Run</button>
-          <button class="btn btn-sm" data-action="add" data-cell-id="${cell.id}" title="Add cell below">+ Add</button>
-          <button class="btn btn-sm" data-action="up" data-testid="cell-move-up-button" data-cell-id="${cell.id}" title="Move up" ${idx === 0 ? 'disabled' : ''}>↑</button>
-          <button class="btn btn-sm" data-action="down" data-testid="cell-move-down-button" data-cell-id="${cell.id}" title="Move down" ${idx === notebook.cells.length - 1 ? 'disabled' : ''}>↓</button>
-          <button class="btn btn-sm btn-danger" data-action="delete" data-testid="cell-delete-button" data-cell-id="${cell.id}" title="Delete cell" ${notebook.cells.length <= 1 ? 'disabled' : ''}>✕</button>
-        </div>
-      </div>
-      <div class="cell-body">
-        <textarea class="cell-editor" data-testid="cell-editor" id="editor-${cell.id}" spellcheck="false" placeholder="Enter Lua code here...">${escapeHtml(cell.source)}</textarea>
-      </div>
-      <div class="cell-outputs" data-testid="cell-output" id="outputs-${cell.id}">
-        ${cell.outputs.map(o => `<div class="output-line" data-testid="cell-output-line">${escapeHtml(o)}</div>`).join('')}
-        ${cell.errors.map(e => `<div class="output-error" data-testid="cell-error">${escapeHtml(e)}</div>`).join('')}
-      </div>
-    `;
+    if (cell.kind === 'markdown') {
+      renderMarkdownCell(el, cell, idx);
+    } else {
+      renderCodeCell(el, cell, idx);
+    }
 
     container.appendChild(el);
+  });
+}
 
-    // Wire up the textarea to update cell.source
-    const textarea = el.querySelector(`#editor-${cell.id}`) as HTMLTextAreaElement;
-    textarea.addEventListener('input', () => {
+function renderCodeCell(el: HTMLDivElement, cell: Cell, idx: number) {
+  const execLabel = cell.executionCount !== null ? `In [${cell.executionCount}]` : `In [ ]`;
+  const statusClass = `status-${cell.status}`;
+  const statusText = cell.status;
+
+  el.innerHTML = `
+    <div class="cell-rail"></div>
+    <div class="cell-header">
+      <span class="exec-label" data-testid="cell-execution-count">${execLabel}</span>
+      <span class="cell-kind-badge cell-kind-code">Lua</span>
+      <span class="cell-status ${statusClass}" data-testid="cell-status">${statusText}</span>
+      <div class="cell-actions">
+        <button class="btn btn-sm btn-exec" data-action="run" data-testid="cell-run-button" data-cell-id="${cell.id}" title="Run cell (Ctrl+Enter)">▶ Run</button>
+        <button class="btn btn-sm" data-action="toggleKind" data-cell-id="${cell.id}" title="Convert to markdown cell">MD</button>
+        <button class="btn btn-sm" data-action="add" data-cell-id="${cell.id}" title="Add cell below">+</button>
+        <button class="btn btn-sm" data-action="up" data-testid="cell-move-up-button" data-cell-id="${cell.id}" title="Move up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn btn-sm" data-action="down" data-testid="cell-move-down-button" data-cell-id="${cell.id}" title="Move down" ${idx === notebook.cells.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="btn btn-sm btn-danger" data-action="delete" data-testid="cell-delete-button" data-cell-id="${cell.id}" title="Delete cell" ${notebook.cells.length <= 1 ? 'disabled' : ''}>✕</button>
+      </div>
+    </div>
+    <div class="cell-body">
+      <textarea class="cell-editor" data-testid="cell-editor" id="editor-${cell.id}" spellcheck="false" placeholder="Enter Lua code here...">${escapeHtml(cell.source)}</textarea>
+    </div>
+    <div class="cell-outputs" data-testid="cell-output" id="outputs-${cell.id}">
+      ${cell.outputs.map(o => `<div class="output-line" data-testid="cell-output-line">${escapeHtml(o)}</div>`).join('')}
+      ${cell.errors.map(e => `<div class="output-error" data-testid="cell-error">${escapeHtml(e)}</div>`).join('')}
+    </div>
+  `;
+
+  wireTextarea(el, cell);
+}
+
+function renderMarkdownCell(el: HTMLDivElement, cell: Cell, idx: number) {
+  const isEditing = el.classList.contains('md-editing');
+  const renderedHtml = marked.parse(cell.source || '', { async: false }) as string;
+
+  el.innerHTML = `
+    <div class="cell-rail"></div>
+    <div class="cell-header">
+      <span class="cell-kind-badge cell-kind-md">MD</span>
+      <div class="cell-actions">
+        <button class="btn btn-sm" data-action="toggleEdit" data-cell-id="${cell.id}" title="${isEditing ? 'Render markdown' : 'Edit markdown'}">${isEditing ? '✓ Done' : '✎ Edit'}</button>
+        <button class="btn btn-sm" data-action="toggleKind" data-cell-id="${cell.id}" title="Convert to code cell">Lua</button>
+        <button class="btn btn-sm" data-action="add" data-cell-id="${cell.id}" title="Add cell below">+</button>
+        <button class="btn btn-sm" data-action="up" data-testid="cell-move-up-button" data-cell-id="${cell.id}" title="Move up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn btn-sm" data-action="down" data-testid="cell-move-down-button" data-cell-id="${cell.id}" title="Move down" ${idx === notebook.cells.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="btn btn-sm btn-danger" data-action="delete" data-testid="cell-delete-button" data-cell-id="${cell.id}" title="Delete cell" ${notebook.cells.length <= 1 ? 'disabled' : ''}>✕</button>
+      </div>
+    </div>
+    <div class="cell-body">
+      ${isEditing
+        ? `<textarea class="cell-editor" data-testid="cell-editor" id="editor-${cell.id}" spellcheck="false" placeholder="Write markdown here...">${escapeHtml(cell.source)}</textarea>`
+        : `<div class="md-preview" data-testid="md-preview" id="md-preview-${cell.id}">${renderedHtml}</div>`
+      }
+    </div>
+  `;
+
+  if (isEditing) {
+    wireTextarea(el, cell);
+  }
+}
+
+function wireTextarea(el: HTMLDivElement, cell: Cell) {
+  const textarea = el.querySelector(`#editor-${cell.id}`) as HTMLTextAreaElement;
+  if (!textarea) return;
+
+  textarea.addEventListener('input', () => {
+    cell.source = textarea.value;
+  });
+
+  textarea.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      textarea.value = textarea.value.substring(0, start) + '  ' + textarea.value.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + 2;
       cell.source = textarea.value;
-    });
-
-    // Tab key inserts tab
-    textarea.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        textarea.value = textarea.value.substring(0, start) + '  ' + textarea.value.substring(end);
-        textarea.selectionStart = textarea.selectionEnd = start + 2;
-        cell.source = textarea.value;
-      }
-      // Ctrl+Enter runs the cell
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        // Save source first
-        cell.source = textarea.value;
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      cell.source = textarea.value;
+      if (cell.kind === 'code') {
         runSingleCell(cell.id);
+      } else {
+        // Markdown: render (exit edit mode)
+        const cellEl = textarea.closest('.cell') as HTMLDivElement;
+        cellEl.classList.remove('md-editing');
+        renderCells();
       }
-    });
+    }
+    // Escape exits markdown editing
+    if (e.key === 'Escape' && cell.kind === 'markdown') {
+      cell.source = textarea.value;
+      const cellEl = textarea.closest('.cell') as HTMLDivElement;
+      cellEl.classList.remove('md-editing');
+      renderCells();
+    }
   });
 }
 
@@ -571,7 +643,8 @@ async function init() {
   });
 
   // Toolbar buttons
-  document.getElementById('btn-add-cell')!.addEventListener('click', () => addCell());
+  document.getElementById('btn-add-cell')!.addEventListener('click', () => addCell(undefined, 'code'));
+  document.getElementById('btn-add-md')!.addEventListener('click', () => addCell(undefined, 'markdown'));
   document.getElementById('btn-run-all')!.addEventListener('click', runAllCells);
   document.getElementById('btn-stop')!.addEventListener('click', stopExecution);
   document.getElementById('btn-restart')!.addEventListener('click', restartKernel);
@@ -594,11 +667,29 @@ async function init() {
 
     switch (action) {
       case 'run': runSingleCell(cellId); break;
-      case 'add': addCell(cellId); break;
+      case 'add': addCell(cellId, 'code'); break;
       case 'up': moveCell(cellId, 'up'); break;
       case 'down': moveCell(cellId, 'down'); break;
       case 'delete': deleteCell(cellId); break;
+      case 'toggleKind': toggleCellKind(cellId); break;
+      case 'toggleEdit': {
+        const cellEl = target.closest('.cell') as HTMLDivElement;
+        cellEl.classList.toggle('md-editing');
+        renderCells();
+        break;
+      }
     }
+  });
+
+  // Double-click markdown preview to edit
+  document.getElementById('cells-container')!.addEventListener('dblclick', (e: Event) => {
+    const target = e.target as HTMLElement;
+    const preview = target.closest('.md-preview') as HTMLElement | null;
+    if (!preview) return;
+    const cellEl = preview.closest('.cell') as HTMLDivElement;
+    if (!cellEl) return;
+    cellEl.classList.add('md-editing');
+    renderCells();
   });
 
   // Auto-load from IndexedDB

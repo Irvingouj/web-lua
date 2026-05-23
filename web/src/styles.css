@@ -479,6 +479,180 @@ body {
   border-top-color: rgba(255,255,255,0.03);
 }
 
+/* ─── Cell kind badge ────────────────────────────────────────── */
+.cell-kind-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+
+.cell-kind-code {
+  background: var(--lua-blue-50);
+  color: var(--lua-blue-900);
+}
+
+.cell-kind-md {
+  background: var(--exec-bg);
+  color: var(--exec-accent);
+}
+
+[data-theme="dark"] .cell-kind-code {
+  background: var(--lua-blue-100);
+  color: var(--lua-blue-900);
+}
+
+/* ─── Markdown preview ──────────────────────────────────────── */
+.md-preview {
+  padding: 16px 20px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-main);
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.md-preview:empty::before {
+  content: 'Double-click to edit markdown…';
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Markdown typography */
+.md-preview h1 {
+  font-size: 1.75em;
+  font-weight: 700;
+  margin: 0.6em 0 0.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-main);
+}
+
+.md-preview h2 {
+  font-size: 1.4em;
+  font-weight: 600;
+  margin: 0.5em 0 0.3em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+.md-preview h3 {
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 0.4em 0 0.2em;
+  color: var(--text-main);
+}
+
+.md-preview h4, .md-preview h5, .md-preview h6 {
+  font-weight: 600;
+  margin: 0.4em 0 0.2em;
+  color: var(--text-secondary);
+}
+
+.md-preview p {
+  margin: 0.5em 0;
+}
+
+.md-preview ul, .md-preview ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.md-preview li {
+  margin: 0.2em 0;
+}
+
+.md-preview strong {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.md-preview em {
+  font-style: italic;
+}
+
+.md-preview a {
+  color: var(--lua-blue-900);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.md-preview a:hover {
+  border-bottom-color: var(--lua-blue-900);
+}
+
+.md-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--bg-output);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+
+.md-preview pre {
+  background: var(--bg-output);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.md-preview pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.md-preview blockquote {
+  border-left: 4px solid var(--lua-blue-900);
+  margin: 0.6em 0;
+  padding: 0.3em 1em;
+  color: var(--text-secondary);
+  background: var(--lua-blue-50);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.md-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1em 0;
+}
+
+.md-preview img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.md-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em 0;
+}
+
+.md-preview th, .md-preview td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.md-preview th {
+  background: var(--bg-output);
+  font-weight: 600;
+}
+
+/* Markdown cell editing mode indicator */
+.cell-markdown.md-editing .cell-editor {
+  min-height: 100px;
+}
+
 /* ─── Footer ─────────────────────────────────────────────────── */
 .footer {
   margin-top: 24px;
