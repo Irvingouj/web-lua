@@ -193,6 +193,10 @@ See `docs/architecture.md` for full details.
   build-wasm.sh             # WASM build script
 ```
 
+## Credits
+
+- **[piccolo](https://github.com/kyren/piccolo)** by kyren — the pure Rust Lua VM that powers this notebook. An incredible piece of work: stackless execution, gc-arena based garbage collector, built-in fuel system, zero C dependencies. This project would not exist without it.
+
 ## License
 
 The piccolo notebook code is MIT licensed. The vendored piccolo runtime is MIT/CC0 licensed (see `vendor/piccolo/LICENSE-MIT` and `vendor/piccolo/LICENSE-CC0`).
