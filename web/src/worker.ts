@@ -8,11 +8,16 @@ let initialized = false;
 
 async function initWasm() {
   if (initialized) return;
-  // Resolve WASM path relative to the pkg directory
-  const wasmUrl = new URL('../pkg/piccolo_notebook_bg.wasm', import.meta.url);
-  await init(wasmUrl);
-  session = new WasmSession();
-  initialized = true;
+  try {
+    // Use the async init — it resolves the WASM URL relative to the JS module
+    await init();
+    session = new WasmSession();
+    initialized = true;
+    console.log('[worker] WASM initialized successfully');
+  } catch (e: any) {
+    console.error('[worker] WASM init failed:', e);
+    throw e;
+  }
 }
 
 // Initialize on load
@@ -21,7 +26,8 @@ initWasm()
     self.postMessage({ type: 'ready' });
   })
   .catch((err: Error) => {
-    self.postMessage({ type: 'error', error: err.message });
+    console.error('[worker] Top-level init error:', err);
+    self.postMessage({ type: 'error', error: 'WASM init failed: ' + err.message });
   });
 
 export type WorkerMessage =

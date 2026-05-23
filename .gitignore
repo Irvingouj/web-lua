@@ -4,3 +4,6 @@
 *.swp
 .DS_Store
 legacy-mlua-playground/node_modules
+web/test-results/
+web/playwright-report/
+web/.nyc_output/

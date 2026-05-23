@@ -62,6 +62,19 @@ export PATH="$(rustup which cargo | xargs dirname):$PATH"
 cargo test -p piccolo-notebook-core
 ```
 
+### Run E2E Browser Tests
+
+```bash
+cd web
+npx playwright install    # First time only
+npm run test:e2e
+```
+
+Headed mode (see the browser):
+```bash
+npm run test:e2e:headed
+```
+
 ## Dev Commands Quick Reference
 
 | Command | Description |
@@ -69,6 +82,8 @@ cargo test -p piccolo-notebook-core
 | `./build-wasm.sh` | Build WASM + JS bindings |
 | `cd web && npm run dev` | Start dev server |
 | `cargo test -p piccolo-notebook-core` | Run core tests |
+| `cd web && npm run test:e2e` | Run Playwright E2E tests |
+| `cd web && npm run test:e2e:headed` | Run E2E tests with visible browser |
 
 ## Supported Lua Subset
 

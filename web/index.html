@@ -7,23 +7,23 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧡</text></svg>">
 </head>
 <body>
-  <div id="app">
+  <div id="app" data-testid="app-root">
     <div class="header">
       <h1>🧡 Piccolo Notebook</h1>
-      <span id="kernel-status" class="kernel-status kernel-stopped">Kernel: stopped</span>
+      <span id="kernel-status" data-testid="kernel-status" class="kernel-status kernel-stopped">Kernel: stopped</span>
     </div>
 
     <div class="toolbar">
-      <button class="btn btn-run" id="btn-run-all" title="Run all cells">▶ Run All</button>
-      <button class="btn" id="btn-add-cell" title="Add new cell">+ Cell</button>
-      <button class="btn btn-danger" id="btn-stop" title="Stop execution">⏹ Stop</button>
-      <button class="btn" id="btn-restart" title="Restart kernel">🔄 Restart Kernel</button>
-      <button class="btn" id="btn-clear" title="Clear all outputs">🧹 Clear Outputs</button>
-      <button class="btn" id="btn-save" title="Save notebook">💾 Save</button>
-      <button class="btn" id="btn-load" title="Load notebook">📂 Load</button>
+      <button class="btn btn-run" id="btn-run-all" data-testid="run-all-button" title="Run all cells">▶ Run All</button>
+      <button class="btn" id="btn-add-cell" data-testid="add-cell-button" title="Add new cell">+ Cell</button>
+      <button class="btn btn-danger" id="btn-stop" data-testid="stop-button" title="Stop execution">⏹ Stop</button>
+      <button class="btn" id="btn-restart" data-testid="restart-kernel-button" title="Restart kernel">🔄 Restart Kernel</button>
+      <button class="btn" id="btn-clear" data-testid="clear-outputs-button" title="Clear all outputs">🧹 Clear Outputs</button>
+      <button class="btn" id="btn-save" data-testid="save-button" title="Save notebook">💾 Save</button>
+      <button class="btn" id="btn-load" data-testid="load-button" title="Load notebook">📂 Load</button>
     </div>
 
-    <div id="cells-container"></div>
+    <div id="cells-container" data-testid="cells-container"></div>
 
     <div class="footer">
       Piccolo Notebook — Lua-like scripting in the browser • Powered by <a href="https://github.com/kyren/piccolo" target="_blank" style="color:var(--accent)">piccolo</a>

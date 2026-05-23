@@ -10,39 +10,58 @@ let runAllQueue: string[] = [];
 let globalExecutionCount = 0;
 
 // ─── Worker Management ──────────────────────────────────────────
-function createWorker(): Worker {
-  const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-  w.onmessage = (e: MessageEvent) => {
-    const msg = e.data;
-    switch (msg.type) {
-      case 'ready':
+function createWorker(): Promise<Worker> {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+    const readyHandler = (e: MessageEvent) => {
+      const msg = e.data;
+      if (msg.type === 'ready') {
+        w.removeEventListener('message', readyHandler);
         setKernelStatus('ready');
-        break;
-      case 'result':
-        handleCellResult(msg.id, msg.data);
-        break;
-      case 'error':
-        handleKernelError(msg.error);
-        break;
-      case 'resetDone':
-        setKernelStatus('ready');
-        break;
-      case 'stopped':
-        setKernelStatus('stopped');
-        break;
-    }
-  };
-  w.onerror = (e: ErrorEvent) => {
-    handleKernelError(e.message);
-  };
-  return w;
+        resolve(w);
+      } else if (msg.type === 'error') {
+        w.removeEventListener('message', readyHandler);
+        reject(new Error(msg.error));
+      }
+    };
+    w.addEventListener('message', readyHandler);
+    w.onerror = (e: ErrorEvent) => {
+      reject(new Error(e.message));
+    };
+  });
 }
 
-function ensureWorker(): Worker {
-  if (!worker) {
-    worker = createWorker();
+let workerReady: Promise<Worker> | null = null;
+
+async function ensureWorker(): Promise<Worker> {
+  if (!workerReady) {
+    workerReady = createWorker().then(w => {
+      // Set up the permanent message handler
+      w.onmessage = (e: MessageEvent) => {
+        const msg = e.data;
+        switch (msg.type) {
+          case 'result':
+            handleCellResult(msg.id, msg.data);
+            break;
+          case 'error':
+            handleKernelError(msg.error);
+            break;
+          case 'resetDone':
+            setKernelStatus('ready');
+            break;
+          case 'stopped':
+            setKernelStatus('stopped');
+            break;
+        }
+      };
+      w.onerror = (e: ErrorEvent) => {
+        handleKernelError(e.message);
+      };
+      worker = w;
+      return w;
+    });
   }
-  return worker;
+  return workerReady;
 }
 
 function terminateWorker() {
@@ -50,6 +69,7 @@ function terminateWorker() {
     worker.terminate();
     worker = null;
   }
+  workerReady = null;
   setKernelStatus('stopped');
 }
 
@@ -106,7 +126,7 @@ function handleKernelError(error: string) {
 }
 
 // ─── Actions ────────────────────────────────────────────────────
-function runSingleCell(cellId: string) {
+async function runSingleCell(cellId: string) {
   const cell = notebook.cells.find(c => c.id === cellId);
   if (!cell) return;
 
@@ -117,9 +137,13 @@ function runSingleCell(cellId: string) {
   renderCells();
   setKernelStatus('running');
 
-  const stdin = (document.getElementById(`stdin-${cellId}`) as HTMLTextAreaElement)?.value || '';
-  const w = ensureWorker();
-  w.postMessage({ type: 'runCell', id: cellId, code: cell.source, stdin });
+  try {
+    const w = await ensureWorker();
+    const stdin = (document.getElementById(`stdin-${cellId}`) as HTMLTextAreaElement)?.value || '';
+    w.postMessage({ type: 'runCell', id: cellId, code: cell.source, stdin });
+  } catch (err: any) {
+    handleKernelError(err.message || String(err));
+  }
 }
 
 function runAllCells() {
@@ -149,6 +173,7 @@ function restartKernel() {
   runAllQueue = [];
   pendingCellId = null;
   globalExecutionCount = 0;
+  workerReady = null;
   // Clear execution counts but keep source code
   notebook.cells.forEach(c => {
     c.executionCount = null;
@@ -157,7 +182,8 @@ function restartKernel() {
     c.errors = [];
   });
   renderCells();
-  worker = createWorker();
+  // Pre-create the worker so kernel becomes ready
+  ensureWorker();
 }
 
 function clearOutputs() {
@@ -242,6 +268,7 @@ function renderCells() {
     const el = document.createElement('div');
     el.className = `cell cell-${cell.status}`;
     el.dataset.cellId = cell.id;
+    el.dataset.testid = 'cell';
 
     const execLabel = cell.executionCount !== null ? `In [${cell.executionCount}]` : `In [ ]`;
     const statusClass = `status-${cell.status}`;
@@ -249,22 +276,22 @@ function renderCells() {
 
     el.innerHTML = `
       <div class="cell-header">
-        <span class="exec-label">${execLabel}</span>
-        <span class="cell-status ${statusClass}">${statusText}</span>
+        <span class="exec-label" data-testid="cell-execution-count">${execLabel}</span>
+        <span class="cell-status ${statusClass}" data-testid="cell-status">${statusText}</span>
         <div class="cell-actions">
-          <button class="btn btn-run" data-action="run" data-cell-id="${cell.id}" title="Run cell (Ctrl+Enter)">▶ Run</button>
+          <button class="btn btn-run" data-action="run" data-testid="cell-run-button" data-cell-id="${cell.id}" title="Run cell (Ctrl+Enter)">▶ Run</button>
           <button class="btn btn-sm" data-action="add" data-cell-id="${cell.id}" title="Add cell below">+ Add</button>
-          <button class="btn btn-sm" data-action="up" data-cell-id="${cell.id}" title="Move up" ${idx === 0 ? 'disabled' : ''}>↑</button>
-          <button class="btn btn-sm" data-action="down" data-cell-id="${cell.id}" title="Move down" ${idx === notebook.cells.length - 1 ? 'disabled' : ''}>↓</button>
-          <button class="btn btn-sm btn-danger" data-action="delete" data-cell-id="${cell.id}" title="Delete cell" ${notebook.cells.length <= 1 ? 'disabled' : ''}>✕</button>
+          <button class="btn btn-sm" data-action="up" data-testid="cell-move-up-button" data-cell-id="${cell.id}" title="Move up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+          <button class="btn btn-sm" data-action="down" data-testid="cell-move-down-button" data-cell-id="${cell.id}" title="Move down" ${idx === notebook.cells.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-testid="cell-delete-button" data-cell-id="${cell.id}" title="Delete cell" ${notebook.cells.length <= 1 ? 'disabled' : ''}>✕</button>
         </div>
       </div>
       <div class="cell-body">
-        <textarea class="cell-editor" id="editor-${cell.id}" spellcheck="false" placeholder="Enter Lua code here...">${escapeHtml(cell.source)}</textarea>
+        <textarea class="cell-editor" data-testid="cell-editor" id="editor-${cell.id}" spellcheck="false" placeholder="Enter Lua code here...">${escapeHtml(cell.source)}</textarea>
       </div>
-      <div class="cell-outputs" id="outputs-${cell.id}">
-        ${cell.outputs.map(o => `<div class="output-line">${escapeHtml(o)}</div>`).join('')}
-        ${cell.errors.map(e => `<div class="output-error">${escapeHtml(e)}</div>`).join('')}
+      <div class="cell-outputs" data-testid="cell-output" id="outputs-${cell.id}">
+        ${cell.outputs.map(o => `<div class="output-line" data-testid="cell-output-line">${escapeHtml(o)}</div>`).join('')}
+        ${cell.errors.map(e => `<div class="output-error" data-testid="cell-error">${escapeHtml(e)}</div>`).join('')}
       </div>
     `;
 
@@ -308,7 +335,7 @@ function escapeHtml(s: string): string {
 }
 
 // ─── Event Wiring ───────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
   // Toolbar buttons
   document.getElementById('btn-add-cell')!.addEventListener('click', () => addCell());
   document.getElementById('btn-run-all')!.addEventListener('click', runAllCells);
@@ -343,4 +370,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial render
   renderCells();
   updateKernelStatusUI();
-});
+}
+
+// Use DOMContentLoaded if document not yet ready, otherwise init immediately
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
