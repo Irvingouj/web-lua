@@ -1,0 +1,11 @@
+                        (Some(high), Some(low)) => {
+                        let high_bytes = high.to_ne_bytes();
+                        let low_bytes = low.to_ne_bytes();
+                        let seed: [u8; 16] = core::array::from_fn(|idx| {
+                            if idx < 8 {
+                                high_bytes[idx]
+                            } else {
+                                low_bytes[idx - 8]
+                            }
+                        });
+                        *rng.borrow_mut() = SmallRng::from_seed(seed);

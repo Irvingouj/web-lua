@@ -1,0 +1,10 @@
+[package]
+name = "piccolo-notebook-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+piccolo.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+getrandom.workspace = true

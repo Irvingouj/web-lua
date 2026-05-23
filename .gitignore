@@ -1,6 +1,6 @@
-node_modules/
-dist/
-rust/target/
-*.wasm
-!public/build/lua_wasm.wasm
+/target
+/web/node_modules
+/web/pkg
+*.swp
 .DS_Store
+legacy-mlua-playground/node_modules
