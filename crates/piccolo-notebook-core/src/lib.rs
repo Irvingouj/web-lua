@@ -4,7 +4,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use piccolo::{
-    Callback, CallbackReturn, Closure, Context, Executor, Fuel, IntoValue, Lua,
+    Callback, CallbackReturn, Closure, Context, Executor, ExecutorMode, Fuel, IntoValue, Lua,
     StashedExecutor, String as LuaString, Table, Value,
 };
 use serde::{Deserialize, Serialize};
@@ -58,6 +58,39 @@ impl fmt::Display for CellError {
     }
 }
 
+/// Status of a cell execution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub enum CellStatus {
+    Done,
+    AsyncPending,
+}
+
+/// An async command yielded from Lua, waiting for external resolution.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct AsyncCommand {
+    pub call_id: u32,
+    pub action: String,
+    #[ts(type = "any")]
+    pub params: serde_json::Value,
+}
+
+/// Response to an async command, passed to resume_cell.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AsyncResponse {
+    pub ok: bool,
+    pub value: Option<serde_json::Value>,
+    pub error: Option<AsyncError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AsyncError {
+    pub message: String,
+    pub code: String,
+}
+
 /// Result of running a single cell.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export_to = "web/src/types/generated.ts")]
@@ -70,6 +103,8 @@ pub struct RunResult {
     pub commands: Vec<serde_json::Value>,
     pub fuel_exhausted: bool,
     pub execution_count: u32,
+    pub status: CellStatus,
+    pub pending_command: Option<AsyncCommand>,
 }
 
 impl RunResult {
@@ -88,6 +123,8 @@ impl RunResult {
             commands,
             fuel_exhausted,
             execution_count,
+            status: CellStatus::Done,
+            pending_command: None,
         }
     }
 
@@ -100,6 +137,8 @@ impl RunResult {
             commands: vec![],
             fuel_exhausted: false,
             execution_count,
+            status: CellStatus::Done,
+            pending_command: None,
         }
     }
 
@@ -119,6 +158,26 @@ impl RunResult {
             commands,
             fuel_exhausted,
             execution_count,
+            status: CellStatus::Done,
+            pending_command: None,
+        }
+    }
+
+    fn async_pending(
+        stdout: Vec<String>,
+        command: AsyncCommand,
+        execution_count: u32,
+    ) -> Self {
+        Self {
+            stdout,
+            stderr: vec![],
+            result: None,
+            error: None,
+            commands: vec![],
+            fuel_exhausted: false,
+            execution_count,
+            status: CellStatus::AsyncPending,
+            pending_command: Some(command),
         }
     }
 }
@@ -136,6 +195,10 @@ struct HostState {
     fuel_exhausted: bool,
     /// Dedicated channel for cell errors from Lua callbacks (e.g. strict mode).
     cell_errors: Vec<CellError>,
+    /// When a callback yields for async, it stores the command here.
+    pending_async_command: Option<AsyncCommand>,
+    /// Monotonic counter for async call IDs.
+    async_call_counter: u32,
 }
 
 // ─── NotebookSession ────────────────────────────────────────────
@@ -282,6 +345,19 @@ impl NotebookSession {
             };
 
             if done {
+                // Check if this is a yield or real completion
+                // A callback can yield by returning CallbackReturn::Yield.
+                // Check for a pending async command to distinguish yield from normal completion.
+                let _mode = self.lua.try_enter(|ctx| {
+                    Ok(ctx.fetch(executor_ref).mode())
+                }).unwrap_or(ExecutorMode::Stopped);
+                let has_pending = self.host_state.borrow().pending_async_command.is_some();
+                if has_pending {
+                    let mut hs = self.host_state.borrow_mut();
+                    let cmd = hs.pending_async_command.take().unwrap();
+                    let stdout_so_far = hs.stdout.clone();
+                    return RunResult::async_pending(stdout_so_far, cmd, exec_count);
+                }
                 break;
             }
 
@@ -329,6 +405,173 @@ impl NotebookSession {
             commands: hs.commands.clone(),
             fuel_exhausted: hs.fuel_exhausted,
             execution_count: exec_count,
+            status: CellStatus::Done,
+            pending_command: None,
+        }
+    }
+
+    /// Resume a yielded cell with an async response.
+    pub fn resume_cell(&mut self, result_json: &str) -> RunResult {
+        let exec_count = self.execution_count;
+        let executor_ref = match self.executor.as_ref() {
+            Some(e) => e,
+            None => {
+                return RunResult::err(
+                    CellError::Internal {
+                        message: "No active executor to resume".into(),
+                    },
+                    exec_count,
+                );
+            }
+        };
+
+        // Parse the async response
+        let response: AsyncResponse = match serde_json::from_str(result_json) {
+            Ok(r) => r,
+            Err(e) => {
+                return RunResult::err(
+                    CellError::Internal {
+                        message: format!("Invalid async response JSON: {}", e),
+                    },
+                    exec_count,
+                );
+            }
+        };
+
+        // Clear the pending command
+        self.host_state.borrow_mut().pending_async_command = None;
+
+        // First, take_result to clear the Result mode → Suspended mode
+        self.lua.enter(|ctx| {
+            let exec = ctx.fetch(executor_ref);
+            let _ = exec.take_result::<Vec<Value>>(ctx);
+        });
+
+        // Now resume the executor (it's in Suspended mode)
+        let resume_result = if response.ok {
+            // Resume with value
+            self.lua.try_enter(|ctx| {
+                let exec = ctx.fetch(executor_ref);
+                let val = json_value_to_lua(ctx, response.value.as_ref().unwrap_or(&serde_json::Value::Null));
+                Ok(exec.resume(ctx, val)?)
+            })
+        } else {
+            // Resume with error
+            self.lua.enter(|ctx| {
+                let exec = ctx.fetch(executor_ref);
+                let err_msg = response.error.as_ref()
+                    .map(|e| e.message.clone())
+                    .unwrap_or_else(|| "unknown async error".into());
+                exec.resume_err(&*ctx, err_msg.into_value(ctx).into()).unwrap();
+            });
+            Ok(())
+        };
+
+        if let Err(bad_mode) = resume_result {
+            return RunResult::err(
+                CellError::Internal {
+                    message: format!("Failed to resume executor: {:?}", bad_mode),
+                },
+                exec_count,
+            );
+        }
+
+        // Continue the fuel loop (same as run_cell Phase 2)
+        loop {
+            let mut fuel = Fuel::with(self.fuel_limit);
+            let done = match self.lua.try_enter(|ctx| {
+                Ok(ctx.fetch(executor_ref).step(ctx, &mut fuel))
+            }) {
+                Ok(Ok(d)) => d,
+                Ok(Err(bad_thread)) => {
+                    let hs = self.host_state.borrow();
+                    return RunResult::with_partial_output(
+                        hs.stdout.clone(),
+                        hs.stderr.clone(),
+                        hs.commands.clone(),
+                        CellError::Internal {
+                            message: format!("{}", bad_thread),
+                        },
+                        false,
+                        exec_count,
+                    );
+                }
+                Err(extern_error) => {
+                    let hs = self.host_state.borrow();
+                    if let Some(cell_err) = hs.cell_errors.first().cloned() {
+                        return RunResult::with_partial_output(
+                            hs.stdout.clone(),
+                            hs.stderr.clone(),
+                            hs.commands.clone(),
+                            cell_err,
+                            false,
+                            exec_count,
+                        );
+                    }
+                    return RunResult::with_partial_output(
+                        hs.stdout.clone(),
+                        hs.stderr.clone(),
+                        hs.commands.clone(),
+                        classify_extern_error(&extern_error),
+                        false,
+                        exec_count,
+                    );
+                }
+            };
+
+            if done {
+                // Check for pending async command (yield)
+                let has_pending = self.host_state.borrow().pending_async_command.is_some();
+                if has_pending {
+                    let mut hs = self.host_state.borrow_mut();
+                    let cmd = hs.pending_async_command.take().unwrap();
+                    let stdout_so_far = hs.stdout.clone();
+                    return RunResult::async_pending(stdout_so_far, cmd, exec_count);
+                }
+                break;
+            }
+
+            if !fuel.should_continue() {
+                self.host_state.borrow_mut().fuel_exhausted = true;
+                break;
+            }
+        }
+
+        // Build final result
+        let result_str = self.lua.try_enter(|ctx| {
+            let exec = ctx.fetch(executor_ref);
+            match exec.take_result::<Vec<Value>>(ctx) {
+                Ok(Ok(results)) => {
+                    if results.is_empty() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(format_value(ctx, results[0])))
+                    }
+                }
+                Ok(Err(_lua_err)) => Ok(None),
+                Err(_bad_mode) => Ok(None),
+            }
+        }).ok().flatten();
+
+        let hs = self.host_state.borrow();
+        let error = if hs.fuel_exhausted {
+            Some(CellError::FuelExhausted)
+        } else if let Some(cell_err) = hs.cell_errors.first().cloned() {
+            Some(cell_err)
+        } else {
+            None
+        };
+
+        RunResult {
+            stdout: hs.stdout.clone(),
+            stderr: hs.stderr.clone(),
+            result: result_str,
+            error,
+            commands: hs.commands.clone(),
+            fuel_exhausted: hs.fuel_exhausted,
+            execution_count: exec_count,
+            status: CellStatus::Done,
+            pending_command: None,
         }
     }
 
@@ -478,6 +721,9 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     // ── json module ──────────────────────────────────────────
     register_json_module(ctx);
 
+    // ── web module ───────────────────────────────────────────
+    register_web_module(ctx, host_state.clone());
+
     // ── Strict mode ──────────────────────────────────────────
     setup_strict_mode(ctx, host_state.clone());
 }
@@ -490,6 +736,7 @@ fn setup_strict_mode(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         "read".into(),
         "emit".into(),
         "json".into(),
+        "web".into(),
         // Stdlib functions
         "tostring".into(),
         "tonumber".into(),
@@ -783,6 +1030,44 @@ fn json_value_to_lua<'gc>(ctx: Context<'gc>, val: &serde_json::Value) -> Value<'
             t.into()
         }
     }
+}
+
+// ─── Web Module ───────────────────────────────────────────────────
+
+fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState>>) {
+    let web_table = Table::new(&ctx);
+
+    // web.mock_async(label) — yields for testing, resumes with provided value
+    let hs_mock = host_state.clone();
+    let mock_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let label = if stack.len() > 0 {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => format_value(ctx, other),
+            }
+        } else {
+            "mock".to_string()
+        };
+
+        let mut hs = hs_mock.borrow_mut();
+        hs.async_call_counter += 1;
+        let call_id = hs.async_call_counter;
+        let command = AsyncCommand {
+            call_id,
+            action: "mock_async".to_string(),
+            params: serde_json::json!({ "label": label }),
+        };
+        hs.pending_async_command = Some(command);
+
+        stack.clear();
+        Ok(CallbackReturn::Yield {
+            to_thread: None,
+            then: None,
+        })
+    });
+
+    web_table.set_field(ctx, "mock_async", mock_cb);
+    ctx.set_global("web", web_table);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
@@ -1479,6 +1764,134 @@ mod tests {
         let r2 = session.run_cell("print(\"recovered\")", "");
         assert_eq!(r2.stdout, vec!["recovered"]);
         assert!(r2.error.is_none());
+    }
+
+    // ── Async yield/resume tests ────────────────────────────────
+
+    #[test]
+    fn test_sync_cell_still_works() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("print(\"hello\")", "");
+        assert_eq!(result.status, CellStatus::Done);
+        assert_eq!(result.stdout, vec!["hello"]);
+        assert!(result.pending_command.is_none());
+    }
+
+    #[test]
+    fn test_async_pending_status() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("local x = web.mock_async(\"test\")\nprint(x)", "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "mock_async");
+    }
+
+    #[test]
+    fn test_resume_with_value() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("local x = web.mock_async(\"hello\")\nprint(x)", "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": "world"}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert_eq!(resume_result.stdout, vec!["world"]);
+    }
+
+    #[test]
+    fn test_resume_with_error() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("local x = web.mock_async(\"test\")\nprint(x)", "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": false, "error": {"message": "something failed", "code": "EUNKNOWN"}}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        // Error from resume_err should appear in error field OR cause the cell to error
+        assert!(
+            resume_result.error.is_some() || resume_result.stdout.is_empty(),
+            "Expected error after resume_err, got stdout: {:?}, error: {:?}",
+            resume_result.stdout, resume_result.error
+        );
+    }
+
+    #[test]
+    fn test_pcall_catches_async_error() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                local x = web.mock_async("test")
+                print(x)
+            end)
+            print("caught:", tostring(not ok))
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": false, "error": {"message": "boom", "code": "EUNKNOWN"}}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.stdout[0].contains("true"), "got: {:?}", resume_result.stdout);
+    }
+
+    #[test]
+    fn test_multiple_async_calls_in_one_cell() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local a = web.mock_async("first")
+            local b = web.mock_async("second")
+            print(a, b)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        // Resume first call
+        let r1 = session.resume_cell(r#"{"ok": true, "value": "A"}"#);
+        assert_eq!(r1.status, CellStatus::AsyncPending);
+
+        // Resume second call
+        let r2 = session.resume_cell(r#"{"ok": true, "value": "B"}"#);
+        assert_eq!(r2.status, CellStatus::Done);
+        assert_eq!(r2.stdout[0], "A\tB");
+    }
+
+    #[test]
+    fn test_async_preserves_stdout_across_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            print("before")
+            local x = web.mock_async("test")
+            print("got: " .. tostring(x))
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        // stdout should have "before" from before the yield
+        assert!(result.stdout.contains(&"before".to_string()), "got: {:?}", result.stdout);
+
+        let resume_result = session.resume_cell(r#"{"ok": true, "value": "data"}"#);
+        assert_eq!(resume_result.status, CellStatus::Done);
+        // Should have both "before" and "got: data"
+        assert!(resume_result.stdout.contains(&"before".to_string()));
+        assert!(resume_result.stdout.iter().any(|s| s.contains("got: data")));
+    }
+
+    #[test]
+    fn test_resume_with_json_object() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local resp = web.mock_async("fetch")
+            print(resp.status)
+            print(resp.body)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": {"status": 200, "body": "hello"}}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.stdout.contains(&"200".to_string()) ||
+                resume_result.stdout.iter().any(|s| s.contains("200")),
+                "got: {:?}", resume_result.stdout);
     }
 
     // ── JSON module tests ───────────────────────────────────────

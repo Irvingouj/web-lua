@@ -29,7 +29,28 @@ impl WasmSession {
                 "result": null,
                 "commands": [],
                 "fuel_exhausted": false,
-                "execution_count": 0
+                "execution_count": 0,
+                "status": "done",
+                "pending_command": null
+            }).to_string()
+        })
+    }
+
+    /// Resume a yielded cell with an async response.
+    /// Returns a JSON string with the result.
+    pub fn resume_cell(&mut self, result_json: &str) -> String {
+        let result = self.inner.resume_cell(result_json);
+        serde_json::to_string(&result).unwrap_or_else(|e| {
+            serde_json::json!({
+                "error": { "kind": "internal", "message": format!("Serialization error: {}", e) },
+                "stdout": [],
+                "stderr": [],
+                "result": null,
+                "commands": [],
+                "fuel_exhausted": false,
+                "execution_count": 0,
+                "status": "done",
+                "pending_command": null
             }).to_string()
         })
     }
