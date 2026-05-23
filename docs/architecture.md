@@ -72,6 +72,18 @@
 9. `main.ts` updates cell outputs/errors/status
 10. If running "Run All", processes next cell in queue
 
+## Async API Architecture
+
+See [async-api-design.md](./async-api-design.md) for the full design.
+
+Summary: User code runs as a coroutine. Async API calls yield the coroutine, the worker executes the async work (e.g., fetch), then resumes the coroutine with the result. This gives Lua users synchronous-looking code backed by async execution.
+
+```
+Lua: web.fetch(url) → yield coroutine → Worker: await fetch() → resume coroutine → Lua continues
+```
+
+Error handling flows through three layers: JS (catch + classify) → Rust (inject Lua error) → Lua (pcall to handle).
+
 ## Memory Safety
 
 ### GC Arena
