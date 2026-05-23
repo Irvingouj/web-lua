@@ -9,10 +9,11 @@ interface Props {
   onClear: () => void;
   onSave: () => void;
   onLoad: () => void;
+  onNew: () => void;
 }
 
 const Toolbar: FunctionalComponent<Props> = ({
-  onRunAll, onStop, onRestart, onAddCode, onAddMarkdown, onClear, onSave, onLoad,
+  onRunAll, onStop, onRestart, onAddCode, onAddMarkdown, onClear, onSave, onLoad, onNew,
 }) => {
   return (
     <nav class="toolbar">
@@ -29,6 +30,7 @@ const Toolbar: FunctionalComponent<Props> = ({
       </div>
       <div class="toolbar-sep" />
       <div class="toolbar-group">
+        <button class="btn" title="New notebook" onClick={onNew}>✕ New</button>
         <button class="btn" data-testid="save-button" title="Save notebook" onClick={onSave}>↓ Save</button>
         <button class="btn" data-testid="load-button" title="Load notebook" onClick={onLoad}>↑ Load</button>
       </div>

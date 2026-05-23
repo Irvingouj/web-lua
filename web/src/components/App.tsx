@@ -254,6 +254,14 @@ const App: FunctionalComponent = () => {
     input.click();
   }, []);
 
+  const handleNewNotebook = useCallback(() => {
+    if (!confirm('Start a new notebook? Unsaved changes will be lost.')) return;
+    kernel.restartKernel();
+    setNotebook(createNotebook());
+    setEditingCells(new Set());
+    runAllQueueRef.current = [];
+  }, [kernel]);
+
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div id="app" data-testid="app-root">
@@ -271,6 +279,7 @@ const App: FunctionalComponent = () => {
         onClear={handleClearOutputs}
         onSave={handleSaveNotebook}
         onLoad={handleLoadNotebook}
+        onNew={handleNewNotebook}
       />
       <main class="canvas">
         <div id="cells-container" data-testid="cells-container">
