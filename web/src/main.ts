@@ -1,5 +1,6 @@
 import './styles.css';
 import { Cell, Notebook, createCell, createNotebook, serializeNotebook, deserializeNotebook } from './notebook';
+import type { WorkerRunResult, CellError } from './types';
 
 // ─── State ───────────────────────────────────────────────────────
 let notebook: Notebook = createNotebook();
@@ -78,15 +79,22 @@ function setKernelStatus(status: typeof kernelStatus) {
   updateKernelStatusUI();
 }
 
-function handleCellResult(cellId: string, data: any) {
+function handleCellResult(cellId: string, data: WorkerRunResult) {
   const cell = notebook.cells.find(c => c.id === cellId);
   if (!cell) return;
 
   cell.outputs = data.stdout || [];
   cell.errors = data.stderr || [];
   if (data.error) {
-    cell.errors.push(data.error);
-    cell.status = 'error';
+    // Structured CellError from Rust: { kind, message?, line?, variable? }
+    const err = data.error;
+    const displayMsg = formatCellError(err);
+    cell.errors.push(displayMsg);
+    if (err.kind === 'fuel_exhausted') {
+      cell.status = 'stopped';
+    } else {
+      cell.status = 'error';
+    }
   } else if (data.fuel_exhausted) {
     cell.errors.push('Execution stopped: fuel limit reached (possible infinite loop)');
     cell.status = 'stopped';
@@ -103,6 +111,23 @@ function handleCellResult(cellId: string, data: any) {
   if (runAllQueue.length > 0) {
     const nextId = runAllQueue.shift()!;
     runSingleCell(nextId);
+  }
+}
+
+function formatCellError(err: CellError): string {
+  switch (err.kind) {
+    case 'compile':
+      return err.line
+        ? `Compile error (line ${err.line}): ${err.message}`
+        : `Compile error: ${err.message}`;
+    case 'runtime':
+      return `Runtime error: ${err.message}`;
+    case 'strict_mode':
+      return `Strict mode: undeclared variable '${err.variable}'`;
+    case 'fuel_exhausted':
+      return 'Execution stopped: fuel limit reached';
+    case 'internal':
+      return `Internal error: ${err.message}`;
   }
 }
 

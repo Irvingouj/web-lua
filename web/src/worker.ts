@@ -2,6 +2,7 @@
 // This worker loads WASM, manages a Session, and handles messages from the main thread.
 
 import init, { WasmSession } from '../pkg/piccolo_notebook.js';
+import type { WorkerRunResult } from './types';
 
 let session: WasmSession | null = null;
 let initialized = false;
@@ -55,7 +56,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     case 'runCell': {
       try {
         const jsonStr = session.run_cell(msg.code, msg.stdin || '');
-        const data = JSON.parse(jsonStr);
+        const data: WorkerRunResult = JSON.parse(jsonStr);
         self.postMessage({ type: 'result', id: msg.id, data });
       } catch (err: any) {
         self.postMessage({ type: 'error', error: err.message || String(err) });

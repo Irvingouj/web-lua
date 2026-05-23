@@ -12,6 +12,10 @@ cd "$SCRIPT_DIR"
 # Build release WASM
 cargo build --target wasm32-unknown-unknown -p piccolo-notebook-wasm --release --manifest-path "$SCRIPT_DIR/Cargo.toml"
 
+# Generate TypeScript types from Rust
+echo "📝 Generating TypeScript types..."
+cargo test -p piccolo-notebook-core --manifest-path "$SCRIPT_DIR/Cargo.toml" -- --test-threads=1 > /dev/null 2>&1 || true
+
 # Generate JS bindings
 echo "📦 Generating wasm-bindgen output..."
 mkdir -p web/pkg

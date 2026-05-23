@@ -23,7 +23,7 @@ impl WasmSession {
         let result = self.inner.run_cell(code, stdin);
         serde_json::to_string(&result).unwrap_or_else(|e| {
             serde_json::json!({
-                "error": format!("Serialization error: {}", e),
+                "error": { "kind": "internal", "message": format!("Serialization error: {}", e) },
                 "stdout": [],
                 "stderr": [],
                 "result": null,

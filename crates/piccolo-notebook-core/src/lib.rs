@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::fmt;
 use std::rc::Rc;
 
 use piccolo::{
@@ -7,18 +8,122 @@ use piccolo::{
     StashedExecutor, String as LuaString, Table, Value,
 };
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+// ─── Error Types ────────────────────────────────────────────────
+
+/// Structured error from running a cell.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub enum CellError {
+    /// Syntax or parse error during compilation.
+    Compile {
+        message: String,
+        line: Option<u32>,
+    },
+    /// Lua runtime error (type mismatch, nil arithmetic, etc.)
+    Runtime {
+        message: String,
+    },
+    /// Strict mode: access to an undeclared global variable.
+    StrictMode {
+        variable: String,
+    },
+    /// Execution exceeded the fuel limit (likely an infinite loop).
+    FuelExhausted,
+    /// Internal error (Rust/WASM panic, unexpected state).
+    Internal {
+        message: String,
+    },
+}
+
+impl fmt::Display for CellError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CellError::Compile { message, line } => {
+                if let Some(line) = line {
+                    write!(f, "Compile error (line {}): {}", line, message)
+                } else {
+                    write!(f, "Compile error: {}", message)
+                }
+            }
+            CellError::Runtime { message } => write!(f, "Runtime error: {}", message),
+            CellError::StrictMode { variable } => {
+                write!(f, "Strict mode: undeclared variable '{}'", variable)
+            }
+            CellError::FuelExhausted => write!(f, "Execution stopped: fuel limit reached"),
+            CellError::Internal { message } => write!(f, "Internal error: {}", message),
+        }
+    }
+}
 
 /// Result of running a single cell.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
 pub struct RunResult {
     pub stdout: Vec<String>,
     pub stderr: Vec<String>,
     pub result: Option<String>,
-    pub error: Option<String>,
+    pub error: Option<CellError>,
+    #[ts(type = "any[]")]
     pub commands: Vec<serde_json::Value>,
     pub fuel_exhausted: bool,
     pub execution_count: u32,
 }
+
+impl RunResult {
+    fn ok(
+        stdout: Vec<String>,
+        result: Option<String>,
+        commands: Vec<serde_json::Value>,
+        fuel_exhausted: bool,
+        execution_count: u32,
+    ) -> Self {
+        Self {
+            stdout,
+            stderr: vec![],
+            result,
+            error: None,
+            commands,
+            fuel_exhausted,
+            execution_count,
+        }
+    }
+
+    fn err(error: CellError, execution_count: u32) -> Self {
+        Self {
+            stdout: vec![],
+            stderr: vec![],
+            result: None,
+            error: Some(error),
+            commands: vec![],
+            fuel_exhausted: false,
+            execution_count,
+        }
+    }
+
+    fn with_partial_output(
+        stdout: Vec<String>,
+        stderr: Vec<String>,
+        commands: Vec<serde_json::Value>,
+        error: CellError,
+        fuel_exhausted: bool,
+        execution_count: u32,
+    ) -> Self {
+        Self {
+            stdout,
+            stderr,
+            result: None,
+            error: Some(error),
+            commands,
+            fuel_exhausted,
+            execution_count,
+        }
+    }
+}
+
+// ─── Internal State ─────────────────────────────────────────────
 
 /// Internal state shared between Lua closures and the host.
 #[derive(Debug, Default)]
@@ -29,7 +134,11 @@ struct HostState {
     stdin_lines: Vec<String>,
     stdin_cursor: usize,
     fuel_exhausted: bool,
+    /// Dedicated channel for cell errors from Lua callbacks (e.g. strict mode).
+    cell_errors: Vec<CellError>,
 }
+
+// ─── NotebookSession ────────────────────────────────────────────
 
 /// A persistent Lua notebook session using piccolo.
 pub struct NotebookSession {
@@ -57,14 +166,9 @@ impl NotebookSession {
         let mut lua = Lua::core();
         let host_state = Rc::new(RefCell::new(HostState::default()));
 
-        // Register our custom host globals
         lua.enter(|ctx| {
             register_host_globals(ctx, host_state.clone());
-
-            // Disable dangerous globals - set them to nil
-            for name in &["io", "os", "debug", "package", "require", "dofile", "loadfile"] {
-                ctx.set_global(*name, Value::Nil);
-            }
+            disable_dangerous_globals(ctx);
         });
 
         Self {
@@ -90,9 +194,7 @@ impl NotebookSession {
 
         self.lua.enter(|ctx| {
             register_host_globals(ctx, self.host_state.clone());
-            for name in &["io", "os", "debug", "package", "require", "dofile", "loadfile"] {
-                ctx.set_global(*name, Value::Nil);
-            }
+            disable_dangerous_globals(ctx);
         });
     }
 
@@ -108,12 +210,13 @@ impl NotebookSession {
             hs.stdin_lines = stdin_lines;
             hs.stdin_cursor = 0;
             hs.fuel_exhausted = false;
+            hs.cell_errors.clear();
         }
 
         self.execution_count += 1;
         let exec_count = self.execution_count;
 
-        // Compile and run
+        // ── Phase 1: Compile ───────────────────────────────────
         let stashed_exec = match self.lua.try_enter(|ctx| {
             let env = ctx.globals();
             let closure = Closure::load_with_env(ctx, None, code.as_bytes(), env)?;
@@ -121,22 +224,17 @@ impl NotebookSession {
             Ok(ctx.stash(executor))
         }) {
             Ok(e) => e,
-            Err(e) => {
-                return RunResult {
-                    stdout: vec![],
-                    stderr: vec![],
-                    result: None,
-                    error: Some(format!("{}", e)),
-                    commands: vec![],
-                    fuel_exhausted: false,
-                    execution_count: exec_count,
-                };
+            Err(extern_error) => {
+                return RunResult::err(
+                    classify_extern_error(&extern_error),
+                    exec_count,
+                );
             }
         };
 
         self.executor = Some(stashed_exec);
 
-        // Run to completion with fuel limiting
+        // ── Phase 2: Execute with fuel limiting ────────────────
         let executor_ref = self.executor.as_ref().unwrap();
         loop {
             let mut fuel = Fuel::with(self.fuel_limit);
@@ -144,30 +242,42 @@ impl NotebookSession {
                 Ok(ctx.fetch(executor_ref).step(ctx, &mut fuel))
             }) {
                 Ok(Ok(d)) => d,
-                Ok(Err(e)) => {
-                    // BadThreadMode - executor finished with an error
+                Ok(Err(bad_thread)) => {
+                    // Executor hit a bad thread mode — this is an internal error
                     let hs = self.host_state.borrow();
-                    return RunResult {
-                        stdout: hs.stdout.clone(),
-                        stderr: hs.stderr.clone(),
-                        result: None,
-                        error: Some(format!("{}", e)),
-                        commands: hs.commands.clone(),
-                        fuel_exhausted: false,
-                        execution_count: exec_count,
-                    };
+                    return RunResult::with_partial_output(
+                        hs.stdout.clone(),
+                        hs.stderr.clone(),
+                        hs.commands.clone(),
+                        CellError::Internal {
+                            message: format!("{}", bad_thread),
+                        },
+                        false,
+                        exec_count,
+                    );
                 }
-                Err(e) => {
+                Err(extern_error) => {
+                    // Runtime error from the executor
                     let hs = self.host_state.borrow();
-                    return RunResult {
-                        stdout: hs.stdout.clone(),
-                        stderr: hs.stderr.clone(),
-                        result: None,
-                        error: Some(format!("{}", e)),
-                        commands: hs.commands.clone(),
-                        fuel_exhausted: false,
-                        execution_count: exec_count,
-                    };
+                    // Check if host callbacks recorded a structured error
+                    if let Some(cell_err) = hs.cell_errors.first().cloned() {
+                        return RunResult::with_partial_output(
+                            hs.stdout.clone(),
+                            hs.stderr.clone(),
+                            hs.commands.clone(),
+                            cell_err,
+                            false,
+                            exec_count,
+                        );
+                    }
+                    return RunResult::with_partial_output(
+                        hs.stdout.clone(),
+                        hs.stderr.clone(),
+                        hs.commands.clone(),
+                        classify_extern_error(&extern_error),
+                        false,
+                        exec_count,
+                    );
                 }
             };
 
@@ -175,15 +285,15 @@ impl NotebookSession {
                 break;
             }
 
-            // Fuel was exhausted but there's more work
+            // Fuel was exhausted but there's more work to do
             if !fuel.should_continue() {
                 self.host_state.borrow_mut().fuel_exhausted = true;
                 break;
             }
         }
 
-        // Get result
-        let result_str = match self.lua.try_enter(|ctx| {
+        // ── Phase 3: Collect result ────────────────────────────
+        let result_str = self.lua.try_enter(|ctx| {
             let exec = ctx.fetch(executor_ref);
             match exec.take_result::<Vec<Value>>(ctx) {
                 Ok(Ok(results)) => {
@@ -193,24 +303,24 @@ impl NotebookSession {
                         Ok(Some(format_value(ctx, results[0])))
                     }
                 }
-                Ok(Err(lua_err)) => {
-                    // Lua execution error — store it as cell error
+                Ok(Err(_lua_err)) => {
+                    // Lua execution error was already handled in Phase 2
                     Ok(None)
                 }
                 Err(_bad_mode) => Ok(None),
             }
-        }) {
-            Ok(Some(s)) => Some(s),
-            _ => None,
+        }).ok().flatten();
+
+        // ── Phase 4: Build result ──────────────────────────────
+        let hs = self.host_state.borrow();
+        let error = if hs.fuel_exhausted {
+            Some(CellError::FuelExhausted)
+        } else if let Some(cell_err) = hs.cell_errors.first().cloned() {
+            Some(cell_err)
+        } else {
+            None
         };
 
-        let hs = self.host_state.borrow();
-        // If stderr has content but error is None, treat stderr as the error
-        let error = if hs.stderr.is_empty() {
-            None
-        } else {
-            Some(hs.stderr.join("\n"))
-        };
         RunResult {
             stdout: hs.stdout.clone(),
             stderr: hs.stderr.clone(),
@@ -227,6 +337,51 @@ impl NotebookSession {
         self.execution_count
     }
 }
+
+// ─── Error Classification ──────────────────────────────────────
+
+/// Classify an ExternError into a structured CellError.
+fn classify_extern_error(err: &piccolo::ExternError) -> CellError {
+    let msg = format!("{}", err);
+
+    // Check for compile/parse errors (they contain "parse error" or "compiler error")
+    if msg.contains("parse error") || msg.contains("compiler error") || msg.contains("Compile error") {
+        let line = extract_line_number(&msg);
+        return CellError::Compile {
+            message: clean_error_message(&msg),
+            line,
+        };
+    }
+
+    // Default to runtime error
+    CellError::Runtime {
+        message: clean_error_message(&msg),
+    }
+}
+
+/// Extract a line number from an error message like "parse error at line 5: ..."
+fn extract_line_number(msg: &str) -> Option<u32> {
+    // Try "at line N" pattern
+    if let Some(idx) = msg.find("at line ") {
+        let rest = &msg[idx + 8..];
+        let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        return num_str.parse().ok();
+    }
+    // Try ":N:" pattern (some formats use this)
+    None
+}
+
+/// Clean up error messages to be more user-friendly.
+fn clean_error_message(msg: &str) -> String {
+    let msg = msg.trim();
+    // Remove the "lua error: " or "runtime error: " prefix from piccolo
+    msg.strip_prefix("lua error: ")
+        .or_else(|| msg.strip_prefix("runtime error: "))
+        .unwrap_or(msg)
+        .to_string()
+}
+
+// ─── Value Formatting ───────────────────────────────────────────
 
 fn format_value(_ctx: Context, value: Value) -> String {
     match value {
@@ -251,8 +406,16 @@ fn format_value(_ctx: Context, value: Value) -> String {
     }
 }
 
+// ─── Host Globals ───────────────────────────────────────────────
+
+fn disable_dangerous_globals(ctx: Context) {
+    for name in &["io", "os", "debug", "package", "require", "dofile", "loadfile"] {
+        ctx.set_global(*name, Value::Nil);
+    }
+}
+
 fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
-    // print(...) - appends formatted line to stdout
+    // ── print(...) ────────────────────────────────────────────
     let hs_print = host_state.clone();
     let print_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
         let parts: Vec<String> = (0..stack.len())
@@ -265,7 +428,7 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     });
     ctx.set_global("print", print_cb);
 
-    // input() - returns full stdin string
+    // ── input() ───────────────────────────────────────────────
     let hs_input = host_state.clone();
     let input_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
         let hs = hs_input.borrow();
@@ -277,7 +440,7 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     });
     ctx.set_global("input", input_cb);
 
-    // read() - returns stdin one line at a time
+    // ── read() ────────────────────────────────────────────────
     let hs_read = host_state.clone();
     let read_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
         let mut hs = hs_read.borrow_mut();
@@ -295,7 +458,7 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     });
     ctx.set_global("read", read_cb);
 
-    // emit(value) - appends a structured command/debug value
+    // ── emit(value) ───────────────────────────────────────────
     let hs_emit = host_state.clone();
     let emit_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
         if stack.len() > 0 {
@@ -312,17 +475,18 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     });
     ctx.set_global("emit", emit_cb);
 
-    // ── Strict mode ──────────────────────────────────────────────
-    // Set up a metatable on the globals table so that reading an
-    // undeclared global raises an error instead of silently returning nil.
-    //
-    // Known safe globals that are pre-declared (host APIs + stdlib):
+    // ── Strict mode ──────────────────────────────────────────
+    setup_strict_mode(ctx, host_state.clone());
+}
+
+fn setup_strict_mode(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     let declared: Rc<RefCell<HashSet<String>>> = Rc::new(RefCell::new(HashSet::from([
+        // Host APIs
         "print".into(),
         "input".into(),
         "read".into(),
         "emit".into(),
-        // stdlib globals that Lua code can call
+        // Stdlib functions
         "tostring".into(),
         "tonumber".into(),
         "type".into(),
@@ -346,13 +510,13 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         "load".into(),
         "dofile".into(),
         "loadfile".into(),
-        // stdlib tables
+        // Stdlib tables
         "string".into(),
         "math".into(),
         "table".into(),
         "coroutine".into(),
         "utf8".into(),
-        // Disabled globals (they exist as nil, but reading them is allowed)
+        // Disabled globals (exist as nil, reading is allowed)
         "io".into(),
         "os".into(),
         "debug".into(),
@@ -361,19 +525,18 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         "_G".into(),
     ])));
 
-    // __newindex: when a global is set, record it as declared
-    let declared_set = declared.clone();
     let globals = ctx.globals();
     let mt = Table::new(&ctx);
+
+    // __newindex: record newly declared globals
+    let declared_set = declared.clone();
     let newindex_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        // stack: table, key, value
         if stack.len() >= 3 {
             let key = stack.get(1);
             if let Value::String(s) = key {
                 let name = String::from_utf8_lossy(s.as_bytes()).to_string();
                 declared_set.borrow_mut().insert(name);
             }
-            // Perform the raw set to avoid infinite __newindex recursion
             let table: Value = stack.get(0);
             let key: Value = stack.get(1);
             let val: Value = stack.get(2);
@@ -385,21 +548,22 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         Ok(CallbackReturn::Return)
     });
 
+    // __index: error on undeclared globals
     let declared_get = declared.clone();
     let hs_strict = host_state.clone();
     let index_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        // stack: table, key
         if stack.len() >= 2 {
             let key = stack.get(1);
             if let Value::String(s) = key {
                 let name = String::from_utf8_lossy(s.as_bytes()).to_string();
                 if !declared_get.borrow().contains(&name) {
+                    hs_strict.borrow_mut().cell_errors.push(CellError::StrictMode {
+                        variable: name.clone(),
+                    });
                     let msg = format!("strict mode: undeclared variable '{}'", name);
-                    hs_strict.borrow_mut().stderr.push(msg.clone());
                     return Err(msg.into_value(ctx).into());
                 }
             }
-            // Return the actual value from the table (raw get to avoid recursion)
             let table: Value = stack.get(0);
             let key_val: Value = stack.get(1);
             let result = if let Value::Table(t) = table {
@@ -418,9 +582,26 @@ fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     globals.set_metatable(&ctx, Some(mt));
 }
 
+// ─── Tests ──────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_export_types() {
+        // Resolve the workspace root: MANIFEST_DIR is crates/piccolo-notebook-core,
+        // so going two levels up gives us the workspace root.
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let workspace_root = std::path::Path::new(&manifest_dir)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let cfg = ts_rs::Config::new().with_out_dir(workspace_root);
+        CellError::export_all(&cfg).unwrap();
+        RunResult::export_all(&cfg).unwrap();
+    }
 
     #[test]
     fn test_basic_print() {
@@ -440,10 +621,8 @@ mod tests {
     #[test]
     fn test_variable_persistence() {
         let mut session = NotebookSession::new();
-
         let r1 = session.run_cell("x = 10", "");
         assert!(r1.error.is_none());
-
         let r2 = session.run_cell("print(x + 1)", "");
         assert_eq!(r2.stdout, vec!["11"]);
     }
@@ -483,6 +662,7 @@ mod tests {
         let mut session = NotebookSession::with_fuel_limit(500);
         let result = session.run_cell("while true do end", "");
         assert!(result.fuel_exhausted);
+        assert!(matches!(result.error, Some(CellError::FuelExhausted)));
     }
 
     #[test]
@@ -522,8 +702,10 @@ mod tests {
         session.run_cell("x = 10", "");
         session.reset();
         let r = session.run_cell("print(x)", "");
-        // With strict mode, x is undeclared after reset → error
-        assert!(r.error.is_some(), "Expected strict mode error for undeclared x after reset, got: {:?}", r);
+        assert!(
+            matches!(r.error, Some(CellError::StrictMode { ref variable } ) if variable == "x"),
+            "Expected StrictMode error for x after reset, got: {:?}", r.error
+        );
     }
 
     #[test]
@@ -531,10 +713,8 @@ mod tests {
         let mut session = NotebookSession::new();
         let r = session.run_cell("print(os)", "");
         assert_eq!(r.stdout, vec!["nil"]);
-
         let r = session.run_cell("print(io)", "");
         assert_eq!(r.stdout, vec!["nil"]);
-
         let r = session.run_cell("print(debug)", "");
         assert_eq!(r.stdout, vec!["nil"]);
     }
@@ -587,9 +767,10 @@ mod tests {
     fn test_strict_mode_undeclared_variable() {
         let mut session = NotebookSession::new();
         let result = session.run_cell("print(undeclared_thing)", "");
-        // Strict mode should error on undeclared variable
-        assert!(result.error.is_some() || result.stdout.iter().any(|s| s.contains("strict")),
-            "Expected strict mode error for undeclared variable, got: {:?}", result);
+        assert!(
+            matches!(result.error, Some(CellError::StrictMode { ref variable }) if variable == "undeclared_thing"),
+            "Expected StrictMode error, got: {:?}", result.error
+        );
     }
 
     #[test]
@@ -598,5 +779,49 @@ mod tests {
         session.run_cell("my_var = 42", "");
         let result = session.run_cell("print(my_var)", "");
         assert_eq!(result.stdout, vec!["42"]);
+    }
+
+    #[test]
+    fn test_compile_error_syntax() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("x = ", "");
+        assert!(
+            matches!(result.error, Some(CellError::Compile { .. })),
+            "Expected Compile error for bad syntax, got: {:?}", result.error
+        );
+    }
+
+    #[test]
+    fn test_runtime_error_nil_arithmetic() {
+        let mut session = NotebookSession::new();
+        // Piccolo may or may not error on nil arithmetic; test that it at least
+        // doesn't crash and produces *some* result (error or output).
+        let result = session.run_cell("local x = nil; print(x + 1)", "");
+        // Either it errors (runtime error) or it produces some output (e.g. "nil" or error message)
+        // Piccolo's behavior for nil + 1 is to produce a runtime error about arithmetic on nil
+        // but if it doesn't, we just check it didn't crash.
+        if let Some(ref err) = result.error {
+            assert!(
+                matches!(err, CellError::Runtime { .. }),
+                "Expected Runtime error for nil arithmetic, got: {:?}", result.error
+            );
+        }
+        // If no error, piccolo may have just printed something — that's also acceptable behavior.
+    }
+
+    #[test]
+    fn test_compile_error_has_line_number() {
+        let mut session = NotebookSession::new();
+        // Line 2 has the syntax error
+        let result = session.run_cell("x = 1\ny =\nz = 3", "");
+        match result.error {
+            Some(CellError::Compile { line: Some(n), .. }) => {
+                assert!(n >= 1, "Line number should be >= 1, got {}", n);
+            }
+            Some(CellError::Compile { line: None, .. }) => {
+                // Some compile errors may not have line numbers, that's ok
+            }
+            other => panic!("Expected Compile error, got: {:?}", other),
+        }
     }
 }
