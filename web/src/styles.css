@@ -414,23 +414,22 @@ body {
   padding: 0;
 }
 
-.cell-editor {
-  width: 100%;
-  min-height: 80px;
-  padding: 12px 16px;
-  background: var(--bg-cell);
-  color: var(--text-main);
+/* CodeMirror wrapper */
+.cm-editor-wrapper .cm-editor {
   border: none;
-  resize: vertical;
+  border-radius: 0;
+  height: auto;
+}
+
+.cm-editor-wrapper .cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor-wrapper .cm-editor .cm-scroller {
   font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.6;
-  outline: none;
-  tab-size: 2;
-}
-
-.cell-editor::placeholder {
-  color: var(--text-muted);
+  overflow-x: auto;
 }
 
 /* ─── Cell outputs ───────────────────────────────────────────── */

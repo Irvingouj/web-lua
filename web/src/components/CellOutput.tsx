@@ -12,7 +12,11 @@ function escapeHtml(s: string): string {
 const CellOutput: FunctionalComponent<Props> = ({ outputs, errors }) => {
   const empty = outputs.length === 0 && errors.length === 0;
   return (
-    <div class="cell-outputs" data-testid="cell-output" id={`outputs-${outputs.length > 0 ? 'x' : 'empty'}`} style={empty ? 'display:none' : undefined}>
+    <div
+      class="cell-outputs"
+      data-testid="cell-output"
+      hidden={empty}
+    >
       {outputs.map((o, i) => (
         <div class="output-line" data-testid="cell-output-line" key={i}>
           {escapeHtml(o)}

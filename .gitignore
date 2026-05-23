@@ -8,3 +8,7 @@ web/test-results/
 web/playwright-report/
 web/.nyc_output/
 test-results/
+node_modules/
+target/
+web/dist/
+web/pkg/

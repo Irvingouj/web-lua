@@ -2,7 +2,7 @@ import { FunctionalComponent } from 'preact';
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import type { Cell as CellType, CellKind } from '../notebook';
 import type { KernelStatus } from '../hooks/useKernel';
-import CellEditor from './CellEditor';
+import CodeMirrorEditor from './CodeMirrorEditor';
 import CellOutput from './CellOutput';
 import MarkdownPreview from './MarkdownPreview';
 
@@ -162,7 +162,7 @@ const Cell: FunctionalComponent<Props> = ({
       </div>
       <div class="cell-body">
         {isCode ? (
-          <CellEditor
+          <CodeMirrorEditor
             id={cell.id}
             value={cell.source}
             placeholder="Enter Lua code here..."
@@ -171,7 +171,7 @@ const Cell: FunctionalComponent<Props> = ({
             onRun={handleRun}
           />
         ) : editing ? (
-          <CellEditor
+          <CodeMirrorEditor
             id={cell.id}
             value={cell.source}
             placeholder="Write markdown here..."
