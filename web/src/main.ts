@@ -87,6 +87,7 @@ let kernelStatus: 'ready' | 'running' | 'stopped' | 'error' = 'ready';
 let pendingCellId: string | null = null;
 let runAllQueue: string[] = [];
 let globalExecutionCount = 0;
+const editingMdCells = new Set<string>(); // cell IDs currently in markdown edit mode
 
 // ─── Worker Management ──────────────────────────────────────────
 function createWorker(): Promise<Worker> {
@@ -435,7 +436,7 @@ function renderCodeCell(el: HTMLDivElement, cell: Cell, idx: number) {
 }
 
 function renderMarkdownCell(el: HTMLDivElement, cell: Cell, idx: number) {
-  const isEditing = el.classList.contains('md-editing');
+  const isEditing = editingMdCells.has(cell.id);
   const renderedHtml = marked.parse(cell.source || '', { async: false }) as string;
 
   el.innerHTML = `
@@ -488,16 +489,14 @@ function wireTextarea(el: HTMLDivElement, cell: Cell) {
         runSingleCell(cell.id);
       } else {
         // Markdown: render (exit edit mode)
-        const cellEl = textarea.closest('.cell') as HTMLDivElement;
-        cellEl.classList.remove('md-editing');
+        editingMdCells.delete(cell.id);
         renderCells();
       }
     }
     // Escape exits markdown editing
     if (e.key === 'Escape' && cell.kind === 'markdown') {
       cell.source = textarea.value;
-      const cellEl = textarea.closest('.cell') as HTMLDivElement;
-      cellEl.classList.remove('md-editing');
+      editingMdCells.delete(cell.id);
       renderCells();
     }
   });
@@ -673,8 +672,11 @@ async function init() {
       case 'delete': deleteCell(cellId); break;
       case 'toggleKind': toggleCellKind(cellId); break;
       case 'toggleEdit': {
-        const cellEl = target.closest('.cell') as HTMLDivElement;
-        cellEl.classList.toggle('md-editing');
+        if (editingMdCells.has(cellId)) {
+          editingMdCells.delete(cellId);
+        } else {
+          editingMdCells.add(cellId);
+        }
         renderCells();
         break;
       }
@@ -684,11 +686,13 @@ async function init() {
   // Double-click markdown preview to edit
   document.getElementById('cells-container')!.addEventListener('dblclick', (e: Event) => {
     const target = e.target as HTMLElement;
-    const preview = target.closest('.md-preview') as HTMLElement | null;
+    const preview = target.closest('[data-testid="md-preview"]') as HTMLElement | null;
     if (!preview) return;
     const cellEl = preview.closest('.cell') as HTMLDivElement;
     if (!cellEl) return;
-    cellEl.classList.add('md-editing');
+    const cellId = cellEl.dataset.cellId;
+    if (!cellId) return;
+    editingMdCells.add(cellId);
     renderCells();
   });
 

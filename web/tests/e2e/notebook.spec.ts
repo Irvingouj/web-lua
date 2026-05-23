@@ -269,6 +269,167 @@ end`;
     await expect(page.locator('[data-testid="cell"]')).toHaveCount(2);
   });
 
+  test("10: markdown cell add and render", async ({ page }) => {
+    await waitForKernelReady(page);
+
+    // Add a markdown cell
+    await page.locator('[data-testid="add-md-button"]').click();
+    await page.waitForTimeout(100);
+
+    // Should have 2 cells now (code + markdown)
+    await expect(page.locator('[data-testid="cell"]')).toHaveCount(2);
+
+    // Cell 1 should be markdown with a preview area
+    const mdCell = getCell(page, 1);
+    const mdPreview = mdCell.locator('[data-testid="md-preview"]');
+    await expect(mdPreview).toBeVisible();
+
+    // Empty markdown preview should be visible and empty (placeholder is CSS pseudo-element)
+    await expect(mdPreview).toBeVisible();
+    await expect(mdPreview).toHaveText("");
+  });
+
+  test("11: markdown edit via button and double-click", async ({ page }) => {
+    await waitForKernelReady(page);
+
+    // Add a markdown cell
+    await page.locator('[data-testid="add-md-button"]').click();
+    await page.waitForTimeout(100);
+
+    const mdCell = getCell(page, 1);
+
+    // Click Edit button to enter edit mode
+    await mdCell.locator('button[data-action="toggleEdit"]').click();
+    await page.waitForTimeout(100);
+
+    // Should now have a textarea editor
+    const editor = mdCell.locator('[data-testid="cell-editor"]');
+    await expect(editor).toBeVisible();
+
+    // Write some markdown
+    await editor.click();
+    await editor.fill("# Hello World\n\nThis is **bold** text.");
+
+    // Click Done button to render
+    await mdCell.locator('button[data-action="toggleEdit"]').click();
+    await page.waitForTimeout(100);
+
+    // Should show rendered markdown
+    const preview = mdCell.locator('[data-testid="md-preview"]');
+    await expect(preview).toBeVisible();
+    await expect(preview.locator("h1")).toHaveText("Hello World");
+    await expect(preview.locator("strong")).toHaveText("bold");
+
+    // Double-click to re-edit
+    await preview.dblclick();
+    await page.waitForTimeout(100);
+
+    // Should be back in editor mode
+    const editor2 = mdCell.locator('[data-testid="cell-editor"]');
+    await expect(editor2).toBeVisible();
+    await expect(editor2).toHaveValue("# Hello World\n\nThis is **bold** text.");
+  });
+
+  test("12: markdown Ctrl+Enter renders, Escape exits editing", async ({ page }) => {
+    await waitForKernelReady(page);
+
+    // Add a markdown cell and enter edit mode
+    await page.locator('[data-testid="add-md-button"]').click();
+    await page.waitForTimeout(100);
+
+    const mdCell = getCell(page, 1);
+    await mdCell.locator('button[data-action="toggleEdit"]').click();
+    await page.waitForTimeout(100);
+
+    const editor = mdCell.locator('[data-testid="cell-editor"]');
+    await editor.click();
+    await editor.fill("## Heading Two");
+
+    // Ctrl+Enter to render
+    await editor.press("Control+Enter");
+    await page.waitForTimeout(100);
+
+    // Should show rendered h2
+    const preview = mdCell.locator('[data-testid="md-preview"]');
+    await expect(preview).toBeVisible();
+    await expect(preview.locator("h2")).toHaveText("Heading Two");
+
+    // Double-click to re-edit
+    await preview.dblclick();
+    await page.waitForTimeout(100);
+
+    const editor2 = mdCell.locator('[data-testid="cell-editor"]');
+    await expect(editor2).toBeVisible();
+
+    // Press Escape to exit editing
+    await editor2.press("Escape");
+    await page.waitForTimeout(100);
+
+    // Back to preview
+    const preview2 = mdCell.locator('[data-testid="md-preview"]');
+    await expect(preview2).toBeVisible();
+  });
+
+  test("13: toggle cell kind between code and markdown", async ({ page }) => {
+    await waitForKernelReady(page);
+
+    // Cell 0 starts as code
+    const codeCell = getCell(page, 0);
+    await expect(codeCell.locator(".cell-kind-badge")).toHaveText("Lua");
+
+    // Click MD button to convert to markdown
+    await codeCell.locator('button[data-action="toggleKind"]').click();
+    await page.waitForTimeout(100);
+
+    // Should now be markdown
+    await expect(codeCell.locator(".cell-kind-badge")).toHaveText("MD");
+    const preview = codeCell.locator('[data-testid="md-preview"]');
+    await expect(preview).toBeVisible();
+
+    // Click Lua button to convert back to code
+    await codeCell.locator('button[data-action="toggleKind"]').click();
+    await page.waitForTimeout(100);
+
+    // Should be code again
+    await expect(codeCell.locator(".cell-kind-badge")).toHaveText("Lua");
+    const editor = codeCell.locator('[data-testid="cell-editor"]');
+    await expect(editor).toBeVisible();
+  });
+
+  test("14: markdown lists, code blocks, and links render", async ({ page }) => {
+    await waitForKernelReady(page);
+
+    await page.locator('[data-testid="add-md-button"]').click();
+    await page.waitForTimeout(100);
+
+    const mdCell = getCell(page, 1);
+    await mdCell.locator('button[data-action="toggleEdit"]').click();
+    await page.waitForTimeout(100);
+
+    const editor = mdCell.locator('[data-testid="cell-editor"]');
+    await editor.click();
+    await editor.fill("- item one\n- item two\n\n`inline code`\n\n```\ncode block\n```\n\n[piccolo](https://github.com/kyren/piccolo)");
+
+    // Render
+    await mdCell.locator('button[data-action="toggleEdit"]').click();
+    await page.waitForTimeout(100);
+
+    const preview = mdCell.locator('[data-testid="md-preview"]');
+    await expect(preview).toBeVisible();
+
+    // Check list items
+    await expect(preview.locator("li")).toHaveCount(2);
+    await expect(preview.locator("li").first()).toHaveText("item one");
+
+    // Check inline code
+    await expect(preview.locator("code")).toHaveCount(2); // inline + block
+
+    // Check link
+    const link = preview.locator("a");
+    await expect(link).toHaveAttribute("href", "https://github.com/kyren/piccolo");
+    await expect(link).toHaveText("piccolo");
+  });
+
   test("10: save/load notebook — skipped: uses native file picker", async () => {
     // Save/Load uses the native file picker API (showSaveFilePicker / <input type="file">)
     // which cannot be automated in Playwright without a real file system dialog.
