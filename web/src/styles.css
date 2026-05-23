@@ -672,6 +672,27 @@ body {
   text-decoration: underline;
 }
 
+.footer-sep {
+  margin: 0 4px;
+  color: var(--text-muted);
+}
+
+.footer-showcase {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: var(--exec-bg);
+  color: var(--exec-accent) !important;
+  font-weight: 600 !important;
+  transition: background 0.15s var(--ease);
+}
+
+.footer-showcase:hover {
+  background: var(--exec-accent);
+  color: #fff !important;
+  text-decoration: none !important;
+}
+
 /* ─── Selection ──────────────────────────────────────────────── */
 ::selection {
   background: var(--lua-blue-100);

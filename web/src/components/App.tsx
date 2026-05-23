@@ -296,6 +296,8 @@ const App: FunctionalComponent = () => {
       <footer class="footer">
         Powered by <a href="https://github.com/kyren/piccolo" target="_blank" rel="noopener">piccolo</a> ·{' '}
         <a href="https://www.lua.org" target="_blank" rel="noopener">Lua</a>
+        <span class="footer-sep">·</span>
+        <a href="?showcase=true" class="footer-showcase">📚 Showcase</a>
       </footer>
     </div>
   );
