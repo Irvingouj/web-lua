@@ -1,0 +1,6 @@
+node_modules/
+dist/
+rust/target/
+*.wasm
+!public/build/lua_wasm.wasm
+.DS_Store

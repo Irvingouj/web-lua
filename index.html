@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lua Playground</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Lua Playground</h1>
+    <span class="status" id="status">Loading WASM…</span>
+  </header>
+
+  <div class="main-grid">
+    <!-- Left: Editor -->
+    <div class="panel editor-panel">
+      <div class="panel-header">
+        <label for="example-select">Examples:</label>
+        <select id="example-select">
+          <option value="default">Default</option>
+          <option value="hello">Hello World</option>
+          <option value="math">Math</option>
+          <option value="tables">Tables</option>
+          <option value="stdin">Stdin / read()</option>
+          <option value="input">input()</option>
+          <option value="error">Error Handling</option>
+          <option value="unsafe">Blocked APIs (os/require)</option>
+        </select>
+      </div>
+      <textarea id="code" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+      <div class="button-bar">
+        <button id="btn-run" disabled>▶ Run</button>
+        <button id="btn-stop" disabled>⏹ Stop</button>
+        <button id="btn-clear">🗑 Clear Output</button>
+      </div>
+    </div>
+
+    <!-- Right: Output -->
+    <div class="panel output-panel">
+      <div class="output-section">
+        <h3>stdout</h3>
+        <pre id="stdout" class="output-box"></pre>
+      </div>
+      <div class="output-section">
+        <h3>result</h3>
+        <pre id="result" class="output-box"></pre>
+      </div>
+      <div class="output-section">
+        <h3>errors</h3>
+        <pre id="errors" class="output-box error-box"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: stdin -->
+  <div class="stdin-panel">
+    <h3>stdin <span class="hint">(simulated — read() reads one line, input() reads all)</span></h3>
+    <textarea id="stdin" spellcheck="false"></textarea>
+  </div>
+
+  <footer>
+    <small>
+      ⚠ Prototype: infinite loops can freeze the tab if the Web Worker does not terminate in time.
+      Use <strong>Stop</strong> to kill a hanging worker.
+    </small>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
