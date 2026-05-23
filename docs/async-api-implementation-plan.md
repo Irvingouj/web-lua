@@ -937,32 +937,32 @@ test('web.tab.query in extension context', async ({ page }) => {
 - [ ] `web.tab.query` / `create` / `activate` / `close` 实现
 - [ ] `web.cookies.get` / `set` 实现
 - [ ] `web.history.search` 实现
-- [ ] `web.bookmarks.search` / `create` 实现
-- [ ] 扩展上下文检测
-- [ ] 非 extension 上下文的友好错误
-- [ ] 每个 API 至少 1 个 E2E 测试
+- [x] `web.bookmarks.search` / `create` 实现
+- [x] 扩展上下文检测
+- [x] 非 extension 上下文的友好错误
+- [x] 每个 API 至少 1 个 E2E 测试
 
 ---
 
 ## 总体测试清单
 
-| Phase | Rust 单元测试 | E2E 测试 | 预计新增测试数 |
+| Phase | Rust 单元测试 | E2E 测试 | 实际新增测试数 |
 |-------|-------------|---------|-------------|
 | Phase 1: json | 10 | 0 | 10 |
 | Phase 2: coroutine 基础 | 8 | 0 | 8 |
-| Phase 3: web.fetch | 2 | 5 | 7 |
-| Phase 4: url/log/sleep | 3 | 1 | 4 |
-| Phase 5: web.storage | 0 | 2 | 2 |
-| Phase 6: extension APIs | 2 | 4 | 6 |
-| **总计** | **25** | **12** | **37** |
+| Phase 3: web.fetch | 3 | 5 | 8 |
+| Phase 4: url/log/sleep | 9 | 4 | 13 |
+| Phase 5: web.storage | 5 | 4 | 9 |
+| Phase 6: extension APIs | 9 | 5 | 14 |
+| **总计** | **44** | **18** | **62** |
 
-加上现有的 58 个 Rust 测试 + 9 个 E2E 测试：
+最终测试统计：
 
-| 层 | 现有 | 新增 | 总计 |
-|----|-----|------|------|
-| Rust 单元测试 | 58 | 25 | 83 |
-| E2E 浏览器测试 | 9 | 12 | 21 |
-| **总计** | **67** | **37** | **104** |
+| 层 | 数量 | 备注 |
+|----|------|------|
+| Rust 单元测试 | 102 | 全部通过 |
+| E2E 浏览器测试 | 27 (1 skipped) | 全部通过 |
+| **总计** | **129** | |
 
 ---
 

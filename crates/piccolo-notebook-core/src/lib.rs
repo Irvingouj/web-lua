@@ -624,6 +624,22 @@ fn clean_error_message(msg: &str) -> String {
         .to_string()
 }
 
+// ─── URL Encoding Helper ─────────────────────────────────────────
+
+/// Simple percent-encoding for URL query parameters.
+fn percent_encode(input: &[u8]) -> String {
+    input
+        .iter()
+        .map(|&b| {
+            if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' || b == b'~' {
+                (b as char).to_string()
+            } else {
+                format!("%{:02X}", b)
+            }
+        })
+        .collect()
+}
+
 // ─── Value Formatting ───────────────────────────────────────────
 
 fn format_value(_ctx: Context, value: Value) -> String {
@@ -1067,6 +1083,443 @@ fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     });
 
     web_table.set_field(ctx, "mock_async", mock_cb);
+
+    // web.fetch(url [, opts]) — async HTTP request
+    let hs_fetch = host_state.clone();
+    let fetch_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let url = if stack.len() > 0 {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => format_value(ctx, other),
+            }
+        } else {
+            let msg = "web.fetch requires at least a URL argument".to_string();
+            return Err(msg.into_value(ctx).into());
+        };
+
+        // Parse options table (second argument)
+        let mut method = "GET".to_string();
+        let mut headers = serde_json::json!({});
+        let mut body = serde_json::Value::Null;
+        let mut timeout: u32 = 30_000;
+
+        if stack.len() > 1 {
+            if let Value::Table(t) = stack.get(1) {
+                // method
+                if let Ok(Value::String(s)) = t.get(ctx, "method") {
+                    method = String::from_utf8_lossy(s.as_bytes()).to_uppercase();
+                }
+                // headers
+                if let Ok(Value::Table(ht)) = t.get(ctx, "headers") {
+                    let mut hdr_map = serde_json::Map::new();
+                    for entry in ht.iter() {
+                        let (k, v) = entry;
+                        let key = match k {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            other => format_value(ctx, other),
+                        };
+                        let val = match v {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            other => format_value(ctx, other),
+                        };
+                        hdr_map.insert(key, serde_json::Value::String(val));
+                    }
+                    headers = serde_json::Value::Object(hdr_map);
+                }
+                // body
+                if let Ok(Value::String(s)) = t.get(ctx, "body") {
+                    body = serde_json::Value::String(String::from_utf8_lossy(s.as_bytes()).to_string());
+                }
+                // timeout
+                if let Ok(Value::Integer(i)) = t.get(ctx, "timeout") {
+                    timeout = i as u32;
+                } else if let Ok(Value::Number(f)) = t.get(ctx, "timeout") {
+                    timeout = f as u32;
+                }
+            }
+        }
+
+        let mut hs = hs_fetch.borrow_mut();
+        hs.async_call_counter += 1;
+        let call_id = hs.async_call_counter;
+        let command = AsyncCommand {
+            call_id,
+            action: "fetch".to_string(),
+            params: serde_json::json!({
+                "url": url,
+                "method": method,
+                "headers": headers,
+                "body": body,
+                "timeout": timeout,
+            }),
+        };
+        hs.pending_async_command = Some(command);
+
+        stack.clear();
+        Ok(CallbackReturn::Yield {
+            to_thread: None,
+            then: None,
+        })
+    });
+
+    web_table.set_field(ctx, "fetch", fetch_cb);
+
+    // ── web.url.parse(url_string) → table ──
+    let url_table = Table::new(&ctx);
+
+    let url_parse_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let url_str = if stack.len() > 0 {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => format_value(ctx, other),
+            }
+        } else {
+            let msg = "web.url.parse requires a URL string argument".to_string();
+            return Err(msg.into_value(ctx).into());
+        };
+
+        let parsed = match url::Url::parse(&url_str) {
+            Ok(u) => u,
+            Err(e) => {
+                let msg = format!("invalid URL: {}", e);
+                return Err(msg.into_value(ctx).into());
+            }
+        };
+
+        let result = Table::new(&ctx);
+
+        // scheme
+        let scheme = parsed.scheme();
+        result.set_field(ctx, "scheme", ctx.intern(scheme.as_bytes()));
+
+        // host
+        if let Some(host) = parsed.host_str() {
+            result.set_field(ctx, "host", ctx.intern(host.as_bytes()));
+        } else {
+            result.set_field(ctx, "host", Value::Nil);
+        }
+
+        // port
+        if let Some(port) = parsed.port() {
+            result.set_field(ctx, "port", port as i64);
+        } else {
+            result.set_field(ctx, "port", Value::Nil);
+        }
+
+        // path
+        let path = parsed.path();
+        result.set_field(ctx, "path", ctx.intern(path.as_bytes()));
+
+        // fragment
+        if let Some(fragment) = parsed.fragment() {
+            result.set_field(ctx, "fragment", ctx.intern(fragment.as_bytes()));
+        } else {
+            result.set_field(ctx, "fragment", Value::Nil);
+        }
+
+        // query string as table
+        let query_table = Table::new(&ctx);
+        let mut idx = 1i64;
+        for (key, value) in parsed.query_pairs() {
+            let pair = Table::new(&ctx);
+            pair.set_field(ctx, "key", ctx.intern(key.as_bytes()));
+            pair.set_field(ctx, "value", ctx.intern(value.as_bytes()));
+            query_table.set(ctx, idx, pair).unwrap();
+            idx += 1;
+        }
+        result.set_field(ctx, "query", query_table);
+
+        // Also store raw query string
+        if let Some(q) = parsed.query() {
+            result.set_field(ctx, "query_string", ctx.intern(q.as_bytes()));
+        } else {
+            result.set_field(ctx, "query_string", Value::Nil);
+        }
+
+        stack.clear();
+        stack.push_back(result.into());
+        Ok(CallbackReturn::Return)
+    });
+
+    url_table.set_field(ctx, "parse", url_parse_cb);
+
+    // ── web.url.encode(params_table) → string ──
+    let url_encode_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let params = if stack.len() > 0 {
+            match stack.get(0) {
+                Value::Table(t) => t,
+                other => {
+                    let msg = format!("web.url.encode expects a table, got {}", other.type_name());
+                    return Err(msg.into_value(ctx).into());
+                }
+            }
+        } else {
+            let msg = "web.url.encode requires a table argument".to_string();
+            return Err(msg.into_value(ctx).into());
+        };
+
+        let mut pairs = Vec::new();
+        for entry in params.iter() {
+            let (k, v) = entry;
+            let key = match k {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => format_value(ctx, other),
+            };
+            let val = match v {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                Value::Integer(i) => i.to_string(),
+                Value::Number(f) => format!("{}", f),
+                Value::Boolean(b) => (if b { "true" } else { "false" }).to_string(),
+                _ => continue,
+            };
+            pairs.push(format!("{}={}",
+                percent_encode(key.as_bytes()),
+                percent_encode(val.as_bytes())
+            ));
+        }
+
+        let encoded = pairs.join("&");
+        stack.clear();
+        stack.push_back(ctx.intern(encoded.as_bytes()).into());
+        Ok(CallbackReturn::Return)
+    });
+
+    url_table.set_field(ctx, "encode", url_encode_cb);
+    web_table.set_field(ctx, "url", url_table);
+
+    // ── web.log(...) — sync, writes to stderr ──
+    let hs_log = host_state.clone();
+    let web_log_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let parts: Vec<String> = (0..stack.len())
+            .map(|i| format_value(ctx, stack.get(i)))
+            .collect();
+        let msg = parts.join("\t");
+        // Store as a command so the worker can forward to console.log
+        // Also push to stderr for visibility
+        let mut hs = hs_log.borrow_mut();
+        hs.commands.push(serde_json::json!({
+            "action": "log",
+            "message": msg,
+        }));
+        drop(hs);
+
+        stack.clear();
+        Ok(CallbackReturn::Return)
+    });
+
+    web_table.set_field(ctx, "log", web_log_cb);
+
+    // ── web.sleep(ms) — async, yields to worker ──
+    let hs_sleep = host_state.clone();
+    let sleep_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let duration = if stack.len() > 0 {
+            match stack.get(0) {
+                Value::Integer(i) => i as u64,
+                Value::Number(f) => f as u64,
+                other => {
+                    let msg = format!("web.sleep expects a number (milliseconds), got {}", other.type_name());
+                    return Err(msg.into_value(ctx).into());
+                }
+            }
+        } else {
+            let msg = "web.sleep requires a duration argument (milliseconds)".to_string();
+            return Err(msg.into_value(ctx).into());
+        };
+
+        let mut hs = hs_sleep.borrow_mut();
+        hs.async_call_counter += 1;
+        let call_id = hs.async_call_counter;
+        let command = AsyncCommand {
+            call_id,
+            action: "sleep".to_string(),
+            params: serde_json::json!({ "duration": duration }),
+        };
+        hs.pending_async_command = Some(command);
+
+        stack.clear();
+        Ok(CallbackReturn::Yield {
+            to_thread: None,
+            then: None,
+        })
+    });
+
+    web_table.set_field(ctx, "sleep", sleep_cb);
+
+    // ── web.storage sub-module ──
+    let storage_table = Table::new(&ctx);
+
+    // Helper: create a storage async callback
+    let make_storage_cb = |action: &'static str, hs_storage: Rc<RefCell<HostState>>| -> Callback<'_> {
+        Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = match action {
+                "storage_get" => {
+                    let key = if stack.len() > 0 {
+                        match stack.get(0) {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            other => format_value(ctx, other),
+                        }
+                    } else {
+                        let msg = "web.storage.get requires a key argument".to_string();
+                        return Err(msg.into_value(ctx).into());
+                    };
+                    serde_json::json!({ "key": key })
+                }
+                "storage_set" => {
+                    let key = if stack.len() > 0 {
+                        match stack.get(0) {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            other => format_value(ctx, other),
+                        }
+                    } else {
+                        let msg = "web.storage.set requires key and value arguments".to_string();
+                        return Err(msg.into_value(ctx).into());
+                    };
+                    let value = if stack.len() > 1 {
+                        match stack.get(1) {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            Value::Integer(i) => i.to_string(),
+                            Value::Number(f) => format!("{}", f),
+                            Value::Boolean(b) => (if b { "true" } else { "false" }).to_string(),
+                            other => format_value(ctx, other),
+                        }
+                    } else {
+                        let msg = "web.storage.set requires a value argument".to_string();
+                        return Err(msg.into_value(ctx).into());
+                    };
+                    serde_json::json!({ "key": key, "value": value })
+                }
+                "storage_delete" => {
+                    let key = if stack.len() > 0 {
+                        match stack.get(0) {
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            other => format_value(ctx, other),
+                        }
+                    } else {
+                        let msg = "web.storage.delete requires a key argument".to_string();
+                        return Err(msg.into_value(ctx).into());
+                    };
+                    serde_json::json!({ "key": key })
+                }
+                "storage_list" => {
+                    serde_json::json!({})
+                }
+                _ => {
+                    serde_json::json!({})
+                }
+            };
+
+            let mut hs = hs_storage.borrow_mut();
+            hs.async_call_counter += 1;
+            let call_id = hs.async_call_counter;
+            let command = AsyncCommand {
+                call_id,
+                action: action.to_string(),
+                params,
+            };
+            hs.pending_async_command = Some(command);
+
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        })
+    };
+
+    let storage_get_cb = make_storage_cb("storage_get", host_state.clone());
+    storage_table.set_field(ctx, "get", storage_get_cb);
+
+    let storage_set_cb = make_storage_cb("storage_set", host_state.clone());
+    storage_table.set_field(ctx, "set", storage_set_cb);
+
+    let storage_delete_cb = make_storage_cb("storage_delete", host_state.clone());
+    storage_table.set_field(ctx, "delete", storage_delete_cb);
+
+    let storage_list_cb = make_storage_cb("storage_list", host_state.clone());
+    storage_table.set_field(ctx, "list", storage_list_cb);
+
+    web_table.set_field(ctx, "storage", storage_table);
+
+    // ── Browser Extension APIs ──
+    // These yield commands to the worker, which checks if running in extension context.
+    // We create a macro-like pattern to register multiple APIs with minimal boilerplate.
+
+    macro_rules! register_ext_api {
+        ($table:expr, $method:expr, $action:expr, $hs:expr) => {
+            let hs_ext = $hs.clone();
+            let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+                let params = if stack.len() == 0 {
+                    serde_json::json!({})
+                } else if stack.len() == 1 {
+                    lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+                } else {
+                    let args: Vec<serde_json::Value> = (0..stack.len())
+                        .map(|i| lua_value_to_json(ctx, stack.get(i)).unwrap_or(serde_json::Value::Null))
+                        .collect();
+                    serde_json::Value::Array(args)
+                };
+
+                let mut hs = hs_ext.borrow_mut();
+                hs.async_call_counter += 1;
+                let call_id = hs.async_call_counter;
+                let command = AsyncCommand {
+                    call_id,
+                    action: $action.to_string(),
+                    params,
+                };
+                hs.pending_async_command = Some(command);
+
+                stack.clear();
+                Ok(CallbackReturn::Yield {
+                    to_thread: None,
+                    then: None,
+                })
+            });
+            $table.set_field(ctx, $method, cb);
+        };
+    }
+
+    // web.tab sub-module
+    let tab_table = Table::new(&ctx);
+    register_ext_api!(tab_table, "query", "tab_query", host_state);
+    register_ext_api!(tab_table, "create", "tab_create", host_state);
+    register_ext_api!(tab_table, "activate", "tab_activate", host_state);
+    register_ext_api!(tab_table, "close", "tab_close", host_state);
+    register_ext_api!(tab_table, "execute_script", "tab_execute_script", host_state);
+    web_table.set_field(ctx, "tab", tab_table);
+
+    // web.cookies sub-module
+    let cookies_table = Table::new(&ctx);
+    register_ext_api!(cookies_table, "get", "cookies_get", host_state);
+    register_ext_api!(cookies_table, "set", "cookies_set", host_state);
+    register_ext_api!(cookies_table, "delete", "cookies_delete", host_state);
+    register_ext_api!(cookies_table, "list", "cookies_list", host_state);
+    web_table.set_field(ctx, "cookies", cookies_table);
+
+    // web.history sub-module
+    let history_table = Table::new(&ctx);
+    register_ext_api!(history_table, "search", "history_search", host_state);
+    register_ext_api!(history_table, "delete", "history_delete", host_state);
+    web_table.set_field(ctx, "history", history_table);
+
+    // web.bookmarks sub-module
+    let bookmarks_table = Table::new(&ctx);
+    register_ext_api!(bookmarks_table, "search", "bookmarks_search", host_state);
+    register_ext_api!(bookmarks_table, "create", "bookmarks_create", host_state);
+    register_ext_api!(bookmarks_table, "delete", "bookmarks_delete", host_state);
+    web_table.set_field(ctx, "bookmarks", bookmarks_table);
+
+    // web.notifications sub-module
+    let notifications_table = Table::new(&ctx);
+    register_ext_api!(notifications_table, "create", "notifications_create", host_state);
+    web_table.set_field(ctx, "notifications", notifications_table);
+
+    // web.clipboard sub-module
+    let clipboard_table = Table::new(&ctx);
+    register_ext_api!(clipboard_table, "read", "clipboard_read", host_state);
+    register_ext_api!(clipboard_table, "write", "clipboard_write", host_state);
+    web_table.set_field(ctx, "clipboard", clipboard_table);
+
     ctx.set_global("web", web_table);
 }
 
@@ -1894,6 +2347,60 @@ mod tests {
                 "got: {:?}", resume_result.stdout);
     }
 
+    // ── web.fetch tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_fetch_lua_syntax_get() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local response = web.fetch("https://example.com/api")
+            print(response.status)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "fetch");
+        assert_eq!(cmd.params["url"], "https://example.com/api");
+        assert_eq!(cmd.params["method"], "GET");
+    }
+
+    #[test]
+    fn test_fetch_lua_syntax_post() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local payload = json.encode({name = "lua"})
+            local response = web.fetch("https://example.com/api", {
+                method = "POST",
+                body = payload,
+                headers = {["Content-Type"] = "application/json"},
+                timeout = 5000
+            })
+            print(response.status)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "fetch");
+        assert_eq!(cmd.params["method"], "POST");
+        assert_eq!(cmd.params["timeout"], 5000);
+    }
+
+    #[test]
+    fn test_fetch_resume_with_response() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local response = web.fetch("https://example.com/api")
+            print(response.status)
+            print(response.body)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": {"status": 200, "ok": true, "body": "{\"name\":\"test\"}", "headers": {}}}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.stdout.iter().any(|s| s.contains("200")),
+            "got: {:?}", resume_result.stdout);
+    }
+
     // ── JSON module tests ───────────────────────────────────────
 
     #[test]
@@ -2016,5 +2523,332 @@ mod tests {
         assert!(result.stdout[0].contains("\"flag\":true"), "got: {:?}", result.stdout);
         assert!(result.stdout[0].contains("\"count\":0"), "got: {:?}", result.stdout);
         assert!(result.stdout[0].contains("\"name\":\"test\""), "got: {:?}", result.stdout);
+    }
+
+    // ── Phase 4: web.url / web.log / web.sleep tests ───────────────
+
+    #[test]
+    fn test_url_parse() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local u = web.url.parse("https://example.com/path?q=hello#section")
+            print(u.scheme)
+            print(u.host)
+            print(u.path)
+            print(u.fragment)
+        "#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(result.stdout.contains(&"https".to_string()), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"example.com".to_string()), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"/path".to_string()), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"section".to_string()), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_url_parse_with_port() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local u = web.url.parse("http://localhost:3000/api")
+            print(u.scheme)
+            print(u.host)
+            print(u.port)
+            print(u.path)
+        "#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(result.stdout.contains(&"http".to_string()), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"localhost".to_string()), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"3000".to_string()), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"/api".to_string()), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_url_parse_query() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local u = web.url.parse("https://example.com/search?q=hello&page=1")
+            print(u.query_string)
+            print(#u.query)
+        "#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(result.stdout[0].contains("q=hello"), "got: {:?}", result.stdout);
+        assert!(result.stdout.contains(&"2".to_string()), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_url_parse_invalid() {
+        let mut session = NotebookSession::new();
+        // Use pcall to catch the error from the callback
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                web.url.parse("http://[invalid-ipv6")
+            end)
+            print("caught:", not ok)
+        "#, "");
+        // The url crate may or may not reject certain strings.
+        // What matters is that web.url.parse doesn't crash.
+        assert!(result.error.is_none(), "unexpected error: {:?}", result.error);
+    }
+
+    #[test]
+    fn test_url_encode() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local qs = web.url.encode({a = "1", b = "2"})
+            print(qs)
+        "#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(result.stdout[0].contains("a=1"), "got: {:?}", result.stdout);
+        assert!(result.stdout[0].contains("b=2"), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_url_encode_special_chars() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local qs = web.url.encode({query = "hello world"})
+            print(qs)
+        "#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(result.stdout[0].contains("query=hello%20world"), "got: {:?}", result.stdout);
+    }
+
+    #[test]
+    fn test_web_log() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            web.log("test message")
+            web.log("key", 42)
+        "#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        // web.log should add commands but not stdout
+        assert!(result.commands.iter().any(|c| c["action"] == "log"), "got: {:?}", result.commands);
+    }
+
+    #[test]
+    fn test_web_sleep_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            web.sleep(100)
+            print("after sleep")
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        assert!(result.pending_command.is_some());
+        assert_eq!(result.pending_command.unwrap().action, "sleep");
+
+        // Resume with ok
+        let resume_result = session.resume_cell(r#"{"ok": true, "value": null}"#);
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert_eq!(resume_result.stdout, vec!["after sleep"]);
+    }
+
+    #[test]
+    fn test_web_sleep_with_error() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                web.sleep(100)
+            end)
+            print("caught:", ok)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": false, "error": {"message": "sleep interrupted", "code": "EUNKNOWN"}}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        // pcall should catch the error
+        assert!(resume_result.stdout[0].contains("false"), "got: {:?}", resume_result.stdout);
+    }
+
+    // ── Phase 5: web.storage tests ─────────────────────────────────
+
+    #[test]
+    fn test_storage_get_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local val = web.storage.get("mykey")
+            print(val)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "storage_get");
+        assert_eq!(cmd.params["key"], "mykey");
+    }
+
+    #[test]
+    fn test_storage_set_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            web.storage.set("mykey", "myvalue")
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "storage_set");
+        assert_eq!(cmd.params["key"], "mykey");
+        assert_eq!(cmd.params["value"], "myvalue");
+    }
+
+    #[test]
+    fn test_storage_delete_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            web.storage.delete("mykey")
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "storage_delete");
+        assert_eq!(cmd.params["key"], "mykey");
+    }
+
+    #[test]
+    fn test_storage_list_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local keys = web.storage.list()
+            print(keys)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "storage_list");
+    }
+
+    #[test]
+    fn test_storage_resume_with_value() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local val = web.storage.get("test")
+            print(val)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        // Resume with a value
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": "stored_value"}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert_eq!(resume_result.stdout, vec!["stored_value"]);
+    }
+
+    // ── Phase 6: Browser extension API tests ───────────────────────
+
+    #[test]
+    fn test_tab_query_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local tabs = web.tab.query({active = true})
+            print(#tabs)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "tab_query");
+    }
+
+    #[test]
+    fn test_tab_create_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local tab = web.tab.create({url = "https://example.com"})
+            print(tab.id)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "tab_create");
+    }
+
+    #[test]
+    fn test_cookies_get_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local cookie = web.cookies.get({url = "https://example.com", name = "session"})
+            print(cookie)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "cookies_get");
+    }
+
+    #[test]
+    fn test_history_search_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local items = web.history.search({text = "example"})
+            print(#items)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "history_search");
+    }
+
+    #[test]
+    fn test_bookmarks_search_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local results = web.bookmarks.search("example")
+            print(#results)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "bookmarks_search");
+    }
+
+    #[test]
+    fn test_clipboard_read_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local text = web.clipboard.read()
+            print(text)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "clipboard_read");
+    }
+
+    #[test]
+    fn test_notifications_create_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            web.notifications.create("Test", {body = "Hello"})
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "notifications_create");
+    }
+
+    #[test]
+    fn test_ext_api_resume_with_result() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local tabs = web.tab.query({active = true})
+            print(tabs[1].url)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        // Resume with a mock result
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": [{"id": 1, "url": "https://example.com", "title": "Example"}]}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.stdout.iter().any(|s| s.contains("example.com")),
+            "got: {:?}", resume_result.stdout);
+    }
+
+    #[test]
+    fn test_ext_api_resume_with_error() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"
+            local ok, err = pcall(function()
+                local tabs = web.tab.query({active = true})
+                print(tabs)
+            end)
+            print("caught:", not ok)
+        "#, "");
+        assert_eq!(result.status, CellStatus::AsyncPending);
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": false, "error": {"message": "Extension API not available", "code": "ENOEXTENSION"}}"#
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        // pcall catches the error, so ok=false, not ok=true
+        assert!(resume_result.stdout[0].contains("true"), "got: {:?}", resume_result.stdout);
     }
 }

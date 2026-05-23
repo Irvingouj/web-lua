@@ -53,6 +53,9 @@ async function ensureWorker(): Promise<Worker> {
           case 'stopped':
             setKernelStatus('stopped');
             break;
+          case 'asyncRelay':
+            handleAsyncRelay(w, msg.id, msg.command);
+            break;
         }
       };
       w.onerror = (e: ErrorEvent) => {
@@ -357,6 +360,75 @@ function updateKernelStatusUI() {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── Main Thread Relay for Async Commands ─────────────────────────
+async function handleAsyncRelay(worker: Worker, relayId: string, command: any) {
+  const result = await executeMainThreadCommand(command);
+  worker.postMessage({ type: 'asyncRelayResult', id: relayId, result: JSON.stringify(result) });
+}
+
+async function executeMainThreadCommand(command: any): Promise<any> {
+  switch (command.action) {
+    case 'storage_get': {
+      try {
+        const value = localStorage.getItem(command.params.key);
+        return { ok: true, value };
+      } catch (err: any) {
+        return { ok: false, error: { message: err.message, code: 'ESTORAGE', category: 'storage' } };
+      }
+    }
+    case 'storage_set': {
+      try {
+        localStorage.setItem(command.params.key, command.params.value);
+        return { ok: true, value: null };
+      } catch (err: any) {
+        return { ok: false, error: { message: err.message, code: 'ESTORAGE', category: 'storage' } };
+      }
+    }
+    case 'storage_delete': {
+      try {
+        localStorage.removeItem(command.params.key);
+        return { ok: true, value: null };
+      } catch (err: any) {
+        return { ok: false, error: { message: err.message, code: 'ESTORAGE', category: 'storage' } };
+      }
+    }
+    case 'storage_list': {
+      try {
+        const keys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) keys.push(key);
+        }
+        return { ok: true, value: keys };
+      } catch (err: any) {
+        return { ok: false, error: { message: err.message, code: 'ESTORAGE', category: 'storage' } };
+      }
+    }
+    case 'clipboard_read': {
+      try {
+        const text = await navigator.clipboard.readText();
+        return { ok: true, value: text };
+      } catch (err: any) {
+        return { ok: false, error: { message: err.message, code: 'ECLIPBOARD', category: 'permission' } };
+      }
+    }
+    case 'clipboard_write': {
+      try {
+        const text = command.params[0]?.text || command.params[0] || command.params.value || '';
+        await navigator.clipboard.writeText(String(text));
+        return { ok: true, value: null };
+      } catch (err: any) {
+        return { ok: false, error: { message: err.message, code: 'ECLIPBOARD', category: 'permission' } };
+      }
+    }
+    default:
+      return {
+        ok: false,
+        error: { message: `Unknown main-thread action: ${command.action}`, code: 'EUNKNOWN', category: 'unknown' },
+      };
+  }
 }
 
 // ─── Event Wiring ───────────────────────────────────────────────

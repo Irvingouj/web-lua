@@ -11,4 +11,10 @@ export interface WorkerRunResult {
   commands: any[];
   fuel_exhausted: boolean;
   execution_count: number;
+  status: 'done' | 'async_pending';
+  pending_command: {
+    call_id: number;
+    action: string;
+    params: any;
+  } | null;
 }
