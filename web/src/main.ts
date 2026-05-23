@@ -67,6 +67,18 @@ function scheduleAutoSave() {
   }, 500);
 }
 
+// ─── Theme ────────────────────────────────────────────────────────
+function applyTheme(theme: 'light' | 'dark') {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('web-lua-theme', theme);
+}
+
+function loadTheme(): 'light' | 'dark' {
+  const saved = localStorage.getItem('web-lua-theme');
+  if (saved === 'dark' || saved === 'light') return saved;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 // ─── State ───────────────────────────────────────────────────────
 let notebook: Notebook = createNotebook();
 let worker: Worker | null = null;
@@ -369,11 +381,12 @@ function renderCells() {
     const statusText = cell.status;
 
     el.innerHTML = `
+      <div class="cell-rail"></div>
       <div class="cell-header">
         <span class="exec-label" data-testid="cell-execution-count">${execLabel}</span>
         <span class="cell-status ${statusClass}" data-testid="cell-status">${statusText}</span>
         <div class="cell-actions">
-          <button class="btn btn-run" data-action="run" data-testid="cell-run-button" data-cell-id="${cell.id}" title="Run cell (Ctrl+Enter)">▶ Run</button>
+          <button class="btn btn-sm btn-exec" data-action="run" data-testid="cell-run-button" data-cell-id="${cell.id}" title="Run cell (Ctrl+Enter)">▶ Run</button>
           <button class="btn btn-sm" data-action="add" data-cell-id="${cell.id}" title="Add cell below">+ Add</button>
           <button class="btn btn-sm" data-action="up" data-testid="cell-move-up-button" data-cell-id="${cell.id}" title="Move up" ${idx === 0 ? 'disabled' : ''}>↑</button>
           <button class="btn btn-sm" data-action="down" data-testid="cell-move-down-button" data-cell-id="${cell.id}" title="Move down" ${idx === notebook.cells.length - 1 ? 'disabled' : ''}>↓</button>
@@ -420,7 +433,7 @@ function renderCells() {
 
 function updateKernelStatusUI() {
   const el = document.getElementById('kernel-status')!;
-  el.className = `kernel-status kernel-${kernelStatus}`;
+  el.className = `kernel-badge kernel-${kernelStatus}`;
   el.textContent = `Kernel: ${kernelStatus}`;
 }
 
@@ -550,6 +563,13 @@ async function handleHostCallAction(action: string, params: any): Promise<any> {
 
 // ─── Event Wiring ───────────────────────────────────────────────
 async function init() {
+  // Theme
+  applyTheme(loadTheme());
+  document.getElementById('btn-toggle-theme')!.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
   // Toolbar buttons
   document.getElementById('btn-add-cell')!.addEventListener('click', () => addCell());
   document.getElementById('btn-run-all')!.addEventListener('click', runAllCells);
