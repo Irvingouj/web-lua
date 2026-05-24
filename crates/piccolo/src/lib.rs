@@ -1,3 +1,5 @@
+#![allow(clippy::never_loop)]
+
 pub mod any;
 pub mod async_callback;
 pub mod callback;

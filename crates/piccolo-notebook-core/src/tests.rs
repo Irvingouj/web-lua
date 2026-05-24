@@ -15,11 +15,13 @@ use piccolo::{
 use serde_json;
 use std::cell::RefCell;
 use std::rc::Rc;
+use ts_rs::TS;
 
 // ─── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_export_types() {
