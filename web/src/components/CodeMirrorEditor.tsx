@@ -60,6 +60,7 @@ const luaGlobals = [
   'page.scroll', 'page.scroll_to', 'page.url', 'page.title', 'page.screenshot',
   'page.goto', 'page.back', 'page.forward', 'page.reload', 'page.wait',
   'page.tabs', 'page.switch', 'page.new_tab', 'page.close', 'page.active_tab',
+  'runtime.inspect',
 ];
 
 function luaCompletions(context: CompletionContext): CompletionResult | null {

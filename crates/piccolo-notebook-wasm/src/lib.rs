@@ -84,6 +84,19 @@ impl WasmSession {
             }).to_string()
         })
     }
+
+    /// Inspect all global variables in the current Lua state.
+    /// Returns a JSON string with { variables: [...], execution_count: N }.
+    pub fn inspect_globals(&mut self) -> String {
+        let snapshot = self.inner.inspect_globals();
+        serde_json::to_string(&snapshot).unwrap_or_else(|e| {
+            serde_json::json!({
+                "error": format!("Serialization error: {}", e),
+                "variables": [],
+                "execution_count": 0
+            }).to_string()
+        })
+    }
 }
 
 impl Default for WasmSession {

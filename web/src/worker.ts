@@ -42,14 +42,16 @@ export type WorkerMessage =
   | { type: 'setFuelLimit'; limit: number }
   | { type: 'asyncRelayResult'; id: string; result: string }
   | { type: 'setTestChromeApis'; apis: any }
-  | { type: 'registerHandler'; action: string };
+  | { type: 'registerHandler'; action: string }
+  | { type: 'inspectGlobals' };
 
 export type WorkerResponse =
   | { type: 'ready' }
   | { type: 'result'; id: string; data: any }
   | { type: 'error'; error: string }
   | { type: 'stopped' }
-  | { type: 'resetDone' };
+  | { type: 'resetDone' }
+  | { type: 'globalsSnapshot'; variables: any[]; executionCount: number };
 
 // ─── Async execution engine ────────────────────────────────────────
 
@@ -679,6 +681,17 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       // Instead, the host app uses the main thread relay pattern:
       // Worker sees host_* action → posts asyncRelay to main thread → main thread runs handler → returns result
       // This message type is reserved for future use with inline handler code.
+      break;
+    }
+
+    case 'inspectGlobals': {
+      try {
+        const jsonStr = session!.inspect_globals();
+        const snap = JSON.parse(jsonStr);
+        self.postMessage({ type: 'globalsSnapshot', variables: snap.variables, executionCount: snap.execution_count });
+      } catch (err: any) {
+        self.postMessage({ type: 'error', error: err.message || String(err) });
+      }
       break;
     }
   }

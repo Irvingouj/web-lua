@@ -67,6 +67,27 @@ pub enum CellStatus {
     AsyncPending,
 }
 
+/// A single global variable observed by `inspect_globals`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct GlobalVariable {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub type_name: String,
+    /// String representation of the value. Truncated for tables (keys only).
+    pub value: Option<String>,
+    /// For tables: list of key names/indices.
+    pub keys: Option<Vec<String>>,
+}
+
+/// Snapshot of all Lua globals.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct GlobalsSnapshot {
+    pub variables: Vec<GlobalVariable>,
+    pub execution_count: u32,
+}
+
 /// An async command yielded from Lua, waiting for external resolution.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export_to = "web/src/types/generated.ts")]
@@ -359,6 +380,114 @@ impl NotebookSession {
     /// Set the fuel limit for execution.
     pub fn set_fuel_limit(&mut self, limit: i32) {
         self.fuel_limit = limit;
+    }
+
+    /// Inspect all global variables in the current Lua state.
+    /// Returns a snapshot of variable names, types, values, and table keys.
+    pub fn inspect_globals(&mut self) -> GlobalsSnapshot {
+        let exec_count = self.execution_count;
+        let mut variables = Vec::new();
+
+        self.lua.enter(|ctx| {
+            let globals = ctx.globals();
+            // Collect entries first (can't hold references across operations)
+            let mut entries: Vec<(String, Value)> = Vec::new();
+            for entry in globals.iter() {
+                let (k, v) = entry;
+                if let Value::String(s) = k {
+                    let name = String::from_utf8_lossy(s.as_bytes()).to_string();
+                    entries.push((name, v));
+                }
+            }
+
+            for (name, val) in entries {
+                let type_name = match val {
+                    Value::Nil => "nil",
+                    Value::Boolean(_) => "boolean",
+                    Value::Integer(_) => "number",
+                    Value::Number(_) => "number",
+                    Value::String(_) => "string",
+                    Value::Table(_) => "table",
+                    Value::Function(_) => "function",
+                    Value::Thread(_) => "thread",
+                    _ => "unknown",
+                };
+
+                let (value, keys) = if type_name == "table" {
+                    if let Value::Table(t) = val {
+                        // Collect table keys for inspection
+                        let mut table_keys: Vec<String> = Vec::new();
+                        let mut next_int: i64 = 1;
+                        for entry in t.iter() {
+                            let (k, _) = entry;
+                            match k {
+                                Value::Integer(i) => {
+                                    if i == next_int {
+                                        table_keys.push(i.to_string());
+                                        next_int += 1;
+                                    } else {
+                                        table_keys.push(format!("[{}]", i));
+                                    }
+                                }
+                                Value::String(s) => {
+                                    table_keys.push(String::from_utf8_lossy(s.as_bytes()).to_string());
+                                }
+                                _ => {
+                                    table_keys.push(format!("{:?}", k));
+                                }
+                            }
+                        }
+                        // Don't include raw value for tables (too large)
+                        (None, Some(table_keys))
+                    } else {
+                        (None, None)
+                    }
+                } else if type_name == "function" {
+                    // Don't try to stringify functions
+                    (None, None)
+                } else {
+                    // For primitives, include the value
+                    let formatted = match val {
+                        Value::Nil => "nil".to_string(),
+                        Value::Boolean(b) => b.to_string(),
+                        Value::Integer(i) => i.to_string(),
+                        Value::Number(f) => {
+                            if f == f.floor() && f.is_finite() {
+                                format!("{:.1}", f)
+                            } else {
+                                format!("{}", f)
+                            }
+                        }
+                        Value::String(s) => {
+                            let s = String::from_utf8_lossy(s.as_bytes()).to_string();
+                            // Truncate long strings
+                            if s.len() > 200 {
+                                format!("{}...", &s[..200])
+                            } else {
+                                s
+                            }
+                        }
+                        _ => format!("{:?}", val),
+                    };
+                    (Some(formatted), None)
+                };
+
+                variables.push(GlobalVariable {
+                    name,
+                    type_name: type_name.to_string(),
+                    value,
+                    keys,
+                });
+            }
+        });
+
+        // Sort by name for stable output
+        variables.sort_by(|a, b| a.name.cmp(&b.name));
+
+        GlobalsSnapshot {
+            variables,
+            execution_count: exec_count,
+        }
     }
 
     /// Reset the session, clearing all Lua state.
@@ -870,6 +999,7 @@ fn setup_strict_mode(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         "host".into(),
         "dom".into(),
         "page".into(),
+        "runtime".into(),
         // Stdlib functions
         "tostring".into(),
         "tonumber".into(),
@@ -2469,6 +2599,92 @@ fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState>>) {
 
     host_table.set_field(ctx, "call", host_call_cb);
     ctx.set_global("host", host_table);
+
+    // ── runtime.inspect() — returns a table of all globals with type/value/keys ──
+    let runtime_table = Table::new(&ctx);
+
+    let inspect_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let globals = ctx.globals();
+        let result_table = Table::new(&ctx);
+        let mut idx = 1;
+
+        let mut entries: Vec<(String, Value)> = Vec::new();
+        for entry in globals.iter() {
+            let (k, v) = entry;
+            if let Value::String(s) = k {
+                let name = String::from_utf8_lossy(s.as_bytes()).to_string();
+                entries.push((name, v));
+            }
+        }
+
+        for (name, val) in entries {
+            let type_name = match val {
+                Value::Nil => "nil",
+                Value::Boolean(_) => "boolean",
+                Value::Integer(_) | Value::Number(_) => "number",
+                Value::String(_) => "string",
+                Value::Table(_) => "table",
+                Value::Function(_) => "function",
+                Value::Thread(_) => "thread",
+                _ => "unknown",
+            };
+
+            let entry_table = Table::new(&ctx);
+            entry_table.set_field(ctx, "name", LuaString::from_slice(&ctx, name.as_bytes()));
+            entry_table.set_field(ctx, "type", LuaString::from_slice(&ctx, type_name.as_bytes()));
+
+            // For primitives, include value
+            if type_name == "table" {
+                if let Value::Table(t) = val {
+                    let keys_table = Table::new(&ctx);
+                    let mut ki = 1;
+                    for entry in t.iter() {
+                        let (k, _) = entry;
+                        let key_str = match k {
+                            Value::Integer(i) => i.to_string(),
+                            Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                            other => format!("{:?}", other),
+                        };
+                        keys_table.set(ctx, ki, LuaString::from_slice(&ctx, key_str.as_bytes())).unwrap();
+                        ki += 1;
+                    }
+                    entry_table.set_field(ctx, "keys", keys_table);
+                }
+            } else if type_name != "function" && type_name != "nil" && type_name != "unknown" {
+                let formatted = match val {
+                    Value::Boolean(b) => b.to_string(),
+                    Value::Integer(i) => i.to_string(),
+                    Value::Number(f) => {
+                        if f == f.floor() && f.is_finite() {
+                            format!("{:.1}", f)
+                        } else {
+                            format!("{}", f)
+                        }
+                    }
+                    Value::String(s) => {
+                        let s = String::from_utf8_lossy(s.as_bytes()).to_string();
+                        if s.len() > 200 {
+                            format!("{}...", &s[..200])
+                        } else {
+                            s
+                        }
+                    }
+                    _ => format!("{:?}", val),
+                };
+                entry_table.set_field(ctx, "value", LuaString::from_slice(&ctx, formatted.as_bytes()));
+            }
+
+            result_table.set(ctx, idx, entry_table).unwrap();
+            idx += 1;
+        }
+
+        stack.clear();
+        stack.push_back(result_table.into());
+        Ok(CallbackReturn::Return)
+    });
+
+    runtime_table.set_field(ctx, "inspect", inspect_cb);
+    ctx.set_global("runtime", runtime_table);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────
@@ -3176,6 +3392,99 @@ mod tests {
         assert_eq!(result.status, CellStatus::Done);
         assert_eq!(result.stdout, vec!["hello"]);
         assert!(result.pending_command.is_none());
+    }
+
+    #[test]
+    fn test_inspect_globals_basic() {
+        let mut session = NotebookSession::new();
+        session.run_cell("x = 42\nname = \"hello\"\nflag = true\narr = {1, 2, 3}", "");
+
+        let snap = session.inspect_globals();
+        assert!(snap.execution_count >= 1);
+
+        let vars: std::collections::HashMap<&str, &GlobalVariable> = snap
+            .variables
+            .iter()
+            .map(|v| (v.name.as_str(), v))
+            .collect();
+
+        // Check primitives
+        let x = vars.get("x").expect("x should exist");
+        assert_eq!(x.type_name, "number");
+        assert_eq!(x.value.as_deref(), Some("42"));
+
+        let name = vars.get("name").expect("name should exist");
+        assert_eq!(name.type_name, "string");
+        assert_eq!(name.value.as_deref(), Some("hello"));
+
+        let flag = vars.get("flag").expect("flag should exist");
+        assert_eq!(flag.type_name, "boolean");
+        assert_eq!(flag.value.as_deref(), Some("true"));
+
+        // Check table
+        let arr = vars.get("arr").expect("arr should exist");
+        assert_eq!(arr.type_name, "table");
+        assert!(arr.value.is_none()); // tables don't include value
+        let expected_keys: &[String] = &["1".to_string(), "2".to_string(), "3".to_string()];
+        assert_eq!(arr.keys.as_deref(), Some(expected_keys));
+
+        // Built-in modules should be present
+        assert!(vars.contains_key("json"), "json module should exist");
+        assert!(vars.contains_key("web"), "web module should exist");
+        assert!(vars.contains_key("page"), "page module should exist");
+        assert!(vars.contains_key("host"), "host module should exist");
+
+        // Functions should show type but no value
+        let print_fn = vars.get("print").expect("print should exist");
+        assert_eq!(print_fn.type_name, "function");
+        assert!(print_fn.value.is_none());
+    }
+
+    #[test]
+    fn test_inspect_globals_after_reset() {
+        let mut session = NotebookSession::new();
+        session.run_cell("my_var = 123", "");
+
+        let snap = session.inspect_globals();
+        assert!(snap.variables.iter().any(|v| v.name == "my_var"));
+
+        session.reset();
+        let snap = session.inspect_globals();
+        assert!(!snap.variables.iter().any(|v| v.name == "my_var"));
+    }
+
+    #[test]
+    fn test_inspect_globals_nested_table() {
+        let mut session = NotebookSession::new();
+        session.run_cell("t = { a = 1, b = 2, [42] = \"deep\" }", "");
+
+        let snap = session.inspect_globals();
+        let t = snap.variables.iter().find(|v| v.name == "t").expect("t should exist");
+        assert_eq!(t.type_name, "table");
+        let keys = t.keys.as_deref().expect("table should have keys");
+        assert!(keys.contains(&"a".to_string()));
+        assert!(keys.contains(&"b".to_string()));
+        assert!(keys.contains(&"[42]".to_string()));
+    }
+
+    #[test]
+    fn test_runtime_inspect_lua_api() {
+        let mut session = NotebookSession::new();
+        session.run_cell("x = 42\nmy_str = \"hello\"", "");
+
+        let result = session.run_cell(
+            "local vars = runtime.inspect()\nfor _, v in ipairs(vars) do if v.name == \"x\" then print(v.type .. \"=\" .. v.value) end end",
+            "",
+        );
+        assert_eq!(result.status, CellStatus::Done);
+        assert!(result.stdout.iter().any(|s| s.contains("number=42")), "got: {:?}", result.stdout);
+
+        // Check that runtime.inspect sees the string variable
+        let result2 = session.run_cell(
+            "local vars = runtime.inspect()\nfor _, v in ipairs(vars) do if v.name == \"my_str\" then print(v.value) end end",
+            "",
+        );
+        assert!(result2.stdout.iter().any(|s| s.contains("hello")), "got: {:?}", result2.stdout);
     }
 
     #[test]
