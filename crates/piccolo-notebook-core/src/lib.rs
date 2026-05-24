@@ -866,6 +866,10 @@ fn setup_strict_mode(ctx: Context, host_state: Rc<RefCell<HostState>>) {
         "emit".into(),
         "json".into(),
         "web".into(),
+        "chrome".into(),
+        "host".into(),
+        "dom".into(),
+        "page".into(),
         // Stdlib functions
         "tostring".into(),
         "tonumber".into(),
@@ -1634,6 +1638,797 @@ fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     web_table.set_field(ctx, "clipboard", clipboard_table);
 
     ctx.set_global("web", web_table);
+
+    // ── chrome module (browser extension APIs) ──
+    let chrome_table = Table::new(&ctx);
+
+    // chrome.runtime
+    let runtime_table = Table::new(&ctx);
+    register_ext_api!(runtime_table, "sendMessage", "chrome_runtime_sendMessage", host_state);
+    chrome_table.set_field(ctx, "runtime", runtime_table);
+
+    // chrome.tabs
+    let tabs_table = Table::new(&ctx);
+    register_ext_api!(tabs_table, "query", "chrome_tabs_query", host_state);
+    register_ext_api!(tabs_table, "create", "chrome_tabs_create", host_state);
+    register_ext_api!(tabs_table, "update", "chrome_tabs_update", host_state);
+    register_ext_api!(tabs_table, "remove", "chrome_tabs_remove", host_state);
+    register_ext_api!(tabs_table, "sendMessage", "chrome_tabs_sendMessage", host_state);
+    chrome_table.set_field(ctx, "tabs", tabs_table);
+
+    // chrome.alarms
+    let alarms_table = Table::new(&ctx);
+    register_ext_api!(alarms_table, "create", "chrome_alarms_create", host_state);
+    register_ext_api!(alarms_table, "clear", "chrome_alarms_clear", host_state);
+    chrome_table.set_field(ctx, "alarms", alarms_table);
+
+    // chrome.action
+    let action_table = Table::new(&ctx);
+    register_ext_api!(action_table, "setBadgeText", "chrome_action_setBadgeText", host_state);
+    register_ext_api!(action_table, "setBadgeBackgroundColor", "chrome_action_setBadgeBackgroundColor", host_state);
+    register_ext_api!(action_table, "setTitle", "chrome_action_setTitle", host_state);
+    register_ext_api!(action_table, "setIcon", "chrome_action_setIcon", host_state);
+    chrome_table.set_field(ctx, "action", action_table);
+
+    // chrome.contextMenus
+    let context_menus_table = Table::new(&ctx);
+    register_ext_api!(context_menus_table, "create", "chrome_contextMenus_create", host_state);
+    register_ext_api!(context_menus_table, "remove", "chrome_contextMenus_remove", host_state);
+    chrome_table.set_field(ctx, "contextMenus", context_menus_table);
+
+    // chrome.windows
+    let windows_table = Table::new(&ctx);
+    register_ext_api!(windows_table, "getAll", "chrome_windows_getAll", host_state);
+    register_ext_api!(windows_table, "create", "chrome_windows_create", host_state);
+    register_ext_api!(windows_table, "update", "chrome_windows_update", host_state);
+    register_ext_api!(windows_table, "remove", "chrome_windows_remove", host_state);
+    chrome_table.set_field(ctx, "windows", windows_table);
+
+    // chrome.sidePanel
+    let side_panel_table = Table::new(&ctx);
+    register_ext_api!(side_panel_table, "setOptions", "chrome_sidePanel_setOptions", host_state);
+    chrome_table.set_field(ctx, "sidePanel", side_panel_table);
+
+    // chrome.cookies
+    let cookies_table = Table::new(&ctx);
+    register_ext_api!(cookies_table, "get", "chrome_cookies_get", host_state);
+    register_ext_api!(cookies_table, "set", "chrome_cookies_set", host_state);
+    register_ext_api!(cookies_table, "remove", "chrome_cookies_remove", host_state);
+    register_ext_api!(cookies_table, "getAll", "chrome_cookies_getAll", host_state);
+    chrome_table.set_field(ctx, "cookies", cookies_table);
+
+    // chrome.bookmarks
+    let bookmarks_table = Table::new(&ctx);
+    register_ext_api!(bookmarks_table, "search", "chrome_bookmarks_search", host_state);
+    register_ext_api!(bookmarks_table, "create", "chrome_bookmarks_create", host_state);
+    register_ext_api!(bookmarks_table, "remove", "chrome_bookmarks_remove", host_state);
+    chrome_table.set_field(ctx, "bookmarks", bookmarks_table);
+
+    // chrome.history
+    let history_table = Table::new(&ctx);
+    register_ext_api!(history_table, "search", "chrome_history_search", host_state);
+    register_ext_api!(history_table, "deleteUrl", "chrome_history_deleteUrl", host_state);
+    chrome_table.set_field(ctx, "history", history_table);
+
+    // chrome.notifications
+    let notifications_table = Table::new(&ctx);
+    register_ext_api!(notifications_table, "create", "chrome_notifications_create", host_state);
+    register_ext_api!(notifications_table, "clear", "chrome_notifications_clear", host_state);
+    chrome_table.set_field(ctx, "notifications", notifications_table);
+
+    // chrome.scripting
+    let scripting_table = Table::new(&ctx);
+    register_ext_api!(scripting_table, "executeScript", "chrome_scripting_executeScript", host_state);
+    chrome_table.set_field(ctx, "scripting", scripting_table);
+
+    ctx.set_global("chrome", chrome_table);
+
+    // ── dom module (DOM semantic tree snapshot via dom-semantic-tree) ──
+    let dom_table = Table::new(&ctx);
+
+    // dom.snapshot(opts?) — async, yields to main thread for DOM traversal
+    {
+        let hs_dom = host_state.clone();
+        let dom_snapshot_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = if stack.len() == 0 {
+                serde_json::json!({})
+            } else {
+                lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+            };
+
+            let mut hs = hs_dom.borrow_mut();
+            hs.async_call_counter += 1;
+            let call_id = hs.async_call_counter;
+            let command = AsyncCommand {
+                call_id,
+                action: "dom_snapshot".to_string(),
+                params,
+            };
+            hs.pending_async_command = Some(command);
+
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        dom_table.set_field(ctx, "snapshot", dom_snapshot_cb);
+    }
+
+    // dom.format(snapshot, format?) — async, relays to main thread for formatting
+    {
+        let hs_dom = host_state.clone();
+        let dom_format_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            if stack.len() < 1 {
+                let msg = "dom.format requires a snapshot argument".to_string();
+                return Err(msg.into_value(ctx).into());
+            }
+
+            let snapshot = lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null);
+            let format = if stack.len() >= 2 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    _ => "compact-text".to_string(),
+                }
+            } else {
+                "compact-text".to_string()
+            };
+
+            let mut hs = hs_dom.borrow_mut();
+            hs.async_call_counter += 1;
+            let call_id = hs.async_call_counter;
+            let command = AsyncCommand {
+                call_id,
+                action: "dom_format".to_string(),
+                params: serde_json::json!({
+                    "snapshot": snapshot,
+                    "format": format,
+                }),
+            };
+            hs.pending_async_command = Some(command);
+
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        dom_table.set_field(ctx, "format", dom_format_cb);
+    }
+
+    ctx.set_global("dom", dom_table);
+
+    // ── page module (Agent API: snapshot + element actions + navigation) ──
+    let page_table = Table::new(&ctx);
+
+    // page.snapshot(opts?) — async, yields "page_snapshot"
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = if stack.len() == 0 {
+                serde_json::json!({})
+            } else {
+                lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_snapshot".to_string(),
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "snapshot", cb);
+    }
+
+    // page.click(ref_id) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.click requires a ref_id argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_click".to_string(),
+                params: serde_json::json!({ "refId": ref_id }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "click", cb);
+    }
+
+    // page.dblclick(ref_id) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.dblclick requires a ref_id argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_dblclick".to_string(),
+                params: serde_json::json!({ "refId": ref_id }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "dblclick", cb);
+    }
+
+    // page.fill(ref_id, value) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.fill requires ref_id and value arguments".into_value(ctx).into());
+            };
+            let value = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.fill requires a value argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_fill".to_string(),
+                params: serde_json::json!({ "refId": ref_id, "value": value }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "fill", cb);
+    }
+
+    // page.type(ref_id, text) — async (append text)
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.type requires ref_id and text arguments".into_value(ctx).into());
+            };
+            let text = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.type requires a text argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_type".to_string(),
+                params: serde_json::json!({ "refId": ref_id, "text": text }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "type", cb);
+    }
+
+    // page.press(key) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let key = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.press requires a key argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_press".to_string(),
+                params: serde_json::json!({ "key": key }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "press", cb);
+    }
+
+    // page.select(ref_id, value) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.select requires ref_id and value arguments".into_value(ctx).into());
+            };
+            let value = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.select requires a value argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_select".to_string(),
+                params: serde_json::json!({ "refId": ref_id, "value": value }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "select", cb);
+    }
+
+    // page.check(ref_id, checked?) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.check requires a ref_id argument".into_value(ctx).into());
+            };
+            let checked = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::Boolean(b) => b,
+                    Value::Nil => true,
+                    _ => true,
+                }
+            } else {
+                true
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_check".to_string(),
+                params: serde_json::json!({ "refId": ref_id, "checked": checked }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "check", cb);
+    }
+
+    // page.hover(ref_id) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.hover requires a ref_id argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_hover".to_string(),
+                params: serde_json::json!({ "refId": ref_id }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "hover", cb);
+    }
+
+    // page.unhover() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_unhover".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "unhover", cb);
+    }
+
+    // page.scroll(direction, amount) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let direction = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                "down".to_string()
+            };
+            let amount = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::Integer(i) => i as f64,
+                    Value::Number(f) => f,
+                    _ => 300.0,
+                }
+            } else {
+                300.0
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_scroll".to_string(),
+                params: serde_json::json!({ "direction": direction, "amount": amount }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "scroll", cb);
+    }
+
+    // page.scroll_to(ref_id) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.scroll_to requires a ref_id argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_scroll_to".to_string(),
+                params: serde_json::json!({ "refId": ref_id }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "scroll_to", cb);
+    }
+
+    // page.url() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_url".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "url", cb);
+    }
+
+    // page.title() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_title".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "title", cb);
+    }
+
+    // page.screenshot() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_screenshot".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "screenshot", cb);
+    }
+
+    // page.goto(url) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let url = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.goto requires a URL argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_goto".to_string(),
+                params: serde_json::json!({ "url": url }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "goto", cb);
+    }
+
+    // page.back() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_back".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "back", cb);
+    }
+
+    // page.forward() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_forward".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "forward", cb);
+    }
+
+    // page.reload() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_reload".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "reload", cb);
+    }
+
+    // page.wait(ms) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ms = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::Integer(i) => i as u64,
+                    Value::Number(f) => f as u64,
+                    _ => 1000,
+                }
+            } else {
+                1000
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_wait".to_string(),
+                params: serde_json::json!({ "ms": ms }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "wait", cb);
+    }
+
+    // page.tabs() — async (extension mode)
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_tabs".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "tabs", cb);
+    }
+
+    // page.switch(tabId) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let tab_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::Integer(i) => i as f64,
+                    Value::Number(f) => f,
+                    other => {
+                        let msg = format!("page.switch expects tabId (number), got {}", other.type_name());
+                        return Err(msg.into_value(ctx).into());
+                    }
+                }
+            } else {
+                return Err("page.switch requires a tabId argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_switch".to_string(),
+                params: serde_json::json!({ "tabId": tab_id }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "switch", cb);
+    }
+
+    // page.new_tab(url?) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let url = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::String(s) => Some(String::from_utf8_lossy(s.as_bytes()).to_string()),
+                    Value::Nil => None,
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_new_tab".to_string(),
+                params: serde_json::json!({ "url": url }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "new_tab", cb);
+    }
+
+    // page.close(tabId) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let tab_id = if stack.len() > 0 {
+                match stack.get(0) {
+                    Value::Integer(i) => i as f64,
+                    Value::Number(f) => f,
+                    other => {
+                        let msg = format!("page.close expects tabId (number), got {}", other.type_name());
+                        return Err(msg.into_value(ctx).into());
+                    }
+                }
+            } else {
+                return Err("page.close requires a tabId argument".into_value(ctx).into());
+            };
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_close".to_string(),
+                params: serde_json::json!({ "tabId": tab_id }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "close", cb);
+    }
+
+    // page.active_tab() — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: "page_active_tab".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield { to_thread: None, then: None })
+        });
+        page_table.set_field(ctx, "active_tab", cb);
+    }
+
+    ctx.set_global("page", page_table);
 
     // ── host.call(action, params) — generic async bridge for JS handlers ──
     let hs_host = host_state.clone();

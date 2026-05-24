@@ -1,2 +1,4 @@
 dist/
 node_modules/
+public/pkg-dom/
+public/pkg-dom-agent/

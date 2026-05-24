@@ -1,0 +1,70 @@
+import { test, expect } from "@playwright/test";
+import { launchExtensionContext, waitForKernelReady, setCellCode, runCell, waitForCellStatus, expectCellOutputContains } from "../extension-helpers";
+
+test.describe("chrome.action", () => {
+  test("chrome.action.setBadgeText sets badge", async () => {
+    const { context, popup } = await launchExtensionContext();
+    try {
+      await waitForKernelReady(popup, 30_000);
+      await popup.locator('.cm-content').first().waitFor({ state: 'visible', timeout: 10_000 });
+      await popup.waitForTimeout(500);
+
+      await setCellCode(popup, 0, `
+chrome.action.setBadgeText({text = "3"})
+chrome.action.setBadgeBackgroundColor({color = "#FF0000"})
+chrome.action.setTitle({title = "Lua Notebook - 3 cells"})
+print("badge set")
+      `);
+      await runCell(popup, 0);
+      await waitForCellStatus(popup, 0, "success", 20_000);
+      await expectCellOutputContains(popup, 0, "badge set");
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("chrome.windows", () => {
+  test("chrome.windows.getAll returns windows", async () => {
+    const { context, popup } = await launchExtensionContext();
+    try {
+      await waitForKernelReady(popup, 30_000);
+      await popup.locator('.cm-content').first().waitFor({ state: 'visible', timeout: 10_000 });
+      await popup.waitForTimeout(500);
+
+      await setCellCode(popup, 0, `
+local wins = chrome.windows.getAll({})
+print("windows: " .. #wins)
+print("type: " .. type(wins[1].id))
+      `);
+      await runCell(popup, 0);
+      await waitForCellStatus(popup, 0, "success", 20_000);
+      await expectCellOutputContains(popup, 0, "windows:");
+      await expectCellOutputContains(popup, 0, "type: number");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("chrome.windows.create then chrome.windows.remove", async () => {
+    const { context, popup } = await launchExtensionContext();
+    try {
+      await waitForKernelReady(popup, 30_000);
+      await popup.locator('.cm-content').first().waitFor({ state: 'visible', timeout: 10_000 });
+      await popup.waitForTimeout(500);
+
+      await setCellCode(popup, 0, `
+local win = chrome.windows.create({url = "https://example.com", focused = false})
+print("created window: " .. type(win.id))
+chrome.windows.remove({windowId = win.id})
+print("removed")
+      `);
+      await runCell(popup, 0);
+      await waitForCellStatus(popup, 0, "success", 20_000);
+      await expectCellOutputContains(popup, 0, "created window: number");
+      await expectCellOutputContains(popup, 0, "removed");
+    } finally {
+      await context.close();
+    }
+  });
+});

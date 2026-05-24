@@ -123,6 +123,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "dom-semantic-tree"
+version = "0.1.0"
+source = "git+https://github.com/Irvingouj/dom-semantic-tree.git#49aed0b041f924585416de28c3861f9216e84c30"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "dom-snapshot-wasm"
+version = "0.1.0"
+dependencies = [
+ "dom-semantic-tree",
+ "js-sys",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -599,6 +624,17 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 // Web Worker kernel for piccolo notebook runtime
 // This worker loads WASM, manages a Session, and handles messages from the main thread.
 
-import init, { WasmSession } from '../pkg/piccolo_notebook.js';
+import init, { WasmSession } from '../pkg/piccolo_notebook_wasm.js';
 import type { WorkerRunResult } from './types';
 
 let session: WasmSession | null = null;
@@ -122,7 +122,55 @@ async function handleAsyncCommand(command: AsyncCommand): Promise<any> {
     case 'clipboard_write': {
       return handleExtensionApi(command);
     }
-    default:
+    case 'dom_snapshot':
+    case 'dom_format': {
+      // DOM operations need main thread (DOM access) + dom-semantic-tree WASM
+      return handleMainThreadRelay(command);
+    }
+    case 'page_snapshot':
+    case 'page_click':
+    case 'page_dblclick':
+    case 'page_fill':
+    case 'page_type':
+    case 'page_press':
+    case 'page_select':
+    case 'page_check':
+    case 'page_hover':
+    case 'page_unhover':
+    case 'page_scroll':
+    case 'page_scroll_to':
+    case 'page_url':
+    case 'page_title':
+    case 'page_screenshot':
+    case 'page_goto':
+    case 'page_back':
+    case 'page_forward':
+    case 'page_reload':
+    case 'page_wait':
+    case 'page_tabs':
+    case 'page_switch':
+    case 'page_new_tab':
+    case 'page_close':
+    case 'page_active_tab': {
+      // Page agent actions need main thread (DOM access + Agent WASM)
+      return handleMainThreadRelay(command);
+    }
+    default: {
+      // Route all chrome_* actions to the extension API handler
+      // These need to go through the main thread because web workers
+      // in extension popups don't have access to chrome.* APIs
+      if (command.action.startsWith('chrome_')) {
+        return handleExtensionApi(command);
+      }
+      return {
+        ok: false,
+        error: {
+          message: `Unknown async action: ${command.action}`,
+          code: 'E_UNKNOWN',
+          category: 'unknown',
+        },
+      };
+    }
       return {
         ok: false,
         error: {
@@ -256,16 +304,39 @@ function handleHostCall(command: AsyncCommand): Promise<any> {
 }
 
 /**
+ * Normalize Chrome extension errors to stable error codes.
+ */
+function normalizeChromeError(err: any): any {
+  const msg = err?.message || String(err);
+  if (msg.includes('permission') || msg.includes('Permission')) {
+    return { ok: false, error: { message: msg, code: 'E_PERMISSION_DENIED', category: 'permission' } };
+  }
+  if (msg.includes('not found') || msg.includes('No tab') || msg.includes('No window')) {
+    return { ok: false, error: { message: msg, code: 'E_NOT_FOUND', category: 'resource' } };
+  }
+  return { ok: false, error: { message: msg, code: 'E_EXTENSION', category: 'extension' } };
+}
+
+/**
  * Handle browser extension API commands.
- * In non-extension context, returns a clear error.
+ * chrome_* actions are always relayed to the main thread because
+ * Web Workers in extension popups don't have access to chrome.* APIs.
+ * Legacy web.* actions try to call chrome APIs directly in the worker.
  */
 async function handleExtensionApi(command: AsyncCommand): Promise<any> {
+  // All chrome_* actions must go through main thread relay
+  // because web workers don't have access to chrome.* APIs
+  if (command.action.startsWith('chrome_')) {
+    return handleMainThreadRelay(command);
+  }
+
+  // Legacy web.* actions — try direct chrome API access (for backward compat)
   if (!isExtensionContext()) {
     return {
       ok: false,
       error: {
         message: `${command.action} is only available in a browser extension context`,
-        code: 'ENOEXTENSION',
+        code: 'E_NO_EXTENSION',
         category: 'permission',
       },
     };
@@ -277,6 +348,7 @@ async function handleExtensionApi(command: AsyncCommand): Promise<any> {
     let result: any;
 
     switch (command.action) {
+      // ── Legacy web.* actions ──
       case 'tab_query': {
         result = await chrome.tabs.query(command.params[0] || {});
         break;
@@ -355,35 +427,204 @@ async function handleExtensionApi(command: AsyncCommand): Promise<any> {
         } else {
           return {
             ok: false,
-            error: { message: 'Notifications API not available', code: 'ENOEXTENSION', category: 'permission' },
+            error: { message: 'Notifications API not available', code: 'E_NO_EXTENSION', category: 'permission' },
           };
         }
         break;
       }
       case 'clipboard_read': {
-        // Clipboard needs main thread in some contexts
         return handleMainThreadRelay(command);
       }
       case 'clipboard_write': {
         return handleMainThreadRelay(command);
       }
+
+      // ── chrome.runtime ──
+      case 'chrome_runtime_sendMessage': {
+        const message = command.params[0] || command.params;
+        result = await chrome.runtime.sendMessage(message);
+        break;
+      }
+
+      // ── chrome.tabs ──
+      case 'chrome_tabs_query': {
+        result = await chrome.tabs.query(command.params[0] || {});
+        break;
+      }
+      case 'chrome_tabs_create': {
+        result = await chrome.tabs.create(command.params[0] || {});
+        break;
+      }
+      case 'chrome_tabs_update': {
+        const tabId = command.params[0]?.tabId || command.params[0];
+        const updateProps = command.params[0]?.update || command.params[1] || {};
+        result = await chrome.tabs.update(typeof tabId === 'number' ? tabId : null, updateProps);
+        break;
+      }
+      case 'chrome_tabs_remove': {
+        const removeTabId = command.params[0]?.tabId || command.params[0]?.id || command.params[0];
+        await chrome.tabs.remove(removeTabId);
+        result = null;
+        break;
+      }
+      case 'chrome_tabs_sendMessage': {
+        const tabId = command.params[0]?.tabId || command.params[0];
+        const message = command.params[0]?.message || command.params[1] || {};
+        result = await chrome.tabs.sendMessage(tabId, message);
+        break;
+      }
+
+      // ── chrome.alarms ──
+      case 'chrome_alarms_create': {
+        const name = command.params[0]?.name || command.params[0] || '';
+        const alarmInfo = command.params[0]?.alarmInfo || command.params[1] || command.params[0] || {};
+        await chrome.alarms.create(name, alarmInfo);
+        result = null;
+        break;
+      }
+      case 'chrome_alarms_clear': {
+        const alarmName = command.params[0]?.name || command.params[0] || '';
+        result = await chrome.alarms.clear(alarmName);
+        break;
+      }
+
+      // ── chrome.action ──
+      case 'chrome_action_setBadgeText': {
+        await chrome.action.setBadgeText(command.params[0] || {});
+        result = null;
+        break;
+      }
+      case 'chrome_action_setBadgeBackgroundColor': {
+        await chrome.action.setBadgeBackgroundColor(command.params[0] || {});
+        result = null;
+        break;
+      }
+      case 'chrome_action_setTitle': {
+        await chrome.action.setTitle(command.params[0] || {});
+        result = null;
+        break;
+      }
+      case 'chrome_action_setIcon': {
+        result = await chrome.action.setIcon(command.params[0] || {});
+        break;
+      }
+
+      // ── chrome.contextMenus ──
+      case 'chrome_contextMenus_create': {
+        result = await chrome.contextMenus.create(command.params[0] || {});
+        break;
+      }
+      case 'chrome_contextMenus_remove': {
+        const menuId = command.params[0]?.menuItemId || command.params[0]?.id || command.params[0];
+        await chrome.contextMenus.remove(menuId);
+        result = null;
+        break;
+      }
+
+      // ── chrome.windows ──
+      case 'chrome_windows_getAll': {
+        result = await chrome.windows.getAll(command.params[0] || {});
+        break;
+      }
+      case 'chrome_windows_create': {
+        result = await chrome.windows.create(command.params[0] || {});
+        break;
+      }
+      case 'chrome_windows_update': {
+        const windowId = command.params[0]?.windowId || command.params[0];
+        const updateInfo = command.params[0]?.update || command.params[1] || {};
+        result = await chrome.windows.update(windowId, updateInfo);
+        break;
+      }
+      case 'chrome_windows_remove': {
+        const windowId = command.params[0]?.windowId || command.params[0];
+        await chrome.windows.remove(windowId);
+        result = null;
+        break;
+      }
+
+      // ── chrome.sidePanel ──
+      case 'chrome_sidePanel_setOptions': {
+        await chrome.sidePanel.setOptions(command.params[0] || {});
+        result = null;
+        break;
+      }
+
+      // ── chrome.cookies ──
+      case 'chrome_cookies_get': {
+        result = await chrome.cookies.get(command.params[0] || {});
+        break;
+      }
+      case 'chrome_cookies_set': {
+        result = await chrome.cookies.set(command.params[0] || {});
+        break;
+      }
+      case 'chrome_cookies_remove': {
+        result = await chrome.cookies.remove(command.params[0] || {});
+        break;
+      }
+      case 'chrome_cookies_getAll': {
+        result = await chrome.cookies.getAll(command.params[0] || {});
+        break;
+      }
+
+      // ── chrome.bookmarks ──
+      case 'chrome_bookmarks_search': {
+        const query = command.params[0]?.query || command.params[0] || '';
+        result = await chrome.bookmarks.search(query);
+        break;
+      }
+      case 'chrome_bookmarks_create': {
+        result = await chrome.bookmarks.create(command.params[0] || {});
+        break;
+      }
+      case 'chrome_bookmarks_remove': {
+        const bookmarkId = command.params[0]?.id || command.params[0];
+        await chrome.bookmarks.remove(bookmarkId);
+        result = null;
+        break;
+      }
+
+      // ── chrome.history ──
+      case 'chrome_history_search': {
+        result = await chrome.history.search(command.params[0] || {});
+        break;
+      }
+      case 'chrome_history_deleteUrl': {
+        await chrome.history.deleteUrl(command.params[0]?.url || command.params[0]);
+        result = null;
+        break;
+      }
+
+      // ── chrome.notifications ──
+      case 'chrome_notifications_create': {
+        const notifId = command.params[0]?.id || command.params[0] || '';
+        const options = command.params[0]?.options || command.params[1] || {};
+        result = await chrome.notifications.create(notifId, options);
+        break;
+      }
+      case 'chrome_notifications_clear': {
+        const notifId = command.params[0]?.id || command.params[0] || '';
+        result = await chrome.notifications.clear(notifId);
+        break;
+      }
+
+      // ── chrome.scripting ──
+      case 'chrome_scripting_executeScript': {
+        result = await chrome.scripting.executeScript(command.params[0] || {});
+        break;
+      }
+
       default:
         return {
           ok: false,
-          error: { message: `Unimplemented extension action: ${command.action}`, code: 'EUNKNOWN', category: 'unknown' },
+          error: { message: `Unimplemented extension action: ${command.action}`, code: 'E_UNKNOWN', category: 'unknown' },
         };
     }
 
     return { ok: true, value: result };
   } catch (err: any) {
-    return {
-      ok: false,
-      error: {
-        message: err.message || String(err),
-        code: 'EEXTENSION',
-        category: 'extension',
-      },
-    };
+    return normalizeChromeError(err);
   }
 }
 
