@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 piccolo-notebook-core = { path = "../piccolo-notebook-core" }
-piccolo = { path = "../../vendor/piccolo" }
+piccolo = { path = "../piccolo" }
 sha2 = "0.10"
 md-5 = "0.10"
 hmac = "0.12"

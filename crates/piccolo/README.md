@@ -3,6 +3,16 @@
 [![Build Status](https://img.shields.io/circleci/project/github/kyren/piccolo.svg)](https://circleci.com/gh/kyren/piccolo)
 [![Chat](https://img.shields.io/discord/865004050357682246)](https://discord.gg/CSJCVTvgNB)
 
+> **Fork of [kyren/piccolo](https://github.com/kyren/piccolo)** (v0.3.3)
+>
+> This is an unmodified copy of piccolo used as a first-party dependency in the
+> [web-lua](https://github.com/Irvingouj/web-lua) project. The source code is
+> identical to upstream — we vendor it here because our crates depend on piccolo
+> but we don't publish to crates.io. All credit belongs to the original author
+> ([kyren](https://github.com/kyren)). Licensed under MIT.
+>
+> Upstream: https://github.com/kyren/piccolo
+
 ## piccolo - An experimental stackless Lua VM implemented in pure Rust
 
 **(After *four* years, now UN-paused!)**
