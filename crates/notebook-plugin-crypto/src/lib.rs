@@ -79,8 +79,9 @@ impl LuaPlugin for CryptoPlugin {
         // crypto.hex_decode(hex_string) → decoded string
         let hex_dec_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
             let input: String = stack_arg_string(ctx, &mut stack, 0, "crypto.hex_decode")?;
-            let decoded = hex::decode(input.as_str())
-                .map_err(|e| -> piccolo::Error { format!("hex_decode error: {}", e).into_value(ctx).into() })?;
+            let decoded = hex::decode(input.as_str()).map_err(|e| -> piccolo::Error {
+                format!("hex_decode error: {}", e).into_value(ctx).into()
+            })?;
             let s = String::from_utf8_lossy(&decoded).to_string();
             stack.clear();
             stack.push_back(ctx.intern(s.as_bytes()).into());
@@ -134,7 +135,10 @@ mod tests {
         let mut session = make_session();
         let result = session.run_cell(r#"print(crypto.sha256("hello"))"#, "");
         assert!(result.error.is_none(), "got: {:?}", result.error);
-        assert_eq!(result.stdout[0], "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
+        assert_eq!(
+            result.stdout[0],
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
     }
 
     #[test]
@@ -148,10 +152,7 @@ mod tests {
     #[test]
     fn test_hmac_sha256() {
         let mut session = make_session();
-        let result = session.run_cell(
-            r#"print(crypto.hmac_sha256("key", "message"))"#,
-            "",
-        );
+        let result = session.run_cell(r#"print(crypto.hmac_sha256("key", "message"))"#, "");
         assert!(result.error.is_none(), "got: {:?}", result.error);
         assert_eq!(result.stdout[0].len(), 64);
     }
@@ -186,7 +187,11 @@ mod tests {
             "",
         );
         assert!(result.error.is_none(), "got: {:?}", result.error);
-        assert!(result.stdout[0].contains("true"), "got: {:?}", result.stdout);
+        assert!(
+            result.stdout[0].contains("true"),
+            "got: {:?}",
+            result.stdout
+        );
     }
 
     #[test]

@@ -63,10 +63,12 @@ interface AsyncCommand {
 
 /**
  * Execute a cell, handling async yield/resume cycles automatically.
+ * fetch/sleep are resolved directly in WASM via runCellAsync;
+ * everything else (storage, DOM, chrome.*, host.*) falls back to JS relay.
  */
 async function executeCell(id: string, code: string, stdin: string) {
   try {
-    let result = session!.run_cell(code, stdin);
+    let result = await session!.runCellAsync(code, stdin);
 
     while (result.status === 'async_pending' && result.pending_command) {
       const response = await handleAsyncCommand(result.pending_command);
@@ -90,11 +92,19 @@ async function handleAsyncCommand(command: AsyncCommand): Promise<any> {
   }
 
   switch (command.action) {
-    case 'fetch': {
-      return handleFetch(command.params);
-    }
+    case 'fetch':
     case 'sleep': {
-      return handleSleep(command.params);
+      // These are handled directly inside WASM by runCellAsync.
+      // If we reach here, the WASM async resolver returned them back
+      // because it was unable to execute (e.g. missing fetch in environment).
+      return {
+        ok: false,
+        error: {
+          message: `${command.action} not available in this environment`,
+          code: 'E_UNAVAILABLE',
+          category: 'environment',
+        },
+      };
     }
     case 'storage_get':
     case 'storage_set':
@@ -171,99 +181,7 @@ async function handleAsyncCommand(command: AsyncCommand): Promise<any> {
         },
       };
     }
-      return {
-        ok: false,
-        error: {
-          message: `Unknown async action: ${command.action}`,
-          code: 'EUNKNOWN',
-          category: 'unknown',
-        },
-      };
   }
-}
-
-/**
- * Real fetch implementation with timeout and error classification.
- */
-async function handleFetch(params: {
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  body: string | null;
-  timeout: number;
-}): Promise<any> {
-  const { url, method, headers, body, timeout } = params;
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout || 30_000);
-
-    const fetchOpts: RequestInit = {
-      method: method || 'GET',
-      headers: headers || {},
-      signal: controller.signal,
-    };
-    if (body !== null && body !== undefined) {
-      fetchOpts.body = body;
-    }
-
-    const response = await fetch(url, fetchOpts);
-    clearTimeout(timeoutId);
-
-    const responseBody = await response.text();
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-
-    return {
-      ok: true,
-      value: {
-        status: response.status,
-        ok: response.ok,
-        headers: responseHeaders,
-        body: responseBody,
-      },
-    };
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      return {
-        ok: false,
-        error: {
-          message: `Request timed out after ${timeout || 30_000}ms`,
-          code: 'ETIMEDOUT',
-          category: 'timeout',
-        },
-      };
-    }
-    if (err instanceof TypeError) {
-      // Network errors in fetch are TypeError
-      return {
-        ok: false,
-        error: {
-          message: err.message,
-          code: 'ENETWORK',
-          category: 'network',
-        },
-      };
-    }
-    return {
-      ok: false,
-      error: {
-        message: err.message || String(err),
-        code: 'EUNKNOWN',
-        category: 'unknown',
-      },
-    };
-  }
-}
-
-/**
- * Sleep: wait for a specified duration.
- */
-async function handleSleep(params: { duration: number }): Promise<any> {
-  await new Promise(resolve => setTimeout(resolve, params.duration || 0));
-  return { ok: true, value: null };
 }
 
 /**
