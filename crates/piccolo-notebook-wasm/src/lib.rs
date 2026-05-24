@@ -1,5 +1,172 @@
 use wasm_bindgen::prelude::*;
 use piccolo_notebook_core::NotebookSession;
+use tsify::Tsify;
+use serde::{Deserialize, Serialize};
+
+// ─── Typed wrapper types for WASM ABI ───────────────────────────
+// These mirror the core types but derive Tsify so wasm-bindgen
+// emits proper TypeScript interfaces in the .d.ts output.
+
+/// Status of a cell execution.
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+#[serde(rename_all = "snake_case")]
+pub enum WasmCellStatus {
+    Done,
+    AsyncPending,
+}
+
+/// Error details inside an async response.
+#[derive(Debug, Clone, Deserialize, Serialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmAsyncError {
+    pub message: String,
+    pub code: String,
+}
+
+/// Response passed to `resume_cell` to resolve an async yield.
+#[derive(Debug, Clone, Deserialize, Serialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmAsyncResponse {
+    pub ok: bool,
+    #[tsify(type = "any")]
+    pub value: Option<serde_json::Value>,
+    pub error: Option<WasmAsyncError>,
+}
+
+/// Structured error from running a cell.
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum WasmCellError {
+    Compile { message: String, line: Option<u32> },
+    Runtime { message: String },
+    StrictMode { variable: String },
+    FuelExhausted,
+    Internal { message: String },
+}
+
+/// A single global variable observed by `inspect_globals`.
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct WasmGlobalVariable {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub type_name: String,
+    pub value: Option<String>,
+    pub keys: Option<Vec<String>>,
+}
+
+/// Snapshot of all Lua globals.
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct WasmGlobalsSnapshot {
+    pub variables: Vec<WasmGlobalVariable>,
+    pub execution_count: u32,
+}
+
+/// An async command yielded from Lua, waiting for external resolution.
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct WasmAsyncCommand {
+    pub call_id: u32,
+    pub action: String,
+    #[tsify(type = "any")]
+    pub params: serde_json::Value,
+}
+
+/// Result of running a single cell.
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct WasmRunResult {
+    pub stdout: Vec<String>,
+    pub stderr: Vec<String>,
+    pub result: Option<String>,
+    pub error: Option<WasmCellError>,
+    #[tsify(type = "any[]")]
+    pub commands: Vec<serde_json::Value>,
+    pub fuel_exhausted: bool,
+    pub execution_count: u32,
+    pub status: WasmCellStatus,
+    pub pending_command: Option<WasmAsyncCommand>,
+}
+
+impl From<piccolo_notebook_core::CellStatus> for WasmCellStatus {
+    fn from(s: piccolo_notebook_core::CellStatus) -> Self {
+        match s {
+            piccolo_notebook_core::CellStatus::Done => WasmCellStatus::Done,
+            piccolo_notebook_core::CellStatus::AsyncPending => WasmCellStatus::AsyncPending,
+        }
+    }
+}
+
+impl From<piccolo_notebook_core::CellError> for WasmCellError {
+    fn from(e: piccolo_notebook_core::CellError) -> Self {
+        match e {
+            piccolo_notebook_core::CellError::Compile { message, line } => {
+                WasmCellError::Compile { message, line }
+            }
+            piccolo_notebook_core::CellError::Runtime { message } => {
+                WasmCellError::Runtime { message }
+            }
+            piccolo_notebook_core::CellError::StrictMode { variable } => {
+                WasmCellError::StrictMode { variable }
+            }
+            piccolo_notebook_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
+            piccolo_notebook_core::CellError::Internal { message } => {
+                WasmCellError::Internal { message }
+            }
+        }
+    }
+}
+
+impl From<piccolo_notebook_core::GlobalVariable> for WasmGlobalVariable {
+    fn from(v: piccolo_notebook_core::GlobalVariable) -> Self {
+        WasmGlobalVariable {
+            name: v.name,
+            type_name: v.type_name,
+            value: v.value,
+            keys: v.keys,
+        }
+    }
+}
+
+impl From<piccolo_notebook_core::GlobalsSnapshot> for WasmGlobalsSnapshot {
+    fn from(s: piccolo_notebook_core::GlobalsSnapshot) -> Self {
+        WasmGlobalsSnapshot {
+            variables: s.variables.into_iter().map(Into::into).collect(),
+            execution_count: s.execution_count,
+        }
+    }
+}
+
+impl From<piccolo_notebook_core::AsyncCommand> for WasmAsyncCommand {
+    fn from(c: piccolo_notebook_core::AsyncCommand) -> Self {
+        WasmAsyncCommand {
+            call_id: c.call_id,
+            action: c.action,
+            params: c.params,
+        }
+    }
+}
+
+impl From<piccolo_notebook_core::RunResult> for WasmRunResult {
+    fn from(r: piccolo_notebook_core::RunResult) -> Self {
+        WasmRunResult {
+            stdout: r.stdout,
+            stderr: r.stderr,
+            result: r.result,
+            error: r.error.map(Into::into),
+            commands: r.commands,
+            fuel_exhausted: r.fuel_exhausted,
+            execution_count: r.execution_count,
+            status: r.status.into(),
+            pending_command: r.pending_command.map(Into::into),
+        }
+    }
+}
+
+// ─── WasmSession ────────────────────────────────────────────────
 
 /// WasmSession wraps NotebookSession for use from JavaScript/TypeScript.
 #[wasm_bindgen]
@@ -18,41 +185,14 @@ impl WasmSession {
     }
 
     /// Run a cell of code with optional stdin.
-    /// Returns a JSON string with the result.
-    pub fn run_cell(&mut self, code: &str, stdin: &str) -> String {
-        let result = self.inner.run_cell(code, stdin);
-        serde_json::to_string(&result).unwrap_or_else(|e| {
-            serde_json::json!({
-                "error": { "kind": "internal", "message": format!("Serialization error: {}", e) },
-                "stdout": [],
-                "stderr": [],
-                "result": null,
-                "commands": [],
-                "fuel_exhausted": false,
-                "execution_count": 0,
-                "status": "done",
-                "pending_command": null
-            }).to_string()
-        })
+    pub fn run_cell(&mut self, code: &str, stdin: &str) -> WasmRunResult {
+        self.inner.run_cell(code, stdin).into()
     }
 
     /// Resume a yielded cell with an async response.
-    /// Returns a JSON string with the result.
-    pub fn resume_cell(&mut self, result_json: &str) -> String {
-        let result = self.inner.resume_cell(result_json);
-        serde_json::to_string(&result).unwrap_or_else(|e| {
-            serde_json::json!({
-                "error": { "kind": "internal", "message": format!("Serialization error: {}", e) },
-                "stdout": [],
-                "stderr": [],
-                "result": null,
-                "commands": [],
-                "fuel_exhausted": false,
-                "execution_count": 0,
-                "status": "done",
-                "pending_command": null
-            }).to_string()
-        })
+    pub fn resume_cell(&mut self, response: WasmAsyncResponse) -> WasmRunResult {
+        let json = serde_json::to_string(&response).unwrap_or_default();
+        self.inner.resume_cell(&json).into()
     }
 
     /// Reset the session, clearing all Lua state.
@@ -67,35 +207,13 @@ impl WasmSession {
 
     /// Load a Lua library by executing its source code.
     /// Any globals defined become available to subsequent cells.
-    /// Returns a JSON string with the result.
-    pub fn load_library(&mut self, source: &str) -> String {
-        let result = self.inner.run_cell(source, "");
-        serde_json::to_string(&result).unwrap_or_else(|e| {
-            serde_json::json!({
-                "error": { "kind": "internal", "message": format!("Serialization error: {}", e) },
-                "stdout": [],
-                "stderr": [],
-                "result": null,
-                "commands": [],
-                "fuel_exhausted": false,
-                "execution_count": 0,
-                "status": "done",
-                "pending_command": null
-            }).to_string()
-        })
+    pub fn load_library(&mut self, source: &str) -> WasmRunResult {
+        self.inner.run_cell(source, "").into()
     }
 
     /// Inspect all global variables in the current Lua state.
-    /// Returns a JSON string with { variables: [...], execution_count: N }.
-    pub fn inspect_globals(&mut self) -> String {
-        let snapshot = self.inner.inspect_globals();
-        serde_json::to_string(&snapshot).unwrap_or_else(|e| {
-            serde_json::json!({
-                "error": format!("Serialization error: {}", e),
-                "variables": [],
-                "execution_count": 0
-            }).to_string()
-        })
+    pub fn inspect_globals(&mut self) -> WasmGlobalsSnapshot {
+        self.inner.inspect_globals().into()
     }
 }
 

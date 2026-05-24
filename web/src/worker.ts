@@ -66,13 +66,11 @@ interface AsyncCommand {
  */
 async function executeCell(id: string, code: string, stdin: string) {
   try {
-    let jsonStr = session!.run_cell(code, stdin);
-    let result: WorkerRunResult = JSON.parse(jsonStr);
+    let result = session!.run_cell(code, stdin);
 
     while (result.status === 'async_pending' && result.pending_command) {
       const response = await handleAsyncCommand(result.pending_command);
-      jsonStr = session!.resume_cell(JSON.stringify(response));
-      result = JSON.parse(jsonStr);
+      result = session!.resume_cell(response);
     }
 
     self.postMessage({ type: 'result', id, data: result });
@@ -686,8 +684,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
 
     case 'inspectGlobals': {
       try {
-        const jsonStr = session!.inspect_globals();
-        const snap = JSON.parse(jsonStr);
+        const snap = session!.inspect_globals();
         self.postMessage({ type: 'globalsSnapshot', variables: snap.variables, executionCount: snap.execution_count });
       } catch (err: any) {
         self.postMessage({ type: 'error', error: err.message || String(err) });

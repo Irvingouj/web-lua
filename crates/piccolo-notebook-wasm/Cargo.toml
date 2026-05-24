@@ -11,7 +11,9 @@ piccolo-notebook-core = { path = "../piccolo-notebook-core" }
 wasm-bindgen = "0.2"
 serde.workspace = true
 serde_json.workspace = true
+serde-wasm-bindgen = "0.6"
 js-sys = "0.3"
+tsify = "0.5"
 
 [dependencies.web-sys]
 version = "0.3"
