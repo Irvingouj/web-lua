@@ -10,6 +10,9 @@
     "worker.ts",
     "extension_lua.js",
     "extension_lua.d.ts",
+    "content-script.js",
+    "manifest.json",
+    "background.js",
     "README.md"
   ],
   "dependencies": {

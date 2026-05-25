@@ -20,3 +20,4 @@ crates/extension-lua/js/extension_lua.js
 crates/extension-lua/js/extension_lua.d.ts
 web/public/dom_snapshot_wasm.js
 web/public/dom_snapshot_wasm_bg.wasm
+.claude/

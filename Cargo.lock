@@ -240,18 +240,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dom-snapshot-wasm"
-version = "0.1.0"
-dependencies = [
- "dom-semantic-tree",
- "js-sys",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
 name = "endian-type"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -731,22 +719,6 @@ dependencies = [
  "serde_json",
  "ts-rs",
  "url",
-]
-
-[[package]]
-name = "piccolo-notebook-wasm"
-version = "0.1.0"
-dependencies = [
- "js-sys",
- "piccolo-notebook-core",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "tsify",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
- "web-sys",
 ]
 
 [[package]]

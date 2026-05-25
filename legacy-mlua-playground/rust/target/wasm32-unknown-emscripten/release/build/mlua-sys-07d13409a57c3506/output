@@ -1,5 +1,0 @@
-cargo:rerun-if-changed=build
-cargo:rustc-link-search=native=/Users/oujunyi/code/web-lua/rust/target/wasm32-unknown-emscripten/release/build/mlua-sys-07d13409a57c3506/out/lua-build/lib
-cargo:rustc-link-lib=static=lua5.4
-cargo:include=/Users/oujunyi/code/web-lua/rust/target/wasm32-unknown-emscripten/release/build/mlua-sys-07d13409a57c3506/out/lua-build/include
-cargo:lib=/Users/oujunyi/code/web-lua/rust/target/wasm32-unknown-emscripten/release/build/mlua-sys-07d13409a57c3506/out/lua-build/lib

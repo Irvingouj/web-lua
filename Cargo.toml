@@ -3,12 +3,10 @@ resolver = "2"
 members = [
     "crates/piccolo",
     "crates/piccolo-notebook-core",
-    "crates/piccolo-notebook-wasm",
     "crates/web-lua-base",
     "crates/web-lua",
     "crates/extension-lua",
     "crates/notebook-plugin-crypto",
-    "crates/dom-snapshot-wasm",
     "crates/dom-semantic-tree",
 ]
 
