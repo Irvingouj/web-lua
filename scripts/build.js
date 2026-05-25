@@ -57,7 +57,7 @@ const targets = [
   },
 ];
 
-function buildTarget(target) {
+async function buildTarget(target) {
   console.log(`\n🔧 Building ${target.name}...`);
 
   const wasmPath = path.join(
@@ -80,6 +80,33 @@ function buildTarget(target) {
   const bundleScript = path.join(rootDir, target.bundleScript);
   if (fs.existsSync(bundleScript)) {
     run(`node ${bundleScript} ${target.outDir}`, rootDir);
+  }
+
+  // Generate API docs by loading the self-contained WASM module in Node.js
+  const jsFile = target.name === "web-lua"
+    ? "web_lua.js"
+    : target.name === "extension-lua"
+      ? "extension_lua.js"
+      : null;
+  if (jsFile) {
+    const jsPath = path.join(outDir, jsFile);
+    if (fs.existsSync(jsPath)) {
+      try {
+        const wasmModule = await import(jsPath);
+        if (typeof wasmModule.generateApiDocs === "function") {
+          const md = wasmModule.generateApiDocs("markdown");
+          const json = wasmModule.generateApiDocs("json");
+          const jsDir = path.resolve(target.outDir, "../js");
+          if (fs.existsSync(jsDir)) {
+            fs.writeFileSync(path.join(jsDir, "API.md"), md);
+            fs.writeFileSync(path.join(jsDir, "api.json"), json);
+            console.log(`  API.md + api.json generated`);
+          }
+        }
+      } catch (e) {
+        console.warn(`  Doc generation skipped: ${e.message}`);
+      }
+    }
   }
 
   console.log(`✅ ${target.name} built`);
@@ -107,9 +134,11 @@ const buildWeb = buildAll || args.includes("web");
 const buildExt = buildAll || args.includes("extension");
 const buildDom = buildAll || args.includes("dom");
 
-if (buildWeb) buildTarget(targets[0]);
-if (buildExt) buildTarget(targets[1]);
-if (buildDom) buildTarget(targets[2]);
-if (buildExt) copyExtensionAssets();
+(async () => {
+  if (buildWeb) await buildTarget(targets[0]);
+  if (buildExt) await buildTarget(targets[1]);
+  if (buildDom) await buildTarget(targets[2]);
+  if (buildExt) copyExtensionAssets();
 
-console.log("\n🎉 All builds complete!");
+  console.log("\n🎉 All builds complete!");
+})();

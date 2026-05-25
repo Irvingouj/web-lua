@@ -15,7 +15,9 @@
     "content-script.js",
     "manifest.json",
     "background.js",
-    "README.md"
+    "README.md",
+    "API.md",
+    "api.json"
   ],
   "scripts": {
     "prepublishOnly": "cd ../../../ && node scripts/build.js extension"

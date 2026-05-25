@@ -39,6 +39,32 @@ page.fetch = web.fetch
 sleep = web.sleep
 "#,
         );
+
+        // Register injected alias metadata
+        web_lua_core::lua_api_doc!(
+            namespace: "page",
+            name: "fetch",
+            action: "",
+            doc: "Fetch a URL (alias for web.fetch).",
+            source: "injected_lua",
+            params: [
+                url: "string", required, "URL to fetch",
+                opts: "table | nil", optional, "Options: method, body, headers, timeout",
+            ],
+            returns: "table" => "{ status, ok, body, headers }",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "global",
+            name: "sleep",
+            action: "",
+            doc: "Pause execution (alias for web.sleep).",
+            source: "injected_lua",
+            params: [
+                ms: "number", optional, "Milliseconds to sleep (default 1000)",
+            ],
+            returns: "nil" => "None",
+        );
+
         session
     }
 

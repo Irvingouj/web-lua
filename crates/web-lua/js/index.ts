@@ -4,10 +4,11 @@
 // directly via web_sys.
 
 import type { CellResult, WasmGlobalsSnapshot } from "./web_lua.js";
-import wasmInit, { WebSession as RawWebSession } from "./web_lua.js";
+import wasmInit, { WebSession as RawWebSession, generateApiDocs } from "./web_lua.js";
 
 export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
 export { registerHostHandler, registerHostHandlers } from "./registry";
+export { generateApiDocs };
 
 export class WebSession {
   private raw: RawWebSession;

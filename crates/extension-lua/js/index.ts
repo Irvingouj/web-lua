@@ -4,6 +4,7 @@
 // runner loop, and returns a proxy + runner promise.
 
 import type { CellResult, WasmGlobalsSnapshot } from "./extension_lua.js";
+import { generateApiDocs } from "./extension_lua.js";
 import { logger } from "./logger";
 import {
   executeMainThreadCommand,
@@ -14,7 +15,7 @@ import {
 } from "./runner";
 
 export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
-export { registerHostHandler, registerHostHandlers };
+export { registerHostHandler, registerHostHandlers, generateApiDocs };
 
 interface WorkerMessage {
   type: string;

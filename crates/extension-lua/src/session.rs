@@ -104,6 +104,105 @@ page.fetch = function(url, opts)
 end
 "#,
         );
+        // Register injected alias metadata
+        web_lua_core::lua_api_doc!(
+            namespace: "tab",
+            name: "current",
+            action: "",
+            doc: "Get the active tab ID.",
+            source: "injected_lua",
+            params: [],
+            returns: "number | nil" => "Tab ID or nil",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "tab",
+            name: "url",
+            action: "",
+            doc: "Get the URL of a tab (defaults to current tab).",
+            source: "injected_lua",
+            params: [
+                tab_id: "number | nil", optional, "Tab ID",
+            ],
+            returns: "string | nil" => "URL or nil",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "tab",
+            name: "title",
+            action: "",
+            doc: "Get the title of a tab (defaults to current tab).",
+            source: "injected_lua",
+            params: [
+                tab_id: "number | nil", optional, "Tab ID",
+            ],
+            returns: "string | nil" => "Title or nil",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "tab",
+            name: "open",
+            action: "",
+            doc: "Create a new tab and return its ID.",
+            source: "injected_lua",
+            params: [
+                url: "string | nil", optional, "URL to open",
+            ],
+            returns: "number | nil" => "New tab ID or nil",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "tab",
+            name: "focus",
+            action: "",
+            doc: "Activate (focus) a tab (defaults to current tab).",
+            source: "injected_lua",
+            params: [
+                tab_id: "number | nil", optional, "Tab ID",
+            ],
+            returns: "number | nil" => "Focused tab ID or nil",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "tab",
+            name: "reload",
+            action: "",
+            doc: "Reload a tab (defaults to current tab).",
+            source: "injected_lua",
+            params: [
+                tab_id: "number | nil", optional, "Tab ID",
+            ],
+            returns: "number | nil" => "Reloaded tab ID or nil",
+        );
+        // tab.* aliases to web.tab.*
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "query", action: "tab_query", doc: "Alias for web.tab.query.", source: "injected_lua", params: [query_info: "table", optional, "Query filter"], returns: "table" => "Array of matching tabs");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "create", action: "tab_create", doc: "Alias for web.tab.create.", source: "injected_lua", params: [create_properties: "table", optional, "Tab properties"], returns: "table" => "Created tab object");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "activate", action: "tab_activate", doc: "Alias for web.tab.activate.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "boolean" => "Whether activation succeeded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "close", action: "tab_close", doc: "Alias for web.tab.close.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "boolean" => "Whether close succeeded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "execute_script", action: "tab_execute_script", doc: "Alias for web.tab.execute_script.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", script: "string | table", required, "Script to inject"], returns: "table" => "Injection results");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "click", action: "tab_click", doc: "Alias for web.tab.click.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", ref_id: "number", required, "Element refId"], returns: "boolean" => "Whether click succeeded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "fill", action: "tab_fill", doc: "Alias for web.tab.fill.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", ref_id: "number", required, "Element refId", value: "string", required, "Text to fill"], returns: "boolean" => "Whether fill succeeded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "snapshot", action: "tab_snapshot", doc: "Alias for web.tab.snapshot.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "table" => "DOM snapshot");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "scroll_to", action: "tab_scroll_to", doc: "Alias for web.tab.scroll_to.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", ref_id: "number", required, "Element refId"], returns: "boolean" => "Whether scroll succeeded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "evaluate", action: "tab_evaluate", doc: "Alias for web.tab.evaluate.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", script: "string", required, "JavaScript to evaluate"], returns: "any" => "Evaluation result");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "back", action: "tab_back", doc: "Alias for web.tab.back.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "boolean" => "Whether navigation succeeded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "wait_for_load", action: "tab_wait_for_load", doc: "Alias for web.tab.wait_for_load.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "boolean" => "Whether tab loaded");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "fetch", action: "tab_fetch", doc: "Alias for web.tab.fetch.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", url: "string", required, "URL", opts: "table | nil", optional, "Options"], returns: "table" => "{ status, ok, body, headers }");
+        // runtime.* aliases
+        web_lua_core::lua_api_doc!(namespace: "runtime", name: "fetch", action: "fetch", doc: "Alias for web.fetch.", source: "injected_lua", params: [url: "string", required, "URL", opts: "table | nil", optional, "Options"], returns: "table" => "{ status, ok, body, headers }");
+        web_lua_core::lua_api_doc!(namespace: "runtime", name: "sleep", action: "sleep", doc: "Alias for web.sleep.", source: "injected_lua", params: [ms: "number", optional, "Milliseconds"], returns: "nil" => "None");
+        web_lua_core::lua_api_doc!(namespace: "runtime", name: "storage", action: "", doc: "Alias for web.storage.", source: "injected_lua", params: [], returns: "table" => "Storage API table");
+        web_lua_core::lua_api_doc!(namespace: "runtime", name: "clipboard", action: "", doc: "Alias for web.clipboard.", source: "injected_lua", params: [], returns: "table" => "Clipboard API table");
+        web_lua_core::lua_api_doc!(namespace: "runtime", name: "notifications", action: "", doc: "Alias for web.notifications.", source: "injected_lua", params: [], returns: "table" => "Notifications API table");
+        // page.fetch wrapper
+        web_lua_core::lua_api_doc!(
+            namespace: "page",
+            name: "fetch",
+            action: "",
+            doc: "Fetch a URL using the active tab origin (wrapper for tab.fetch).",
+            source: "injected_lua",
+            params: [
+                url: "string", required, "URL to fetch",
+                opts: "table | nil", optional, "Options: method, body, headers, timeout",
+            ],
+            returns: "table" => "{ status, ok, body, headers }",
+        );
+
         session
     }
 
@@ -216,11 +315,17 @@ end
 
             let response = match self.handle_command(cmd).await {
                 Ok(r) => {
-                    log_debug(&format!("[ExtensionSession] async response: action={}", cmd.action));
+                    log_debug(&format!(
+                        "[ExtensionSession] async response: action={}",
+                        cmd.action
+                    ));
                     r
                 }
                 Err(e) => {
-                    log_error(&format!("[ExtensionSession] async relay error: action={}, err={}", cmd.action, e));
+                    log_error(&format!(
+                        "[ExtensionSession] async relay error: action={}, err={}",
+                        cmd.action, e
+                    ));
                     let err_json = serde_json::to_string(&WasmAsyncResponse {
                         ok: false,
                         value: None,
@@ -270,7 +375,10 @@ impl ExtensionSession {
         let resp: WasmAsyncResponse = serde_json::from_str(&resp_json_str)
             .map_err(|e| format!("Failed to deserialize response: {:?}", e))?;
 
-        log_debug(&format!("[ExtensionSession] deserialized response: ok={}", resp.ok));
+        log_debug(&format!(
+            "[ExtensionSession] deserialized response: ok={}",
+            resp.ok
+        ));
         Ok(resp)
     }
 }

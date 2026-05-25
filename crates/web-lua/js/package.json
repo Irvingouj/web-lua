@@ -10,7 +10,9 @@
     "registry.ts",
     "web_lua.js",
     "web_lua.d.ts",
-    "README.md"
+    "README.md",
+    "API.md",
+    "api.json"
   ],
   "scripts": {
     "prepublishOnly": "cd ../../../ && node scripts/build.js web"

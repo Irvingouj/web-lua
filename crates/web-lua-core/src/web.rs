@@ -42,6 +42,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     web_table.set_field(ctx, "mock_async", mock_cb);
+    crate::lua_api_doc!(
+    namespace: "web",
+    name: "mock_async",
+    action: "mock_async",
+    doc: "Yield for testing, resumes with provided value.",
+    params: [
+    label: "string | nil", optional, "Test label",
+    ],
+    returns: "string" => "Test label echoed back",
+    );
 
     // web.fetch(url [, opts]) — async HTTP request
     let hs_fetch = host_state.clone();
@@ -125,6 +135,18 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
 
     web_table.set_field(ctx, "fetch", fetch_cb);
 
+    crate::lua_api_doc!(
+        namespace: "web",
+        name: "fetch",
+        action: "fetch",
+        doc: "Perform an HTTP fetch request.",
+        params: [
+            url: "string", required, "URL to fetch",
+            opts: "table | nil", optional, "Options: method, body, headers, timeout",
+        ],
+        returns: "table" => "{ status, ok, body, headers }",
+    );
+
     // ── web.url.parse(url_string) → table ──
     let url_table = Table::new(&ctx);
 
@@ -203,6 +225,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     url_table.set_field(ctx, "parse", url_parse_cb);
+    crate::lua_api_doc!(
+    namespace: "web.url",
+    name: "parse",
+    action: "url_parse",
+    doc: "Parse a URL string into components.",
+    params: [
+    url: "string", required, "URL string to parse",
+    ],
+    returns: "table" => "Parsed URL components: protocol, host, pathname, search, hash",
+    );
 
     // ── web.url.encode(params_table) → string ──
     let url_encode_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
@@ -247,6 +279,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     url_table.set_field(ctx, "encode", url_encode_cb);
+    crate::lua_api_doc!(
+    namespace: "web.url",
+    name: "encode",
+    action: "url_encode",
+    doc: "Encode a table into a query string.",
+    params: [
+    params: "table", required, "Key-value pairs to encode",
+    ],
+    returns: "string" => "URL-encoded query string",
+    );
     web_table.set_field(ctx, "url", url_table);
 
     // ── web.log(...) — sync, writes to stderr ──
@@ -270,6 +312,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     web_table.set_field(ctx, "log", web_log_cb);
+    crate::lua_api_doc!(
+    namespace: "web",
+    name: "log",
+    action: "web_log",
+    doc: "Log a message to the browser console.",
+    params: [
+    message: "any", required, "Value to log",
+    ],
+    returns: "nil" => "None",
+    );
 
     // ── web.sleep(ms) — async, yields to worker ──
     let hs_sleep = host_state.clone();
@@ -309,6 +361,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     web_table.set_field(ctx, "sleep", sleep_cb);
+    crate::lua_api_doc!(
+    namespace: "web",
+    name: "sleep",
+    action: "sleep",
+    doc: "Pause execution for a duration.",
+    params: [
+    ms: "number", optional, "Milliseconds to sleep (default 1000)",
+    ],
+    returns: "nil" => "None",
+    );
 
     // ── web.storage sub-module ──
     let storage_table = Table::new(&ctx);
@@ -395,15 +457,55 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
 
     let storage_get_cb = make_storage_cb("storage_get", host_state.clone());
     storage_table.set_field(ctx, "get", storage_get_cb);
+    crate::lua_api_doc!(
+    namespace: "web.storage",
+    name: "get",
+    action: "storage_get",
+    doc: "Get a value from web storage.",
+    params: [
+    key: "string", required, "Storage key",
+    ],
+    returns: "string | nil" => "Stored value or nil",
+    );
 
     let storage_set_cb = make_storage_cb("storage_set", host_state.clone());
     storage_table.set_field(ctx, "set", storage_set_cb);
+    crate::lua_api_doc!(
+    namespace: "web.storage",
+    name: "set",
+    action: "storage_set",
+    doc: "Set a value in web storage.",
+    params: [
+    key: "string", required, "Storage key",
+    value: "string", required, "Value to store",
+    ],
+    returns: "boolean" => "Whether set succeeded",
+    );
 
     let storage_delete_cb = make_storage_cb("storage_delete", host_state.clone());
     storage_table.set_field(ctx, "delete", storage_delete_cb);
+    crate::lua_api_doc!(
+    namespace: "web.storage",
+    name: "delete",
+    action: "storage_delete",
+    doc: "Remove a key from web storage.",
+    params: [
+    key: "string", required, "Storage key to remove",
+    ],
+    returns: "boolean" => "Whether deletion succeeded",
+    );
 
     let storage_list_cb = make_storage_cb("storage_list", host_state.clone());
     storage_table.set_field(ctx, "list", storage_list_cb);
+    crate::lua_api_doc!(
+    namespace: "web.storage",
+    name: "list",
+    action: "storage_list",
+    doc: "List all keys in web storage.",
+    params: [
+    ],
+    returns: "table" => "Array of key strings",
+    );
 
     web_table.set_field(ctx, "storage", storage_table);
 
@@ -411,100 +513,392 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // These yield commands to the worker, which checks if running in extension context.
     // We create a macro-like pattern to register multiple APIs with minimal boilerplate.
 
-    macro_rules! register_ext_api {
-        ($table:expr, $method:expr, $action:expr, $hs:expr) => {
-            let hs_ext = $hs.clone();
-            let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-                let params = if stack.len() == 0 {
-                    serde_json::json!({})
-                } else if stack.len() == 1 {
-                    lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
-                } else {
-                    let args: Vec<serde_json::Value> = (0..stack.len())
-                        .map(|i| {
-                            lua_value_to_json(ctx, stack.get(i)).unwrap_or(serde_json::Value::Null)
-                        })
-                        .collect();
-                    serde_json::Value::Array(args)
-                };
+    macro_rules! lua_api {
+        (
+            $table:expr,
+            name: $name:expr,
+            action: $action:expr,
+            host_state: $hs:expr,
+            namespace: $ns:expr,
+            doc: $desc:expr,
+            params: [$($pname:ident: $ptype:expr, $preq:ident, $pdesc:expr),* $(,)?],
+            returns: $rtype:expr => $rdesc:expr $(,)?
+        ) => {
+            {
+                let hs_ext = $hs.clone();
+                let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+                    let params = if stack.len() == 0 {
+                        serde_json::json!({})
+                    } else if stack.len() == 1 {
+                        lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+                    } else {
+                        let args: Vec<serde_json::Value> = (0..stack.len())
+                            .map(|i| {
+                                lua_value_to_json(ctx, stack.get(i)).unwrap_or(serde_json::Value::Null)
+                            })
+                            .collect();
+                        serde_json::Value::Array(args)
+                    };
 
-                let mut hs = hs_ext.borrow_mut();
-                hs.async_call_counter += 1;
-                let call_id = hs.async_call_counter;
-                let command = AsyncCommand {
-                    call_id,
-                    action: $action.to_string(),
-                    params,
-                };
-                hs.pending_async_command = Some(command);
+                    let mut hs = hs_ext.borrow_mut();
+                    hs.async_call_counter += 1;
+                    let call_id = hs.async_call_counter;
+                    let command = AsyncCommand {
+                        call_id,
+                        action: $action.to_string(),
+                        params,
+                    };
+                    hs.pending_async_command = Some(command);
 
-                stack.clear();
-                Ok(CallbackReturn::Yield {
-                    to_thread: None,
-                    then: None,
-                })
-            });
-            $table.set_field(ctx, $method, cb);
+                    stack.clear();
+                    Ok(CallbackReturn::Yield {
+                        to_thread: None,
+                        then: None,
+                    })
+                });
+                $table.set_field(ctx, $name, cb);
+
+                let mut _params = Vec::new();
+                $(
+                    _params.push(crate::api_docs::ParamDoc {
+                        name: stringify!($pname).to_string(),
+                        lua_type: $ptype.to_string(),
+                        required: stringify!($preq) == "required",
+                        description: $pdesc.to_string(),
+                    });
+                )*
+                crate::api_docs::register(crate::api_docs::LuaApiDoc {
+                    namespace: $ns.to_string(),
+                    name: $name.to_string(),
+                    action: Some($action.to_string()),
+                    description: $desc.to_string(),
+                    params: _params,
+                    returns: crate::api_docs::ReturnDoc {
+                        lua_type: $rtype.to_string(),
+                        description: $rdesc.to_string(),
+                    },
+                    source: "rust_core".to_string(),
+                });
+            }
         };
     }
 
     // web.tab sub-module
     let tab_table = Table::new(&ctx);
-    register_ext_api!(tab_table, "query", "tab_query", host_state);
-    register_ext_api!(tab_table, "create", "tab_create", host_state);
-    register_ext_api!(tab_table, "activate", "tab_activate", host_state);
-    register_ext_api!(tab_table, "close", "tab_close", host_state);
-    register_ext_api!(
-        tab_table,
-        "execute_script",
-        "tab_execute_script",
-        host_state
+    lua_api!(tab_table,
+    name: "query",
+    action: "tab_query",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Query Chrome tabs matching given criteria.",
+    params: [
+    query_info: "table", optional, "Query filter: active, currentWindow, url, etc.",
+    ],
+    returns: "table" => "Array of matching tab objects",
     );
-    register_ext_api!(tab_table, "click", "tab_click", host_state);
-    register_ext_api!(tab_table, "fill", "tab_fill", host_state);
-    register_ext_api!(tab_table, "snapshot", "tab_snapshot", host_state);
-    register_ext_api!(tab_table, "scroll_to", "tab_scroll_to", host_state);
-    register_ext_api!(tab_table, "evaluate", "tab_evaluate", host_state);
-    register_ext_api!(tab_table, "back", "tab_back", host_state);
-    register_ext_api!(tab_table, "wait_for_load", "tab_wait_for_load", host_state);
-    register_ext_api!(tab_table, "fetch", "tab_fetch", host_state);
+    lua_api!(tab_table,
+    name: "create",
+    action: "tab_create",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Create a new tab.",
+    params: [
+    create_properties: "table", optional, "URL, windowId, active, etc.",
+    ],
+    returns: "table" => "Created tab object",
+    );
+    lua_api!(tab_table,
+    name: "activate",
+    action: "tab_activate",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Activate (focus) a tab.",
+    params: [
+    tab_id: "number", required, "Tab ID to activate",
+    ],
+    returns: "boolean" => "Whether activation succeeded",
+    );
+    lua_api!(tab_table,
+    name: "close",
+    action: "tab_close",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Close a tab.",
+    params: [
+    tab_id: "number", required, "Tab ID to close",
+    ],
+    returns: "boolean" => "Whether close succeeded",
+    );
+    lua_api!(tab_table,
+    name: "execute_script",
+    action: "tab_execute_script",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Execute JavaScript in a target tab.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    script: "string | table", required, "Script code or injection details",
+    ],
+    returns: "table" => "Injection results",
+    );
+    lua_api!(tab_table,
+        name: "click",
+        action: "tab_click",
+        host_state: host_state,
+        namespace: "web.tab",
+        doc: "Click an element by refId in the target tab.",
+        params: [
+            tab_id: "number", required, "Target tab ID",
+            ref_id: "number", required, "Element refId from snapshot",
+        ],
+        returns: "boolean" => "Whether the click succeeded",
+    );
+    lua_api!(tab_table,
+    name: "fill",
+    action: "tab_fill",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Fill an input element by refId in the target tab.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    ref_id: "number", required, "Element refId from snapshot",
+    value: "string", required, "Text to fill",
+    ],
+    returns: "boolean" => "Whether fill succeeded",
+    );
+    lua_api!(tab_table,
+        name: "snapshot",
+        action: "tab_snapshot",
+        host_state: host_state,
+        namespace: "web.tab",
+        doc: "Take a DOM snapshot of the target tab.",
+        params: [
+            tab_id: "number", required, "Target tab ID",
+        ],
+        returns: "table" => "Simplified inline DOM snapshot with refIds",
+    );
+    lua_api!(tab_table,
+    name: "scroll_to",
+    action: "tab_scroll_to",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Scroll to an element by refId in the target tab.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    ref_id: "number", required, "Element refId from snapshot",
+    ],
+    returns: "boolean" => "Whether scroll succeeded",
+    );
+    lua_api!(tab_table,
+    name: "evaluate",
+    action: "tab_evaluate",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Evaluate JavaScript in a target tab and return the result.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    script: "string", required, "JavaScript code to evaluate",
+    ],
+    returns: "any" => "Evaluation result",
+    );
+    lua_api!(tab_table,
+    name: "back",
+    action: "tab_back",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Navigate back in a target tab.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    ],
+    returns: "boolean" => "Whether navigation succeeded",
+    );
+    lua_api!(tab_table,
+    name: "wait_for_load",
+    action: "tab_wait_for_load",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Wait for a tab to finish loading.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    ],
+    returns: "boolean" => "Whether the tab loaded",
+    );
+    lua_api!(tab_table,
+    name: "fetch",
+    action: "tab_fetch",
+    host_state: host_state,
+    namespace: "web.tab",
+    doc: "Perform an HTTP fetch inside a target tab origin.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    url: "string", required, "URL to fetch",
+    opts: "table | nil", optional, "Options: method, body, headers, timeout",
+    ],
+    returns: "table" => "{ status, ok, body, headers }",
+    );
     web_table.set_field(ctx, "tab", tab_table);
 
     // web.cookies sub-module
     let cookies_table = Table::new(&ctx);
-    register_ext_api!(cookies_table, "get", "cookies_get", host_state);
-    register_ext_api!(cookies_table, "set", "cookies_set", host_state);
-    register_ext_api!(cookies_table, "delete", "cookies_delete", host_state);
-    register_ext_api!(cookies_table, "list", "cookies_list", host_state);
+    lua_api!(cookies_table,
+    name: "get",
+    action: "cookies_get",
+    host_state: host_state,
+    namespace: "web.cookies",
+    doc: "Get a cookie by name and URL.",
+    params: [
+    details: "table", required, "Cookie query: name, url, storeId",
+    ],
+    returns: "table | nil" => "Cookie object or nil if not found",
+    );
+    lua_api!(cookies_table,
+    name: "set",
+    action: "cookies_set",
+    host_state: host_state,
+    namespace: "web.cookies",
+    doc: "Set a cookie.",
+    params: [
+    details: "table", required, "Cookie to set: name, value, url, etc.",
+    ],
+    returns: "table" => "Set cookie object",
+    );
+    lua_api!(cookies_table,
+    name: "delete",
+    action: "cookies_delete",
+    host_state: host_state,
+    namespace: "web.cookies",
+    doc: "Delete a cookie.",
+    params: [
+    details: "table", required, "Cookie to delete: name, url",
+    ],
+    returns: "boolean" => "Whether deletion succeeded",
+    );
+    lua_api!(cookies_table,
+    name: "list",
+    action: "cookies_list",
+    host_state: host_state,
+    namespace: "web.cookies",
+    doc: "List cookies matching a filter.",
+    params: [
+    filter: "table", optional, "Filter: url, name, domain, etc.",
+    ],
+    returns: "table" => "Array of cookie objects",
+    );
     web_table.set_field(ctx, "cookies", cookies_table);
 
     // web.history sub-module
     let history_table = Table::new(&ctx);
-    register_ext_api!(history_table, "search", "history_search", host_state);
-    register_ext_api!(history_table, "delete", "history_delete", host_state);
+    lua_api!(history_table,
+    name: "search",
+    action: "history_search",
+    host_state: host_state,
+    namespace: "web.history",
+    doc: "Search browser history.",
+    params: [
+    query: "table", required, "Search query: text, startTime, endTime, maxResults",
+    ],
+    returns: "table" => "Array of history items",
+    );
+    lua_api!(history_table,
+    name: "delete",
+    action: "history_delete",
+    host_state: host_state,
+    namespace: "web.history",
+    doc: "Delete a URL from browser history.",
+    params: [
+    url: "string", required, "URL to remove from history",
+    ],
+    returns: "boolean" => "Whether deletion succeeded",
+    );
     web_table.set_field(ctx, "history", history_table);
 
     // web.bookmarks sub-module
     let bookmarks_table = Table::new(&ctx);
-    register_ext_api!(bookmarks_table, "search", "bookmarks_search", host_state);
-    register_ext_api!(bookmarks_table, "create", "bookmarks_create", host_state);
-    register_ext_api!(bookmarks_table, "delete", "bookmarks_delete", host_state);
+    lua_api!(bookmarks_table,
+    name: "search",
+    action: "bookmarks_search",
+    host_state: host_state,
+    namespace: "web.bookmarks",
+    doc: "Search bookmarks.",
+    params: [
+    query: "string | table", required, "Search string or query object",
+    ],
+    returns: "table" => "Array of bookmark nodes",
+    );
+    lua_api!(bookmarks_table,
+    name: "create",
+    action: "bookmarks_create",
+    host_state: host_state,
+    namespace: "web.bookmarks",
+    doc: "Create a bookmark or folder.",
+    params: [
+    bookmark: "table", required, "Bookmark properties: parentId, title, url",
+    ],
+    returns: "table" => "Created bookmark node",
+    );
+    lua_api!(bookmarks_table,
+    name: "delete",
+    action: "bookmarks_delete",
+    host_state: host_state,
+    namespace: "web.bookmarks",
+    doc: "Delete a bookmark.",
+    params: [
+    id: "string", required, "Bookmark node ID to delete",
+    ],
+    returns: "boolean" => "Whether deletion succeeded",
+    );
     web_table.set_field(ctx, "bookmarks", bookmarks_table);
 
     // web.notifications sub-module
     let notifications_table = Table::new(&ctx);
-    register_ext_api!(
-        notifications_table,
-        "create",
-        "notifications_create",
-        host_state
+    lua_api!(notifications_table,
+    name: "create",
+    action: "notifications_create",
+    host_state: host_state,
+    namespace: "web.notifications",
+    doc: "Create a browser notification.",
+    params: [
+    id: "string | nil", optional, "Notification ID (nil for auto-generated)",
+    options: "table", required, "Notification options: type, title, message, iconUrl",
+    ],
+    returns: "string" => "Notification ID",
+    );
+    lua_api!(notifications_table,
+    name: "clear",
+    action: "notifications_clear",
+    host_state: host_state,
+    namespace: "web.notifications",
+    doc: "Clear a browser notification.",
+    params: [
+    id: "string", required, "Notification ID to clear",
+    ],
+    returns: "boolean" => "Whether notification was cleared",
     );
     web_table.set_field(ctx, "notifications", notifications_table);
 
     // web.clipboard sub-module
     let clipboard_table = Table::new(&ctx);
-    register_ext_api!(clipboard_table, "read", "clipboard_read", host_state);
-    register_ext_api!(clipboard_table, "write", "clipboard_write", host_state);
+    lua_api!(clipboard_table,
+    name: "read",
+    action: "clipboard_read",
+    host_state: host_state,
+    namespace: "web.clipboard",
+    doc: "Read text from the system clipboard.",
+    params: [
+    ],
+    returns: "string | nil" => "Clipboard text or nil",
+    );
+    lua_api!(clipboard_table,
+    name: "write",
+    action: "clipboard_write",
+    host_state: host_state,
+    namespace: "web.clipboard",
+    doc: "Write text to the system clipboard.",
+    params: [
+    text: "string", required, "Text to write",
+    ],
+    returns: "boolean" => "Whether write succeeded",
+    );
     web_table.set_field(ctx, "clipboard", clipboard_table);
 
     ctx.set_global("web", web_table);
@@ -514,157 +908,421 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
 
     // chrome.runtime
     let runtime_table = Table::new(&ctx);
-    register_ext_api!(
-        runtime_table,
-        "sendMessage",
-        "chrome_runtime_sendMessage",
-        host_state
+    lua_api!(runtime_table,
+    name: "sendMessage",
+    action: "chrome_runtime_sendMessage",
+    host_state: host_state,
+    namespace: "chrome.runtime",
+    doc: "Send a message to the extension background script or another extension.",
+    params: [
+    message: "any", required, "Message payload",
+    options: "table | nil", optional, "Options: to, includeTlsChannelId",
+    ],
+    returns: "any" => "Response from the recipient",
     );
     chrome_table.set_field(ctx, "runtime", runtime_table);
 
     // chrome.tabs
     let tabs_table = Table::new(&ctx);
-    register_ext_api!(tabs_table, "query", "chrome_tabs_query", host_state);
-    register_ext_api!(tabs_table, "create", "chrome_tabs_create", host_state);
-    register_ext_api!(tabs_table, "update", "chrome_tabs_update", host_state);
-    register_ext_api!(tabs_table, "remove", "chrome_tabs_remove", host_state);
-    register_ext_api!(tabs_table, "get", "chrome_tabs_get", host_state);
-    register_ext_api!(tabs_table, "reload", "chrome_tabs_reload", host_state);
-    register_ext_api!(
-        tabs_table,
-        "sendMessage",
-        "chrome_tabs_sendMessage",
-        host_state
+    lua_api!(tabs_table,
+        name: "query",
+        action: "chrome_tabs_query",
+        host_state: host_state,
+        namespace: "chrome.tabs",
+        doc: "Query Chrome tabs matching given criteria.",
+        params: [
+            query_info: "table", required, "Query filter: active, currentWindow, url, etc.",
+        ],
+        returns: "table" => "Array of matching tab objects",
+    );
+    lua_api!(tabs_table,
+    name: "create",
+    action: "chrome_tabs_create",
+    host_state: host_state,
+    namespace: "chrome.tabs",
+    doc: "Create a new Chrome tab.",
+    params: [
+    create_properties: "table", optional, "URL, windowId, active, etc.",
+    ],
+    returns: "table" => "Created tab object",
+    );
+    lua_api!(tabs_table,
+    name: "update",
+    action: "chrome_tabs_update",
+    host_state: host_state,
+    namespace: "chrome.tabs",
+    doc: "Update properties of a tab.",
+    params: [
+    tab_id: "number | nil", optional, "Tab ID (nil for active tab)",
+    update_properties: "table", required, "Properties: url, active, muted, etc.",
+    ],
+    returns: "table" => "Updated tab object",
+    );
+    lua_api!(tabs_table,
+    name: "remove",
+    action: "chrome_tabs_remove",
+    host_state: host_state,
+    namespace: "chrome.tabs",
+    doc: "Close one or more tabs.",
+    params: [
+    tab_ids: "number | table", required, "Tab ID or array of tab IDs",
+    ],
+    returns: "boolean" => "Whether removal succeeded",
+    );
+    lua_api!(tabs_table,
+    name: "get",
+    action: "chrome_tabs_get",
+    host_state: host_state,
+    namespace: "chrome.tabs",
+    doc: "Get a tab by ID.",
+    params: [
+    tab_id: "number", required, "Tab ID",
+    ],
+    returns: "table" => "Tab object",
+    );
+    lua_api!(tabs_table,
+    name: "reload",
+    action: "chrome_tabs_reload",
+    host_state: host_state,
+    namespace: "chrome.tabs",
+    doc: "Reload a tab.",
+    params: [
+    tab_id: "number | nil", optional, "Tab ID (nil for active tab)",
+    reload_properties: "table | nil", optional, "bypassCache",
+    ],
+    returns: "boolean" => "Whether reload succeeded",
+    );
+    lua_api!(tabs_table,
+    name: "sendMessage",
+    action: "chrome_tabs_sendMessage",
+    host_state: host_state,
+    namespace: "chrome.tabs",
+    doc: "Send a message to a specific tab.",
+    params: [
+    tab_id: "number", required, "Target tab ID",
+    message: "any", required, "Message payload",
+    options: "table | nil", optional, "Options: frameId",
+    ],
+    returns: "any" => "Response from the tab",
     );
     chrome_table.set_field(ctx, "tabs", tabs_table);
 
     // chrome.alarms
     let alarms_table = Table::new(&ctx);
-    register_ext_api!(alarms_table, "create", "chrome_alarms_create", host_state);
-    register_ext_api!(alarms_table, "clear", "chrome_alarms_clear", host_state);
+    lua_api!(alarms_table,
+    name: "create",
+    action: "chrome_alarms_create",
+    host_state: host_state,
+    namespace: "chrome.alarms",
+    doc: "Create an alarm.",
+    params: [
+    name: "string | nil", optional, "Alarm name",
+    alarm_info: "table", required, "When: delayInMinutes, periodInMinutes",
+    ],
+    returns: "boolean" => "Whether creation succeeded",
+    );
+    lua_api!(alarms_table,
+    name: "clear",
+    action: "chrome_alarms_clear",
+    host_state: host_state,
+    namespace: "chrome.alarms",
+    doc: "Clear an alarm.",
+    params: [
+    name: "string | nil", optional, "Alarm name (nil clears all)",
+    ],
+    returns: "boolean" => "Whether any alarm was cleared",
+    );
     chrome_table.set_field(ctx, "alarms", alarms_table);
 
     // chrome.action
     let action_table = Table::new(&ctx);
-    register_ext_api!(
-        action_table,
-        "setBadgeText",
-        "chrome_action_setBadgeText",
-        host_state
+    lua_api!(action_table,
+    name: "setBadgeText",
+    action: "chrome_action_setBadgeText",
+    host_state: host_state,
+    namespace: "chrome.action",
+    doc: "Set the badge text on the extension action icon.",
+    params: [
+    details: "table", required, "text, tabId",
+    ],
+    returns: "boolean" => "Whether set succeeded",
     );
-    register_ext_api!(
-        action_table,
-        "setBadgeBackgroundColor",
-        "chrome_action_setBadgeBackgroundColor",
-        host_state
+    lua_api!(action_table,
+    name: "setBadgeBackgroundColor",
+    action: "chrome_action_setBadgeBackgroundColor",
+    host_state: host_state,
+    namespace: "chrome.action",
+    doc: "Set the badge background color.",
+    params: [
+    details: "table", required, "color, tabId",
+    ],
+    returns: "boolean" => "Whether set succeeded",
     );
-    register_ext_api!(
-        action_table,
-        "setTitle",
-        "chrome_action_setTitle",
-        host_state
+    lua_api!(action_table,
+    name: "setTitle",
+    action: "chrome_action_setTitle",
+    host_state: host_state,
+    namespace: "chrome.action",
+    doc: "Set the title of the extension action.",
+    params: [
+    details: "table", required, "title, tabId",
+    ],
+    returns: "boolean" => "Whether set succeeded",
     );
-    register_ext_api!(action_table, "setIcon", "chrome_action_setIcon", host_state);
+    lua_api!(action_table,
+    name: "setIcon",
+    action: "chrome_action_setIcon",
+    host_state: host_state,
+    namespace: "chrome.action",
+    doc: "Set the icon of the extension action.",
+    params: [
+    details: "table", required, "imageData, path, tabId",
+    ],
+    returns: "boolean" => "Whether set succeeded",
+    );
     chrome_table.set_field(ctx, "action", action_table);
 
     // chrome.contextMenus
     let context_menus_table = Table::new(&ctx);
-    register_ext_api!(
-        context_menus_table,
-        "create",
-        "chrome_contextMenus_create",
-        host_state
+    lua_api!(context_menus_table,
+    name: "create",
+    action: "chrome_contextMenus_create",
+    host_state: host_state,
+    namespace: "chrome.contextMenus",
+    doc: "Create a context menu item.",
+    params: [
+    create_properties: "table", required, "id, title, contexts, onclick",
+    ],
+    returns: "string | number" => "Created item ID",
     );
-    register_ext_api!(
-        context_menus_table,
-        "remove",
-        "chrome_contextMenus_remove",
-        host_state
+    lua_api!(context_menus_table,
+    name: "remove",
+    action: "chrome_contextMenus_remove",
+    host_state: host_state,
+    namespace: "chrome.contextMenus",
+    doc: "Remove a context menu item.",
+    params: [
+    menuItemId: "string | number", required, "Item ID to remove",
+    ],
+    returns: "boolean" => "Whether removal succeeded",
     );
     chrome_table.set_field(ctx, "contextMenus", context_menus_table);
 
     // chrome.windows
     let windows_table = Table::new(&ctx);
-    register_ext_api!(windows_table, "getAll", "chrome_windows_getAll", host_state);
-    register_ext_api!(windows_table, "create", "chrome_windows_create", host_state);
-    register_ext_api!(windows_table, "update", "chrome_windows_update", host_state);
-    register_ext_api!(windows_table, "remove", "chrome_windows_remove", host_state);
+    lua_api!(windows_table,
+    name: "getAll",
+    action: "chrome_windows_getAll",
+    host_state: host_state,
+    namespace: "chrome.windows",
+    doc: "Get all browser windows.",
+    params: [
+    get_info: "table | nil", optional, "populate, windowTypes",
+    ],
+    returns: "table" => "Array of window objects",
+    );
+    lua_api!(windows_table,
+    name: "create",
+    action: "chrome_windows_create",
+    host_state: host_state,
+    namespace: "chrome.windows",
+    doc: "Create a new browser window.",
+    params: [
+    create_data: "table | nil", optional, "url, type, focused, etc.",
+    ],
+    returns: "table" => "Created window object",
+    );
+    lua_api!(windows_table,
+    name: "update",
+    action: "chrome_windows_update",
+    host_state: host_state,
+    namespace: "chrome.windows",
+    doc: "Update a browser window.",
+    params: [
+    window_id: "number", required, "Window ID",
+    update_info: "table", required, "focused, state, etc.",
+    ],
+    returns: "table" => "Updated window object",
+    );
+    lua_api!(windows_table,
+    name: "remove",
+    action: "chrome_windows_remove",
+    host_state: host_state,
+    namespace: "chrome.windows",
+    doc: "Close a browser window.",
+    params: [
+    window_id: "number", required, "Window ID to close",
+    ],
+    returns: "boolean" => "Whether close succeeded",
+    );
     chrome_table.set_field(ctx, "windows", windows_table);
 
     // chrome.sidePanel
     let side_panel_table = Table::new(&ctx);
-    register_ext_api!(
-        side_panel_table,
-        "setOptions",
-        "chrome_sidePanel_setOptions",
-        host_state
+    lua_api!(side_panel_table,
+    name: "setOptions",
+    action: "chrome_sidePanel_setOptions",
+    host_state: host_state,
+    namespace: "chrome.sidePanel",
+    doc: "Configure the side panel behavior.",
+    params: [
+    options: "table", required, "enabled, path",
+    ],
+    returns: "boolean" => "Whether options were set",
     );
     chrome_table.set_field(ctx, "sidePanel", side_panel_table);
 
     // chrome.cookies
     let cookies_table = Table::new(&ctx);
-    register_ext_api!(cookies_table, "get", "chrome_cookies_get", host_state);
-    register_ext_api!(cookies_table, "set", "chrome_cookies_set", host_state);
-    register_ext_api!(cookies_table, "remove", "chrome_cookies_remove", host_state);
-    register_ext_api!(cookies_table, "getAll", "chrome_cookies_getAll", host_state);
+    lua_api!(cookies_table,
+    name: "get",
+    action: "chrome_cookies_get",
+    host_state: host_state,
+    namespace: "chrome.cookies",
+    doc: "Get a cookie by details.",
+    params: [
+    details: "table", required, "name, url, storeId",
+    ],
+    returns: "table | nil" => "Cookie object or nil",
+    );
+    lua_api!(cookies_table,
+    name: "set",
+    action: "chrome_cookies_set",
+    host_state: host_state,
+    namespace: "chrome.cookies",
+    doc: "Set a cookie.",
+    params: [
+    details: "table", required, "name, value, url, etc.",
+    ],
+    returns: "table" => "Set cookie object",
+    );
+    lua_api!(cookies_table,
+    name: "remove",
+    action: "chrome_cookies_remove",
+    host_state: host_state,
+    namespace: "chrome.cookies",
+    doc: "Remove a cookie.",
+    params: [
+    details: "table", required, "name, url",
+    ],
+    returns: "boolean" => "Whether removal succeeded",
+    );
+    lua_api!(cookies_table,
+    name: "getAll",
+    action: "chrome_cookies_getAll",
+    host_state: host_state,
+    namespace: "chrome.cookies",
+    doc: "Get all cookies matching a filter.",
+    params: [
+    details: "table", optional, "url, name, domain, etc.",
+    ],
+    returns: "table" => "Array of cookie objects",
+    );
     chrome_table.set_field(ctx, "cookies", cookies_table);
 
     // chrome.bookmarks
     let bookmarks_table = Table::new(&ctx);
-    register_ext_api!(
-        bookmarks_table,
-        "search",
-        "chrome_bookmarks_search",
-        host_state
+    lua_api!(bookmarks_table,
+    name: "search",
+    action: "chrome_bookmarks_search",
+    host_state: host_state,
+    namespace: "chrome.bookmarks",
+    doc: "Search bookmarks.",
+    params: [
+    query: "string | table", required, "Search string or query object",
+    ],
+    returns: "table" => "Array of bookmark nodes",
     );
-    register_ext_api!(
-        bookmarks_table,
-        "create",
-        "chrome_bookmarks_create",
-        host_state
+    lua_api!(bookmarks_table,
+    name: "create",
+    action: "chrome_bookmarks_create",
+    host_state: host_state,
+    namespace: "chrome.bookmarks",
+    doc: "Create a bookmark.",
+    params: [
+    bookmark: "table", required, "parentId, title, url, index",
+    ],
+    returns: "table" => "Created bookmark node",
     );
-    register_ext_api!(
-        bookmarks_table,
-        "remove",
-        "chrome_bookmarks_remove",
-        host_state
+    lua_api!(bookmarks_table,
+    name: "remove",
+    action: "chrome_bookmarks_remove",
+    host_state: host_state,
+    namespace: "chrome.bookmarks",
+    doc: "Remove a bookmark.",
+    params: [
+    id: "string", required, "Bookmark node ID",
+    ],
+    returns: "boolean" => "Whether removal succeeded",
     );
     chrome_table.set_field(ctx, "bookmarks", bookmarks_table);
 
     // chrome.history
     let history_table = Table::new(&ctx);
-    register_ext_api!(history_table, "search", "chrome_history_search", host_state);
-    register_ext_api!(
-        history_table,
-        "deleteUrl",
-        "chrome_history_deleteUrl",
-        host_state
+    lua_api!(history_table,
+    name: "search",
+    action: "chrome_history_search",
+    host_state: host_state,
+    namespace: "chrome.history",
+    doc: "Search browser history.",
+    params: [
+    query: "table", required, "text, startTime, endTime, maxResults",
+    ],
+    returns: "table" => "Array of history items",
+    );
+    lua_api!(history_table,
+    name: "deleteUrl",
+    action: "chrome_history_deleteUrl",
+    host_state: host_state,
+    namespace: "chrome.history",
+    doc: "Delete a URL from history.",
+    params: [
+    url: "string", required, "URL to remove",
+    ],
+    returns: "boolean" => "Whether deletion succeeded",
     );
     chrome_table.set_field(ctx, "history", history_table);
 
     // chrome.notifications
     let notifications_table = Table::new(&ctx);
-    register_ext_api!(
-        notifications_table,
-        "create",
-        "chrome_notifications_create",
-        host_state
+    lua_api!(notifications_table,
+    name: "create",
+    action: "chrome_notifications_create",
+    host_state: host_state,
+    namespace: "chrome.notifications",
+    doc: "Create a notification.",
+    params: [
+    id: "string | nil", optional, "Notification ID",
+    options: "table", required, "type, title, message, iconUrl",
+    ],
+    returns: "string" => "Notification ID",
     );
-    register_ext_api!(
-        notifications_table,
-        "clear",
-        "chrome_notifications_clear",
-        host_state
+    lua_api!(notifications_table,
+    name: "clear",
+    action: "chrome_notifications_clear",
+    host_state: host_state,
+    namespace: "chrome.notifications",
+    doc: "Clear a notification.",
+    params: [
+    id: "string", required, "Notification ID to clear",
+    ],
+    returns: "boolean" => "Whether notification was cleared",
     );
     chrome_table.set_field(ctx, "notifications", notifications_table);
 
     // chrome.scripting
     let scripting_table = Table::new(&ctx);
-    register_ext_api!(
-        scripting_table,
-        "executeScript",
-        "chrome_scripting_executeScript",
-        host_state
+    lua_api!(scripting_table,
+    name: "executeScript",
+    action: "chrome_scripting_executeScript",
+    host_state: host_state,
+    namespace: "chrome.scripting",
+    doc: "Inject JavaScript into a page.",
+    params: [
+    target: "table", required, "tabId, frameIds, allFrames",
+    func: "string | table | nil", optional, "Function or script to inject",
+    ],
+    returns: "table" => "Array of injection results",
     );
     chrome_table.set_field(ctx, "scripting", scripting_table);
 
@@ -700,6 +1358,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         dom_table.set_field(ctx, "snapshot", dom_snapshot_cb);
+
+        crate::lua_api_doc!(
+            namespace: "dom",
+            name: "snapshot",
+            action: "dom_snapshot",
+            doc: "Take a semantic DOM snapshot of the current page.",
+            params: [
+                opts: "table | nil", optional, "Options: max_depth, include_hidden, etc.",
+            ],
+            returns: "table" => "Semantic DOM tree snapshot",
+        );
     }
 
     // dom.format(snapshot, format?) — async, relays to main thread for formatting
@@ -741,6 +1410,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         dom_table.set_field(ctx, "format", dom_format_cb);
+        crate::lua_api_doc!(
+        namespace: "dom",
+        name: "format",
+        action: "dom_format",
+        doc: "Format a DOM snapshot into a text representation.",
+        params: [
+        snapshot: "table", required, "DOM snapshot object",
+        format: "string | nil", optional, "Output format: compact-text, markdown, etc.",
+        ],
+        returns: "string" => "Formatted text representation",
+        );
     }
 
     ctx.set_global("dom", dom_table);
@@ -772,6 +1452,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "snapshot", cb);
+
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "snapshot",
+        action: "page_snapshot",
+        doc: "Take a DOM snapshot of the current page.",
+        params: [
+        opts: "table | nil", optional, "Options: refId, maxDepth, etc.",
+        ],
+        returns: "table" => "DOM snapshot object",
+        );
     }
 
     // page.click(ref_id) — async
@@ -803,6 +1494,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "click", cb);
+
+        crate::lua_api_doc!(
+            namespace: "page",
+            name: "click",
+            action: "page_click",
+            doc: "Click an element by refId in the current page.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
+        );
     }
 
     // page.dblclick(ref_id) — async
@@ -834,6 +1536,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "dblclick", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "dblclick",
+        action: "page_dblclick",
+        doc: "Double-click an element by refId.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.fill(ref_id, value) — async
@@ -873,6 +1585,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "fill", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "fill",
+        action: "page_fill",
+        doc: "Fill an input element by refId with a value.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        value: "string", required, "Text to fill",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.type(ref_id, text) — async (append text)
@@ -912,6 +1635,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "type", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "type",
+        action: "page_type",
+        doc: "Append text to an input element by refId.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        text: "string", required, "Text to append",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.press(key) — async
@@ -941,6 +1675,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "press", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "press",
+        action: "page_press",
+        doc: "Press a keyboard key.",
+        params: [
+        key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.select(ref_id, value) — async
@@ -982,6 +1726,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "select", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "select",
+        action: "page_select",
+        doc: "Select an option in a dropdown by refId and value.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        value: "string", required, "Option value to select",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.check(ref_id, checked?) — async
@@ -1022,6 +1777,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "check", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "check",
+        action: "page_check",
+        doc: "Check or uncheck a checkbox by refId.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        checked: "boolean", optional, "Checked state (default true)",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.hover(ref_id) — async
@@ -1053,6 +1819,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "hover", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "hover",
+        action: "page_hover",
+        doc: "Hover over an element by refId.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.unhover() — async
@@ -1074,6 +1850,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "unhover", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "unhover",
+        action: "page_unhover",
+        doc: "Move mouse away from any hovered element.",
+        params: [
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.scroll(direction, amount) — async
@@ -1112,6 +1897,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "scroll", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "scroll",
+        action: "page_scroll",
+        doc: "Scroll the page by direction and amount.",
+        params: [
+        direction: "string", optional, "up, down, left, right (default down)",
+        amount: "number", optional, "Pixels to scroll (default 300)",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.scroll_to(ref_id) — async
@@ -1143,6 +1939,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "scroll_to", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "scroll_to",
+        action: "page_scroll_to",
+        doc: "Scroll to an element by refId.",
+        params: [
+        ref_id: "string", required, "Element refId from snapshot",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.url() — async
@@ -1164,6 +1970,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "url", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "url",
+        action: "page_url",
+        doc: "Get the current page URL.",
+        params: [
+        ],
+        returns: "string" => "Current URL",
+        );
     }
 
     // page.title() — async
@@ -1185,6 +2000,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "title", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "title",
+        action: "page_title",
+        doc: "Get the current page title.",
+        params: [
+        ],
+        returns: "string" => "Current page title",
+        );
     }
 
     // page.screenshot() — async
@@ -1206,6 +2030,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "screenshot", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "screenshot",
+        action: "page_screenshot",
+        doc: "Take a screenshot of the current page.",
+        params: [
+        ],
+        returns: "string" => "Base64-encoded screenshot image",
+        );
     }
 
     // page.goto(url) — async
@@ -1235,6 +2068,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "goto", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "goto",
+        action: "page_goto",
+        doc: "Navigate to a URL.",
+        params: [
+        url: "string", required, "URL to navigate to",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.back() — async
@@ -1256,6 +2099,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "back", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "back",
+        action: "page_back",
+        doc: "Navigate back in history.",
+        params: [
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.forward() — async
@@ -1277,6 +2129,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "forward", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "forward",
+        action: "page_forward",
+        doc: "Navigate forward in history.",
+        params: [
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.reload() — async
@@ -1298,6 +2159,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "reload", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "reload",
+        action: "page_reload",
+        doc: "Reload the current page.",
+        params: [
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.wait(ms) — async
@@ -1328,6 +2198,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "wait", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "wait",
+        action: "page_wait",
+        doc: "Wait for a duration.",
+        params: [
+        ms: "number", optional, "Milliseconds to wait (default 1000)",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.tabs() — async (extension mode)
@@ -1349,6 +2229,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "tabs", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "tabs",
+        action: "page_tabs",
+        doc: "Get all tabs in the current window (extension mode).",
+        params: [
+        ],
+        returns: "table" => "Array of tab objects",
+        );
     }
 
     // page.switch(tabId) — async
@@ -1387,6 +2276,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "switch", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "switch",
+        action: "page_switch",
+        doc: "Switch to a tab by ID.",
+        params: [
+        tab_id: "number", required, "Tab ID to switch to",
+        ],
+        returns: "nil" => "None",
+        );
     }
 
     // page.new_tab(url?) — async
@@ -1417,6 +2316,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "new_tab", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "new_tab",
+        action: "page_new_tab",
+        doc: "Open a new tab (optionally with a URL).",
+        params: [
+        url: "string | nil", optional, "URL to open in the new tab",
+        ],
+        returns: "table" => "Created tab object",
+        );
     }
 
     // page.close(tabId) — async
@@ -1455,6 +2364,16 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "close", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "close",
+        action: "page_close",
+        doc: "Close a tab by ID.",
+        params: [
+        tab_id: "number", required, "Tab ID to close",
+        ],
+        returns: "boolean" => "Whether close succeeded",
+        );
     }
 
     // page.active_tab() — async
@@ -1476,6 +2395,15 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             })
         });
         page_table.set_field(ctx, "active_tab", cb);
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "active_tab",
+        action: "page_active_tab",
+        doc: "Get the currently active tab ID.",
+        params: [
+        ],
+        returns: "number | nil" => "Active tab ID or nil",
+        );
     }
 
     ctx.set_global("page", page_table);
@@ -1524,6 +2452,17 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     host_table.set_field(ctx, "call", host_call_cb);
+    crate::lua_api_doc!(
+    namespace: "host",
+    name: "call",
+    action: "host_call",
+    doc: "Call a registered host handler by name.",
+    params: [
+    action: "string", required, "Handler action name",
+    params: "table | nil", optional, "Parameters to pass to handler",
+    ],
+    returns: "any" => "Handler response",
+    );
     ctx.set_global("host", host_table);
 
     // ── runtime.inspect() — returns a table of all globals with type/value/keys ──
@@ -1620,5 +2559,14 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     });
 
     runtime_table.set_field(ctx, "inspect", inspect_cb);
+    crate::lua_api_doc!(
+    namespace: "runtime",
+    name: "inspect",
+    action: "runtime_inspect",
+    doc: "Inspect all global variables in the Lua state.",
+    params: [
+    ],
+    returns: "table" => "Array of global variable descriptors: name, type, keys, value",
+    );
     ctx.set_global("runtime", runtime_table);
 }
