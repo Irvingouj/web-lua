@@ -19,6 +19,7 @@ const workerSelf = self as unknown as WorkerSelf;
 
 // Define the relay function that extension-lua WASM expects globally
 workerSelf.__extension_lua_relay = (cmd: unknown) => {
+  console.log("[worker] __extension_lua_relay cmd:", (cmd as Record<string, unknown>)?.action);
   return new Promise((resolve) => {
     const relayId = generateId();
     pendingRelays.set(relayId, resolve);
@@ -125,10 +126,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
     case "asyncRelayResult": {
+      console.log("[worker] asyncRelayResult id:", msg.id, "result:", typeof msg.result);
       const resolve = pendingRelays.get(msg.id);
       if (resolve) {
         pendingRelays.delete(msg.id);
         resolve(msg.result);
+      } else {
+        console.warn("[worker] asyncRelayResult: no pending relay for id", msg.id);
       }
       break;
     }

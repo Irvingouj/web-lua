@@ -60,7 +60,13 @@ const luaGlobals = [
   'page.scroll', 'page.scroll_to', 'page.url', 'page.title', 'page.screenshot',
   'page.goto', 'page.back', 'page.forward', 'page.reload', 'page.wait',
   'page.tabs', 'page.switch', 'page.new_tab', 'page.close', 'page.active_tab',
-  'runtime.inspect',
+  'runtime.inspect', 'runtime.fetch',
+  'tab.query', 'tab.open', 'tab.close', 'tab.current', 'tab.focus',
+  'tab.click', 'tab.fill', 'tab.type', 'tab.evaluate', 'tab.fetch',
+  'tab.snapshot', 'tab.screenshot', 'tab.url', 'tab.title',
+  'tab.back', 'tab.forward', 'tab.reload', 'tab.wait',
+  'tab.goto', 'tab.scroll', 'tab.scroll_to',
+  'tab.press', 'tab.select', 'tab.check', 'tab.hover', 'tab.unhover',
 ];
 
 function luaCompletions(context: CompletionContext): CompletionResult | null {

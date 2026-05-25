@@ -3,17 +3,12 @@
 /**
  * An async command yielded from Lua, waiting for external resolution.
  */
-export type AsyncCommand = { call_id: number; action: string; params: unknown };
+export type AsyncCommand = { call_id: number, action: string, params: unknown, };
 
 /**
  * Structured error from running a cell.
  */
-export type CellError =
-  | { kind: "compile"; message: string; line: number | null }
-  | { kind: "runtime"; message: string }
-  | { kind: "strict_mode"; variable: string }
-  | { kind: "fuel_exhausted" }
-  | { kind: "internal"; message: string };
+export type CellError = { "kind": "compile", message: string, line: number | null, } | { "kind": "runtime", message: string, } | { "kind": "strict_mode", variable: string, } | { "kind": "fuel_exhausted" } | { "kind": "internal", message: string, };
 
 /**
  * Status of a cell execution.
@@ -23,14 +18,4 @@ export type CellStatus = "done" | "async_pending";
 /**
  * Result of running a single cell.
  */
-export type RunResult = {
-  stdout: Array<string>;
-  stderr: Array<string>;
-  result: string | null;
-  error: CellError | null;
-  commands: unknown[];
-  fuel_exhausted: boolean;
-  execution_count: number;
-  status: CellStatus;
-  pending_command: AsyncCommand | null;
-};
+export type RunResult = { stdout: Array<string>, stderr: Array<string>, result: string | null, error: CellError | null, commands: unknown[], fuel_exhausted: boolean, execution_count: number, status: CellStatus, pending_command: AsyncCommand | null, };

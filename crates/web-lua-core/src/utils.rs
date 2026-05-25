@@ -66,7 +66,7 @@ pub(crate) fn percent_encode(input: &[u8]) -> String {
 
 // ─── Value Formatting ───────────────────────────────────────────
 
-pub(crate) fn format_value(_ctx: Context, value: Value) -> String {
+pub(crate) fn format_value(ctx: Context, value: Value) -> String {
     match value {
         Value::Nil => "nil".to_string(),
         Value::Boolean(b) => b.to_string(),
@@ -82,7 +82,10 @@ pub(crate) fn format_value(_ctx: Context, value: Value) -> String {
             let bytes = s.as_bytes();
             String::from_utf8_lossy(bytes).to_string()
         }
-        Value::Table(_) => "table".to_string(),
+        Value::Table(_) => match crate::json::lua_value_to_json(ctx, value) {
+            Ok(json) => serde_json::to_string(&json).unwrap_or_else(|_| "table".to_string()),
+            Err(_) => "table".to_string(),
+        },
         Value::Function(_) => "function".to_string(),
         Value::Thread(_) => "thread".to_string(),
         _ => format!("{:?}", value),

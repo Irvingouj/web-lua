@@ -3,14 +3,15 @@ import { FunctionalComponent } from 'preact';
 interface Props {
   outputs: string[];
   errors: string[];
+  result: string | null;
 }
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const CellOutput: FunctionalComponent<Props> = ({ outputs, errors }) => {
-  const empty = outputs.length === 0 && errors.length === 0;
+const CellOutput: FunctionalComponent<Props> = ({ outputs, errors, result }) => {
+  const empty = outputs.length === 0 && errors.length === 0 && !result;
   return (
     <div
       class="cell-outputs"
@@ -22,6 +23,11 @@ const CellOutput: FunctionalComponent<Props> = ({ outputs, errors }) => {
           {escapeHtml(o)}
         </div>
       ))}
+      {result && (
+        <div class="output-result" data-testid="cell-result">
+          {escapeHtml(result)}
+        </div>
+      )}
       {errors.map((e, i) => (
         <div class="output-error" data-testid="cell-error" key={`e${i}`}>
           {escapeHtml(e)}

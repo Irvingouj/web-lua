@@ -133,8 +133,11 @@ export class ExtensionSession {
       }
       case "asyncRelay": {
         if (!msg.id || !msg.command) break;
+        const action = (msg.command as Record<string, unknown>)?.action;
+        console.log("[ExtensionSession] asyncRelay action:", action, "id:", msg.id);
         executeMainThreadCommand(msg.command)
           .then((result) => {
+            console.log("[ExtensionSession] asyncRelayResult action:", action, "resultType:", typeof result);
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,
@@ -143,6 +146,7 @@ export class ExtensionSession {
           })
           .catch((err: Error | unknown) => {
             const message = err instanceof Error ? err.message : String(err);
+            console.error("[ExtensionSession] asyncRelay error action:", action, "msg:", message);
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,

@@ -187,7 +187,7 @@ const Cell: FunctionalComponent<Props> = ({
           />
         )}
       </div>
-      {isCode && <CellOutput outputs={cell.outputs} errors={cell.errors} />}
+      {isCode && <CellOutput outputs={cell.outputs} errors={cell.errors} result={cell.result} />}
     </div>
   );
 };

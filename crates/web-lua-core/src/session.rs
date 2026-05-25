@@ -378,27 +378,34 @@ impl NotebookSession {
         }
 
         // ── Phase 3: Collect result ────────────────────────────
-        let result_str = self
+        let (result_str, lua_error) = self
             .lua
             .try_enter(|ctx| {
                 let exec = ctx.fetch(executor_ref);
-                match exec.take_result::<Vec<Value>>(ctx) {
-                    Ok(Ok(results)) => {
-                        if results.is_empty() {
-                            Ok(None)
+                match exec.take_result::<Value>(ctx) {
+                    Ok(Ok(value)) => {
+                        if matches!(value, Value::Nil) {
+                            Ok((None, None))
                         } else {
-                            Ok(Some(format_value(ctx, results[0])))
+                            Ok((Some(format_value(ctx, value)), None))
                         }
                     }
-                    Ok(Err(_lua_err)) => {
-                        // Lua execution error was already handled in Phase 2
-                        Ok(None)
+                    Ok(Err(lua_err)) => {
+                        let msg = format!("{}", lua_err);
+                        Ok((None, Some(msg)))
                     }
-                    Err(_bad_mode) => Ok(None),
+                    Err(_bad_mode) => Ok((None, None)),
                 }
             })
             .ok()
-            .flatten();
+            .unwrap_or((None, None));
+
+        if let Some(err_msg) = lua_error {
+            self.host_state
+                .borrow_mut()
+                .cell_errors
+                .push(CellError::Runtime { message: err_msg });
+        }
 
         // ── Phase 4: Build result ──────────────────────────────
         let hs = self.host_state.borrow();
@@ -558,24 +565,34 @@ impl NotebookSession {
         }
 
         // Build final result
-        let result_str = self
+        let (result_str, lua_error) = self
             .lua
             .try_enter(|ctx| {
                 let exec = ctx.fetch(executor_ref);
-                match exec.take_result::<Vec<Value>>(ctx) {
-                    Ok(Ok(results)) => {
-                        if results.is_empty() {
-                            Ok(None)
+                match exec.take_result::<Value>(ctx) {
+                    Ok(Ok(value)) => {
+                        if matches!(value, Value::Nil) {
+                            Ok((None, None))
                         } else {
-                            Ok(Some(format_value(ctx, results[0])))
+                            Ok((Some(format_value(ctx, value)), None))
                         }
                     }
-                    Ok(Err(_lua_err)) => Ok(None),
-                    Err(_bad_mode) => Ok(None),
+                    Ok(Err(lua_err)) => {
+                        let msg = format!("{}", lua_err);
+                        Ok((None, Some(msg)))
+                    }
+                    Err(_bad_mode) => Ok((None, None)),
                 }
             })
             .ok()
-            .flatten();
+            .unwrap_or((None, None));
+
+        if let Some(err_msg) = lua_error {
+            self.host_state
+                .borrow_mut()
+                .cell_errors
+                .push(CellError::Runtime { message: err_msg });
+        }
 
         let hs = self.host_state.borrow();
         let error = if hs.fuel_exhausted {

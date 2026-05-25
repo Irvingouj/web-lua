@@ -8,6 +8,7 @@ export interface Cell {
   source: string;
   outputs: string[];
   errors: string[];
+  result: string | null;
   executionCount: number | null;
   status: "idle" | "running" | "success" | "error" | "stopped";
 }
@@ -28,6 +29,7 @@ export function createCell(source = "", kind: CellKind = "code"): Cell {
     source,
     outputs: [],
     errors: [],
+    result: null,
     executionCount: null,
     status: "idle",
   };

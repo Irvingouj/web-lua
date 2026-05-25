@@ -13,8 +13,8 @@ use std::rc::Rc;
 use hmac::{Hmac, Mac};
 use md5::Md5;
 use piccolo::{Callback, CallbackReturn, Context, IntoValue, Table, Value};
-use web_lua_core::{HostState, LuaPlugin};
 use sha2::{Digest, Sha256};
+use web_lua_core::{HostState, LuaPlugin};
 
 type HmacSha256 = Hmac<Sha256>;
 

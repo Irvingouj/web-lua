@@ -42,7 +42,7 @@ ${chunks.map(c => `    "${c}"`).join(',\n')}
 ].join("");
 
 const WASM_BYTES = Uint8Array.from(atob(WASM_BASE64), c => c.charCodeAt(0));
-initSync(WASM_BYTES);
+initSync({ module: WASM_BYTES });
 `;
 
 fs.writeFileSync(jsPath, js + embedBlock);

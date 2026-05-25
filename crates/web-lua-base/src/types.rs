@@ -104,16 +104,12 @@ impl From<web_lua_core::CellError> for WasmCellError {
             web_lua_core::CellError::Compile { message, line } => {
                 WasmCellError::Compile { message, line }
             }
-            web_lua_core::CellError::Runtime { message } => {
-                WasmCellError::Runtime { message }
-            }
+            web_lua_core::CellError::Runtime { message } => WasmCellError::Runtime { message },
             web_lua_core::CellError::StrictMode { variable } => {
                 WasmCellError::StrictMode { variable }
             }
             web_lua_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
-            web_lua_core::CellError::Internal { message } => {
-                WasmCellError::Internal { message }
-            }
+            web_lua_core::CellError::Internal { message } => WasmCellError::Internal { message },
         }
     }
 }

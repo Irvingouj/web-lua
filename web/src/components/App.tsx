@@ -29,6 +29,7 @@ const App: FunctionalComponent = () => {
         const updated = { ...c };
         updated.outputs = data.stdout || [];
         updated.errors = data.stderr || [];
+        updated.result = data.result || null;
         if (data.error) {
           updated.errors = [...updated.errors, formatCellError(data.error)];
           updated.status = data.error.kind === 'fuel_exhausted' ? 'stopped' : 'error';

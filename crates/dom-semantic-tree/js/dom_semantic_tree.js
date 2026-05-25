@@ -9412,4 +9412,4 @@ const WASM_BASE64 = [
 ].join("");
 
 const WASM_BYTES = Uint8Array.from(atob(WASM_BASE64), c => c.charCodeAt(0));
-initSync(WASM_BYTES);
+initSync({ module: WASM_BYTES });

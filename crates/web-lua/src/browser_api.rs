@@ -1,8 +1,8 @@
 use serde_json;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_lua_base::types::WasmAsyncResponse;
 use web_lua_base::types::WasmAsyncError;
+use web_lua_base::types::WasmAsyncResponse;
 
 pub async fn execute_fetch(params: serde_json::Value) -> WasmAsyncResponse {
     let url = params.get("url").and_then(|v| v.as_str()).unwrap_or("");
@@ -88,7 +88,11 @@ pub async fn execute_fetch(params: serde_json::Value) -> WasmAsyncResponse {
                 value: None,
                 error: Some(WasmAsyncError {
                     message: msg,
-                    code: if is_timeout { "ETIMEDOUT".into() } else { "ENETWORK".into() },
+                    code: if is_timeout {
+                        "ETIMEDOUT".into()
+                    } else {
+                        "ENETWORK".into()
+                    },
                 }),
             };
         }
@@ -269,89 +273,103 @@ pub async fn execute_storage_delete(params: serde_json::Value) -> WasmAsyncRespo
 pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmAsyncResponse {
     let window = match web_sys::window() {
         Some(w) => w,
-        None => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "No window available".into(),
-                code: "E_HOST".into(),
-            }),
-        },
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "No window available".into(),
+                    code: "E_HOST".into(),
+                }),
+            }
+        }
     };
 
     let handlers = match js_sys::Reflect::get(&window, &"__hostHandlers".into()) {
         Ok(h) if !h.is_undefined() && !h.is_null() => h,
-        _ => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: format!("No handler registered for '{}'", action),
-                code: "E_HOST_NO_HANDLER".into(),
-            }),
-        },
+        _ => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("No handler registered for '{}'", action),
+                    code: "E_HOST_NO_HANDLER".into(),
+                }),
+            }
+        }
     };
 
     let handler = match js_sys::Reflect::get(&handlers, &action.into()) {
         Ok(h) if h.is_function() => h.dyn_into::<js_sys::Function>().unwrap(),
-        _ => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: format!("No handler registered for '{}'", action),
-                code: "E_HOST_NO_HANDLER".into(),
-            }),
-        },
+        _ => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("No handler registered for '{}'", action),
+                    code: "E_HOST_NO_HANDLER".into(),
+                }),
+            }
+        }
     };
 
     // Serialize params to a JSON string, then parse to a JS object.
     // This avoids serde_wasm_bindgen's default map-to-JS-Map behavior.
     let params_json = match serde_json::to_string(&params) {
         Ok(s) => s,
-        Err(e) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: format!("Failed to serialize params: {}", e),
-                code: "E_HOST".into(),
-            }),
-        },
+        Err(e) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("Failed to serialize params: {}", e),
+                    code: "E_HOST".into(),
+                }),
+            }
+        }
     };
     let params_js = match js_sys::JSON::parse(&params_json) {
         Ok(v) => v,
-        Err(e) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: format!("Failed to parse params JSON: {:?}", e),
-                code: "E_HOST".into(),
-            }),
-        },
+        Err(e) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("Failed to parse params JSON: {:?}", e),
+                    code: "E_HOST".into(),
+                }),
+            }
+        }
     };
 
     let result = match handler.call1(&handlers, &params_js) {
         Ok(r) => r,
-        Err(e) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: format!("Handler threw: {:?}", e),
-                code: "E_HOST".into(),
-            }),
-        },
+        Err(e) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("Handler threw: {:?}", e),
+                    code: "E_HOST".into(),
+                }),
+            }
+        }
     };
 
     // If result is a Promise, await it
     let resolved = if result.is_instance_of::<js_sys::Promise>() {
         match JsFuture::from(result.dyn_into::<js_sys::Promise>().unwrap()).await {
             Ok(v) => v,
-            Err(e) => return WasmAsyncResponse {
-                ok: false,
-                value: None,
-                error: Some(WasmAsyncError {
-                    message: format!("Handler promise rejected: {:?}", e),
-                    code: "E_HOST".into(),
-                }),
-            },
+            Err(e) => {
+                return WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: format!("Handler promise rejected: {:?}", e),
+                        code: "E_HOST".into(),
+                    }),
+                }
+            }
         }
     } else {
         result
@@ -361,7 +379,9 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
         Ok(v) => v,
         Err(_) => {
             // If it can't be deserialized to JSON, treat as string
-            let s = resolved.as_string().unwrap_or_else(|| format!("{:?}", resolved));
+            let s = resolved
+                .as_string()
+                .unwrap_or_else(|| format!("{:?}", resolved));
             serde_json::Value::String(s)
         }
     };
@@ -383,14 +403,16 @@ pub fn execute_dom_snapshot(params: serde_json::Value) -> WasmAsyncResponse {
 
     let js_options = match serde_wasm_bindgen::to_value(&options) {
         Ok(v) => v,
-        Err(_) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "Failed to serialize snapshot options".into(),
-                code: "E_SNAPSHOT".into(),
-            }),
-        },
+        Err(_) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "Failed to serialize snapshot options".into(),
+                    code: "E_SNAPSHOT".into(),
+                }),
+            }
+        }
     };
 
     let snap_js = dom_semantic_tree::collect::collect_document(js_options);
@@ -400,40 +422,46 @@ pub fn execute_dom_snapshot(params: serde_json::Value) -> WasmAsyncResponse {
         .and_then(|s| s.as_string())
     {
         Some(s) => s,
-        None => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "Failed to stringify snapshot".into(),
-                code: "E_SNAPSHOT".into(),
-            }),
-        },
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "Failed to stringify snapshot".into(),
+                    code: "E_SNAPSHOT".into(),
+                }),
+            }
+        }
     };
 
     let snapshot: dom_semantic_tree::model::TreeSnapshot = match serde_json::from_str(&snap_json) {
         Ok(s) => s,
-        Err(_) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "Failed to parse snapshot".into(),
-                code: "E_SNAPSHOT".into(),
-            }),
-        },
+        Err(_) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "Failed to parse snapshot".into(),
+                    code: "E_SNAPSHOT".into(),
+                }),
+            }
+        }
     };
 
     let text = dom_semantic_tree::format::format_snapshot(&snapshot, "compact-text");
 
     let data = match serde_json::to_value(&snapshot) {
         Ok(v) => v,
-        Err(_) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "Failed to serialize snapshot data".into(),
-                code: "E_SNAPSHOT".into(),
-            }),
-        },
+        Err(_) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "Failed to serialize snapshot data".into(),
+                    code: "E_SNAPSHOT".into(),
+                }),
+            }
+        }
     };
 
     let result = serde_json::json!({
@@ -451,27 +479,35 @@ pub fn execute_dom_snapshot(params: serde_json::Value) -> WasmAsyncResponse {
 pub fn execute_dom_format(params: serde_json::Value) -> WasmAsyncResponse {
     let snapshot = match params.get("snapshot") {
         Some(s) => s,
-        None => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "dom_format requires snapshot argument".into(),
-                code: "E_FORMAT".into(),
-            }),
-        },
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "dom_format requires snapshot argument".into(),
+                    code: "E_FORMAT".into(),
+                }),
+            }
+        }
     };
-    let format = params.get("format").and_then(|v| v.as_str()).unwrap_or("compact-text");
-    let snap: dom_semantic_tree::model::TreeSnapshot = match serde_json::from_value(snapshot.clone()) {
-        Ok(s) => s,
-        Err(_) => return WasmAsyncResponse {
-            ok: false,
-            value: None,
-            error: Some(WasmAsyncError {
-                message: "Failed to parse snapshot for formatting".into(),
-                code: "E_FORMAT".into(),
-            }),
-        },
-    };
+    let format = params
+        .get("format")
+        .and_then(|v| v.as_str())
+        .unwrap_or("compact-text");
+    let snap: dom_semantic_tree::model::TreeSnapshot =
+        match serde_json::from_value(snapshot.clone()) {
+            Ok(s) => s,
+            Err(_) => {
+                return WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Failed to parse snapshot for formatting".into(),
+                        code: "E_FORMAT".into(),
+                    }),
+                }
+            }
+        };
     let text = dom_semantic_tree::format::format_snapshot(&snap, format);
     WasmAsyncResponse {
         ok: true,
@@ -504,42 +540,78 @@ pub async fn execute_page_hover(params: serde_json::Value) -> WasmAsyncResponse 
     let ref_id = extract_ref_id(&params).unwrap_or("");
     match get_element_by_ref_id(ref_id) {
         Ok(element) => {
-            let event = web_sys::MouseEvent::new_with_mouse_event_init_dict("mouseenter", &web_sys::MouseEventInit::new());
+            let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
+                "mouseenter",
+                &web_sys::MouseEventInit::new(),
+            );
             let _ = element.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
-            WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            }
         }
         Err(e) => WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: e, code: "E_AGENT".into() }),
-        }
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: e,
+                code: "E_AGENT".into(),
+            }),
+        },
     }
 }
 
 pub async fn execute_page_unhover(_params: serde_json::Value) -> WasmAsyncResponse {
     let document = match web_sys::window().and_then(|w| w.document()) {
         Some(d) => d,
-        None => return WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: "No document available".into(), code: "E_AGENT".into() }),
-        },
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "No document available".into(),
+                    code: "E_AGENT".into(),
+                }),
+            }
+        }
     };
     // Dispatch mouseleave on body to clear any hover
     if let Some(body) = document.body() {
-        let event = web_sys::MouseEvent::new_with_mouse_event_init_dict("mouseleave", &web_sys::MouseEventInit::new());
+        let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
+            "mouseleave",
+            &web_sys::MouseEventInit::new(),
+        );
         let _ = body.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
     }
-    WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+    WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Bool(true)),
+        error: None,
+    }
 }
 
 pub async fn execute_page_scroll(params: serde_json::Value) -> WasmAsyncResponse {
-    let direction = params.get("direction").and_then(|v| v.as_str()).unwrap_or("down");
-    let amount = params.get("amount").and_then(|v| v.as_f64()).unwrap_or(300.0);
+    let direction = params
+        .get("direction")
+        .and_then(|v| v.as_str())
+        .unwrap_or("down");
+    let amount = params
+        .get("amount")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(300.0);
     let window = match web_sys::window() {
         Some(w) => w,
-        None => return WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: "No window available".into(), code: "E_AGENT".into() }),
-        },
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "No window available".into(),
+                    code: "E_AGENT".into(),
+                }),
+            }
+        }
     };
     let (dx, dy) = match direction {
         "down" => (0.0, amount),
@@ -549,7 +621,11 @@ pub async fn execute_page_scroll(params: serde_json::Value) -> WasmAsyncResponse
         _ => (0.0, amount),
     };
     window.scroll_by_with_x_and_y(dx, dy);
-    WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+    WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Bool(true)),
+        error: None,
+    }
 }
 
 pub async fn execute_page_scroll_to(params: serde_json::Value) -> WasmAsyncResponse {
@@ -557,12 +633,20 @@ pub async fn execute_page_scroll_to(params: serde_json::Value) -> WasmAsyncRespo
     match get_element_by_ref_id(ref_id) {
         Ok(element) => {
             element.scroll_into_view();
-            WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            }
         }
         Err(e) => WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: e, code: "E_AGENT".into() }),
-        }
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: e,
+                code: "E_AGENT".into(),
+            }),
+        },
     }
 }
 
@@ -570,14 +654,25 @@ pub async fn execute_page_dblclick(params: serde_json::Value) -> WasmAsyncRespon
     let ref_id = extract_ref_id(&params).unwrap_or("");
     match get_element_by_ref_id(ref_id) {
         Ok(element) => {
-            let event = web_sys::MouseEvent::new_with_mouse_event_init_dict("dblclick", &web_sys::MouseEventInit::new());
+            let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
+                "dblclick",
+                &web_sys::MouseEventInit::new(),
+            );
             let _ = element.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
-            WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            }
         }
         Err(e) => WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: e, code: "E_AGENT".into() }),
-        }
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: e,
+                code: "E_AGENT".into(),
+            }),
+        },
     }
 }
 
@@ -594,16 +689,28 @@ pub async fn execute_page_type(params: serde_json::Value) -> WasmAsyncResponse {
                 textarea.set_value(&new_val);
             } else {
                 return WasmAsyncResponse {
-                    ok: false, value: None,
-                    error: Some(WasmAsyncError { message: "Element is not a text input".into(), code: "E_AGENT".into() }),
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Element is not a text input".into(),
+                        code: "E_AGENT".into(),
+                    }),
                 };
             }
-            WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            }
         }
         Err(e) => WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: e, code: "E_AGENT".into() }),
-        }
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: e,
+                code: "E_AGENT".into(),
+            }),
+        },
     }
 }
 
@@ -611,19 +718,26 @@ pub async fn execute_page_press(params: serde_json::Value) -> WasmAsyncResponse 
     let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("");
     let document = match web_sys::window().and_then(|w| w.document()) {
         Some(d) => d,
-        None => return WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: "No document available".into(), code: "E_AGENT".into() }),
-        },
+        None => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "No document available".into(),
+                    code: "E_AGENT".into(),
+                }),
+            }
+        }
     };
     let mut init = web_sys::KeyboardEventInit::new();
     init.set_key(key);
-    let event = web_sys::KeyboardEvent::new_with_keyboard_event_init_dict(
-        "keydown",
-        &init,
-    );
+    let event = web_sys::KeyboardEvent::new_with_keyboard_event_init_dict("keydown", &init);
     let _ = document.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
-    WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+    WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Bool(true)),
+        error: None,
+    }
 }
 
 pub async fn execute_page_select(params: serde_json::Value) -> WasmAsyncResponse {
@@ -635,22 +749,37 @@ pub async fn execute_page_select(params: serde_json::Value) -> WasmAsyncResponse
                 select.set_value(value);
             } else {
                 return WasmAsyncResponse {
-                    ok: false, value: None,
-                    error: Some(WasmAsyncError { message: "Element is not a select".into(), code: "E_AGENT".into() }),
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Element is not a select".into(),
+                        code: "E_AGENT".into(),
+                    }),
                 };
             }
-            WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            }
         }
         Err(e) => WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: e, code: "E_AGENT".into() }),
-        }
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: e,
+                code: "E_AGENT".into(),
+            }),
+        },
     }
 }
 
 pub async fn execute_page_check(params: serde_json::Value) -> WasmAsyncResponse {
     let ref_id = extract_ref_id(&params).unwrap_or("");
-    let checked = params.get("checked").and_then(|v| v.as_bool()).unwrap_or(true);
+    let checked = params
+        .get("checked")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
     match get_element_by_ref_id(ref_id) {
         Ok(element) => {
             if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
@@ -659,16 +788,28 @@ pub async fn execute_page_check(params: serde_json::Value) -> WasmAsyncResponse 
                 checkbox.set_checked(checked);
             } else {
                 return WasmAsyncResponse {
-                    ok: false, value: None,
-                    error: Some(WasmAsyncError { message: "Element is not a checkbox".into(), code: "E_AGENT".into() }),
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Element is not a checkbox".into(),
+                        code: "E_AGENT".into(),
+                    }),
                 };
             }
-            WasmAsyncResponse { ok: true, value: Some(serde_json::Value::Bool(true)), error: None }
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            }
         }
         Err(e) => WasmAsyncResponse {
-            ok: false, value: None,
-            error: Some(WasmAsyncError { message: e, code: "E_AGENT".into() }),
-        }
+            ok: false,
+            value: None,
+            error: Some(WasmAsyncError {
+                message: e,
+                code: "E_AGENT".into(),
+            }),
+        },
     }
 }
 

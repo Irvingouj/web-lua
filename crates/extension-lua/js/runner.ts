@@ -511,10 +511,13 @@ export async function executeMainThreadCommand(
       const optRec = asRecord(opts);
       const maxNodes =
         typeof optRec.max_nodes === "number" ? optRec.max_nodes : 500;
-      return sendMessageToTab(tabId, {
+      console.log("[runner] tab_snapshot → tabId:", tabId, "maxNodes:", maxNodes);
+      const r = await sendMessageToTab(tabId, {
         action: "snapshot",
         params: { max_nodes: maxNodes },
       });
+      console.log("[runner] tab_snapshot ← result:", r);
+      return r;
     }
     case "cookies_get":
       return handleChromeApi({ action: "chrome_cookies_get", params });
@@ -816,9 +819,11 @@ async function sendMessageToTab(
       },
     };
   }
+  console.log("[sendMessageToTab] targetTab:", targetTab, "message:", message);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const result = await chrome.tabs.sendMessage(targetTab, message);
+      console.log("[sendMessageToTab] raw result:", result);
       // Content-script handlers may return { ok: false, error: msg } on failure.
       // Flatten that so Lua consumers always see a single error shape.
       if (
@@ -828,6 +833,7 @@ async function sendMessageToTab(
       ) {
         const raw = (result as Record<string, unknown>).error;
         const msg = typeof raw === "string" ? raw : String(raw);
+        console.log("[sendMessageToTab] content-script error:", msg);
         return {
           ok: false,
           error: {
@@ -836,10 +842,23 @@ async function sendMessageToTab(
           },
         };
       }
+      console.log("[sendMessageToTab] success, result:", result);
       return { ok: true, value: result };
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : String(err)) || "";
       if (msg.includes("Receiving end does not exist") && attempt < 4) {
+        if (attempt === 0) {
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: targetTab },
+              files: ["content-script.js"],
+              world: "ISOLATED",
+            });
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          } catch (injectErr: unknown) {
+            return normalizeChromeError(injectErr);
+          }
+        }
         await new Promise((resolve) => setTimeout(resolve, 500));
         continue;
       }

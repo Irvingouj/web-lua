@@ -28,3 +28,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[lua-notebook] extension installed');
 });
+
+// Open side panel on extension icon click (replaces popup)
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((err) => console.error('[lua-notebook] side panel behavior failed:', err));
