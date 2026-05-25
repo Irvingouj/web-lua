@@ -3,10 +3,10 @@
 // WebSession runs on the main thread and handles all browser side-effects
 // directly via web_sys.
 
-import type { LuaGlobalsSnapshot, LuaRunResult } from "@pi-oxide/lua-types";
+import type { CellResult, WasmGlobalsSnapshot } from "./web_lua.js";
 import wasmInit, { WebSession as RawWebSession } from "./web_lua.js";
 
-export type { LuaGlobalsSnapshot, LuaRunResult } from "@pi-oxide/lua-types";
+export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
 export { registerHostHandler, registerHostHandlers } from "./registry";
 
 export class WebSession {
@@ -31,23 +31,23 @@ export class WebSession {
     }
   }
 
-  async runCellAsync(code: string, stdin?: string): Promise<LuaRunResult> {
-    return this.raw.runCellAsync(code, stdin || "") as Promise<LuaRunResult>;
+  async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
+    return this.raw.runCellAsync(code, stdin || "");
   }
 
   reset(): void {
     this.raw.reset();
   }
 
-  inspectGlobals(): LuaGlobalsSnapshot {
-    return this.raw.inspectGlobals() as LuaGlobalsSnapshot;
+  inspectGlobals(): WasmGlobalsSnapshot {
+    return this.raw.inspectGlobals();
   }
 
   setFuelLimit(limit: number): void {
     this.raw.set_fuel_limit(limit);
   }
 
-  loadLibrary(source: string): LuaRunResult {
-    return this.raw.load_library(source) as LuaRunResult;
+  loadLibrary(source: string): CellResult {
+    return this.raw.load_library(source);
   }
 }

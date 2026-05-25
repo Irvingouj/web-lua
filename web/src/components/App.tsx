@@ -33,9 +33,6 @@ const App: FunctionalComponent = () => {
         if (data.error) {
           updated.errors = [...updated.errors, formatCellError(data.error)];
           updated.status = data.error.kind === 'fuel_exhausted' ? 'stopped' : 'error';
-        } else if (data.fuel_exhausted) {
-          updated.errors = [...updated.errors, 'Execution stopped: fuel limit reached (possible infinite loop)'];
-          updated.status = 'stopped';
         } else {
           updated.status = 'success';
         }

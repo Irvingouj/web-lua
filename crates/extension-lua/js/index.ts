@@ -3,7 +3,7 @@
 // ExtensionSession.init() spawns the Worker internally, starts the main-thread
 // runner loop, and returns a proxy + runner promise.
 
-import type { LuaGlobalsSnapshot, LuaRunResult } from "@pi-oxide/lua-types";
+import type { CellResult, WasmGlobalsSnapshot } from "./extension_lua.js";
 import { logger } from "./logger";
 import {
   executeMainThreadCommand,
@@ -13,7 +13,7 @@ import {
   setRunnerAbortController,
 } from "./runner";
 
-export type { LuaGlobalsSnapshot, LuaRunResult } from "@pi-oxide/lua-types";
+export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
 export { registerHostHandler, registerHostHandlers };
 
 interface WorkerMessage {
@@ -180,7 +180,7 @@ export class ExtensionSession {
     });
   }
 
-  async runCellAsync(code: string, stdin?: string): Promise<LuaRunResult> {
+  async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
     const id = this.generateId();
     return this.postAndWait({ type: "runCell", id, code, stdin: stdin || "" });
   }
@@ -190,7 +190,7 @@ export class ExtensionSession {
     return this.postAndWait({ type: "reset", id });
   }
 
-  inspectGlobals(): Promise<LuaGlobalsSnapshot> {
+  inspectGlobals(): Promise<WasmGlobalsSnapshot> {
     const id = this.generateId();
     return this.postAndWait({ type: "inspectGlobals", id });
   }
@@ -200,7 +200,7 @@ export class ExtensionSession {
     this.worker.postMessage({ type: "setFuelLimit", limit });
   }
 
-  loadLibrary(source: string): Promise<LuaRunResult> {
+  loadLibrary(source: string): Promise<CellResult> {
     const id = this.generateId();
     return this.postAndWait({ type: "loadLibrary", id, source });
   }

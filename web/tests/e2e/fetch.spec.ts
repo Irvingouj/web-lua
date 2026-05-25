@@ -19,16 +19,13 @@ test.describe("web.fetch", () => {
       page,
       0,
       `local ok, result = pcall(function()
-  return web.fetch({
-    url = "https://jsonplaceholder.typicode.com/posts/1",
-    method = "GET"
-  })
+  return web.fetch("https://httpbin.org/json")
 end)
 if ok then
   print("Status: " .. result.status)
   local data = json.decode(result.body)
-  print("Post ID: " .. tostring(data.id))
-  print("Has title: " .. tostring(data.title ~= nil))
+  print("Has slideshow: " .. tostring(data.slideshow ~= nil))
+  print("Has title: " .. tostring(data.slideshow.title ~= nil))
 else
   print("Fetch error: " .. tostring(result))
 end`,
@@ -44,10 +41,7 @@ end`,
       page,
       0,
       `local ok, result = pcall(function()
-  return web.fetch({
-    url = "https://httpbin.org/status/404",
-    method = "GET"
-  })
+  return web.fetch("https://httpbin.org/status/404")
 end)
 if ok then
   print("Status: " .. result.status)
@@ -64,11 +58,7 @@ end`,
       page,
       0,
       `local ok, result = pcall(function()
-  return web.fetch({
-    url = "https://0.0.0.0:1/impossible",
-    method = "GET",
-    timeout = 1000
-  })
+  return web.fetch("https://0.0.0.0:1/impossible", { timeout = 1000 })
 end)
 print("pcall ok: " .. tostring(ok))`,
     );
@@ -82,8 +72,7 @@ print("pcall ok: " .. tostring(ok))`,
       page,
       0,
       `local ok, result = pcall(function()
-  return web.fetch({
-    url = "https://httpbin.org/post",
+  return web.fetch("https://httpbin.org/post", {
     method = "POST",
     body = '{"hello":"world"}',
     headers = { ["Content-Type"] = "application/json" }
@@ -105,11 +94,11 @@ end`,
       0,
       `local urls = {
   "https://httpbin.org/get",
-  "https://jsonplaceholder.typicode.com/todos/1"
+  "https://httpbin.org/ip"
 }
 for i, url in ipairs(urls) do
   local ok, result = pcall(function()
-    return web.fetch({ url = url, method = "GET" })
+    return web.fetch(url)
   end)
   if ok then
     print("Fetch " .. i .. ": " .. result.status)

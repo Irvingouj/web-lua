@@ -89,6 +89,18 @@ pub struct WasmRunResult {
     pub pending_command: Option<WasmAsyncCommand>,
 }
 
+/// Consumer-facing result of running a single cell.
+/// Stripped of internal async-loop fields (commands, fuel_exhausted, status, pending_command).
+#[derive(Debug, Clone, Serialize, Tsify)]
+#[tsify(into_wasm_abi)]
+pub struct CellResult {
+    pub stdout: Vec<String>,
+    pub stderr: Vec<String>,
+    pub result: Option<String>,
+    pub error: Option<WasmCellError>,
+    pub execution_count: u32,
+}
+
 impl From<web_lua_core::CellStatus> for WasmCellStatus {
     fn from(s: web_lua_core::CellStatus) -> Self {
         match s {
@@ -156,6 +168,30 @@ impl From<web_lua_core::RunResult> for WasmRunResult {
             execution_count: r.execution_count,
             status: r.status.into(),
             pending_command: r.pending_command.map(Into::into),
+        }
+    }
+}
+
+impl From<web_lua_core::RunResult> for CellResult {
+    fn from(r: web_lua_core::RunResult) -> Self {
+        CellResult {
+            stdout: r.stdout,
+            stderr: r.stderr,
+            result: r.result,
+            error: r.error.map(Into::into),
+            execution_count: r.execution_count,
+        }
+    }
+}
+
+impl From<WasmRunResult> for CellResult {
+    fn from(r: WasmRunResult) -> Self {
+        CellResult {
+            stdout: r.stdout,
+            stderr: r.stderr,
+            result: r.result,
+            error: r.error,
+            execution_count: r.execution_count,
         }
     }
 }

@@ -187,8 +187,8 @@ end
     }
 
     /// Load a Lua library by executing its source code.
-    pub fn load_library(&mut self, source: &str) -> WasmRunResult {
-        self.base.load_library(source)
+    pub fn load_library(&mut self, source: &str) -> CellResult {
+        self.base.load_library(source).into()
     }
 
     /// Inspect all global variables in the current Lua state.
@@ -205,7 +205,7 @@ end
     /// Run a cell, automatically resolving all async calls by relaying
     /// them to the main-thread runner via `__extension_lua_relay`.
     #[wasm_bindgen(js_name = runCellAsync)]
-    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> WasmRunResult {
+    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> CellResult {
         let mut result = self.base.run_cell(&code, &stdin);
 
         while result.status == WasmCellStatus::AsyncPending {
@@ -239,7 +239,7 @@ end
             result = self.base.resume_cell(&json);
         }
 
-        result
+        result.into()
     }
 }
 

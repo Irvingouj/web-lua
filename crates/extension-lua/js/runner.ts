@@ -494,16 +494,55 @@ export async function executeMainThreadCommand(
       const body = optsRec.body ?? null;
       const timeout =
         typeof optsRec.timeout === "number" ? optsRec.timeout : 30_000;
-      return sendMessageToTab(tabId, {
-        action: "fetch",
-        params: {
-          url,
-          method,
-          headers,
-          body,
-          timeout,
+      return executeInTab(
+        tabId,
+        (
+          urlArg: unknown,
+          methodArg: unknown,
+          headersArg: unknown,
+          bodyArg: unknown,
+          timeoutArg: unknown,
+        ) => {
+          const urlStr = typeof urlArg === "string" ? urlArg : "";
+          const methodStr = typeof methodArg === "string" ? methodArg : "GET";
+          const headersRec =
+            typeof headersArg === "object" && headersArg !== null
+              ? (headersArg as Record<string, string>)
+              : {};
+          const bodyStr = bodyArg !== null && bodyArg !== undefined ? String(bodyArg) : null;
+          const timeoutNum = typeof timeoutArg === "number" ? timeoutArg : 30_000;
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(
+            () => controller.abort(),
+            timeoutNum || 30_000,
+          );
+          const fetchOpts: RequestInit = {
+            method: methodStr || "GET",
+            headers: headersRec,
+            signal: controller.signal,
+          };
+          if (bodyStr !== null) {
+            fetchOpts.body = bodyStr;
+          }
+          return fetch(urlStr, fetchOpts)
+            .then(async (resp) => {
+              clearTimeout(timeoutId);
+              const text = await resp.text();
+              return {
+                status: resp.status,
+                ok: resp.ok,
+                headers: Object.fromEntries(resp.headers.entries()),
+                body: text,
+              };
+            })
+            .catch((e) => {
+              clearTimeout(timeoutId);
+              throw e;
+            });
         },
-      });
+        [url, method, headers, body, timeout],
+      );
     }
     case "tab_snapshot": {
       const tabId = extractTabId(params);
@@ -512,13 +551,86 @@ export async function executeMainThreadCommand(
       const optRec = asRecord(opts);
       const maxNodes =
         typeof optRec.max_nodes === "number" ? optRec.max_nodes : 500;
-      logger.debug("[runner] tab_snapshot → tabId:", tabId, "maxNodes:", maxNodes);
-      const r = await sendMessageToTab(tabId, {
-        action: "snapshot",
-        params: { max_nodes: maxNodes },
-      });
-      logger.debug("[runner] tab_snapshot ← result:", r);
-      return r;
+      return executeInTab(
+        tabId,
+        (maxNodesArg: unknown) => {
+          const maxNodesNum =
+            typeof maxNodesArg === "number" ? maxNodesArg : 500;
+
+          function getElementRole(el: Element): string {
+            const tag = el.tagName.toLowerCase();
+            const ariaRole = el.getAttribute("role");
+            if (ariaRole) return ariaRole;
+            if (
+              tag === "button" ||
+              (tag === "input" && (el as HTMLInputElement).type === "submit")
+            )
+              return "button";
+            if (tag === "a") return "link";
+            if (tag === "input") {
+              const type = (el as HTMLInputElement).type;
+              if (
+                type === "text" ||
+                type === "email" ||
+                type === "password" ||
+                type === "search"
+              )
+                return "textbox";
+              if (type === "checkbox") return "checkbox";
+              if (type === "radio") return "radio";
+              if (type === "submit" || type === "button") return "button";
+            }
+            if (tag === "textarea") return "textbox";
+            if (tag === "select") return "combobox";
+            if (tag === "img") return "img";
+            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4")
+              return "heading";
+            return "generic";
+          }
+
+          function inlineSnapshot(maxNodes: number) {
+            const all = document.body.querySelectorAll("*");
+            const nodes: Array<Record<string, unknown>> = [];
+            const lines: string[] = [];
+            for (let i = 0; i < all.length && nodes.length < maxNodes; i++) {
+              const el = all[i];
+              const tag = el.tagName.toLowerCase();
+              if (tag === "script" || tag === "style" || tag === "noscript")
+                continue;
+              const role = getElementRole(el);
+              if (role === "generic") continue;
+              const refId = i + 1;
+              el.setAttribute("data-ref-id", String(refId));
+              const node: Record<string, unknown> = { refId, role, tag };
+              const name =
+                el.ariaLabel ||
+                el.title ||
+                el.textContent?.slice(0, 30) ||
+                "";
+              if (name) node.name = name;
+              nodes.push(node);
+              const parts = [`[${refId}]`, role];
+              if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
+              lines.push(parts.join(" "));
+            }
+            return {
+              data: {
+                nodes,
+                url: window.location.href,
+                title: document.title,
+                viewport: {
+                  width: window.innerWidth,
+                  height: window.innerHeight,
+                },
+              },
+              text: lines.join("\n"),
+            };
+          }
+
+          return inlineSnapshot(maxNodesNum);
+        },
+        [maxNodes],
+      );
     }
     case "cookies_get":
       return handleChromeApi({ action: "chrome_cookies_get", params });
