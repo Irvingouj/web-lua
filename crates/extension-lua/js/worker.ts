@@ -1,7 +1,8 @@
 // Web Worker for extension-lua
 // Loads extension-lua WASM, defines __extension_lua_relay, and communicates with main thread.
 
-import init, { ExtensionSession } from "./extension_lua.js";
+import { logger } from "./logger";
+import init, { ExtensionSession, setLogLevel as setWasmLogLevel } from "./extension_lua.js";
 
 let session: ExtensionSession | null = null;
 let initialized = false;
@@ -19,7 +20,7 @@ const workerSelf = self as unknown as WorkerSelf;
 
 // Define the relay function that extension-lua WASM expects globally
 workerSelf.__extension_lua_relay = (cmd: unknown) => {
-  console.log("[worker] __extension_lua_relay cmd:", (cmd as Record<string, unknown>)?.action);
+  logger.debug("[worker] __extension_lua_relay cmd:", (cmd as Record<string, unknown>)?.action);
   return new Promise((resolve) => {
     const relayId = generateId();
     pendingRelays.set(relayId, resolve);
@@ -31,6 +32,7 @@ async function initWasm() {
   if (initialized) return;
   await init();
   session = new ExtensionSession();
+  setWasmLogLevel(3); // default "error"
   initialized = true;
 }
 
@@ -50,10 +52,17 @@ export type WorkerMessage =
   | { type: "setFuelLimit"; id?: string; limit: number }
   | { type: "inspectGlobals"; id: string }
   | { type: "loadLibrary"; id: string; source: string }
+  | { type: "setLogLevel"; level: number }
   | { type: "asyncRelayResult"; id: string; result: unknown };
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   const msg = e.data;
+
+  if (msg.type === "setLogLevel") {
+    setWasmLogLevel(msg.level);
+    logger.debug("[worker] WASM log level set to", msg.level);
+    return;
+  }
 
   if (!initialized || !session) {
     self.postMessage({
@@ -126,13 +135,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
     case "asyncRelayResult": {
-      console.log("[worker] asyncRelayResult id:", msg.id, "result:", typeof msg.result);
+      logger.debug("[worker] asyncRelayResult id:", msg.id, "result:", typeof msg.result);
       const resolve = pendingRelays.get(msg.id);
       if (resolve) {
         pendingRelays.delete(msg.id);
         resolve(msg.result);
       } else {
-        console.warn("[worker] asyncRelayResult: no pending relay for id", msg.id);
+        logger.warn("[worker] asyncRelayResult: no pending relay for id", msg.id);
       }
       break;
     }

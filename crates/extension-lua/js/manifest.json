@@ -21,6 +21,7 @@
   "background": {
     "service_worker": "background.js"
   },
+  "action": {},
   "side_panel": {
     "default_path": "index.html"
   },

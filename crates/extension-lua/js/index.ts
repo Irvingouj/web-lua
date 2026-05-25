@@ -4,6 +4,7 @@
 // runner loop, and returns a proxy + runner promise.
 
 import type { LuaGlobalsSnapshot, LuaRunResult } from "@pi-oxide/lua-types";
+import { logger } from "./logger";
 import {
   executeMainThreadCommand,
   registerHostHandler,
@@ -128,16 +129,16 @@ export class ExtensionSession {
           }
         }
         // Global worker errors without a matching call
-        console.error("[extension-lua worker]", msg.error);
+        logger.error("[extension-lua worker]", msg.error);
         break;
       }
       case "asyncRelay": {
         if (!msg.id || !msg.command) break;
         const action = (msg.command as Record<string, unknown>)?.action;
-        console.log("[ExtensionSession] asyncRelay action:", action, "id:", msg.id);
+        logger.debug("[ExtensionSession] asyncRelay action:", action, "id:", msg.id);
         executeMainThreadCommand(msg.command)
           .then((result) => {
-            console.log("[ExtensionSession] asyncRelayResult action:", action, "resultType:", typeof result);
+            logger.debug("[ExtensionSession] asyncRelayResult action:", action, "resultType:", typeof result);
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,
@@ -146,7 +147,7 @@ export class ExtensionSession {
           })
           .catch((err: Error | unknown) => {
             const message = err instanceof Error ? err.message : String(err);
-            console.error("[ExtensionSession] asyncRelay error action:", action, "msg:", message);
+            logger.error("[ExtensionSession] asyncRelay error action:", action, "msg:", message);
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,

@@ -1,3 +1,4 @@
+use crate::log::{log_debug, log_error};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_lua_base::types::*;
@@ -214,8 +215,12 @@ end
             };
 
             let response = match self.handle_command(cmd).await {
-                Ok(r) => r,
+                Ok(r) => {
+                    log_debug(&format!("[ExtensionSession] async response: action={}", cmd.action));
+                    r
+                }
                 Err(e) => {
+                    log_error(&format!("[ExtensionSession] async relay error: action={}, err={}", cmd.action, e));
                     let err_json = serde_json::to_string(&WasmAsyncResponse {
                         ok: false,
                         value: None,
@@ -265,6 +270,7 @@ impl ExtensionSession {
         let resp: WasmAsyncResponse = serde_json::from_str(&resp_json_str)
             .map_err(|e| format!("Failed to deserialize response: {:?}", e))?;
 
+        log_debug(&format!("[ExtensionSession] deserialized response: ok={}", resp.ok));
         Ok(resp)
     }
 }

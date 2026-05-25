@@ -1,8 +1,23 @@
 // Content script for Lua Notebook extension
 // Runs in isolated world, handles tab.* operations via chrome.runtime.onMessage.
 
+const __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 };
+let __logLevel = 3; // default "error"
+
+const logger = {
+  debug: (...args) => { if (__logLevel <= 0) console.log(...args); },
+  info: (...args) => { if (__logLevel <= 1) console.log(...args); },
+  warn: (...args) => { if (__logLevel <= 2) console.warn(...args); },
+  error: (...args) => { if (__logLevel <= 3) console.error(...args); },
+};
+
+// biome-ignore lint/suspicious/noGlobalAssign: exposed for dev console tuning
+window.__luaNotebookSetLogLevel = (level) => {
+  __logLevel = __LOG_LEVELS[level] ?? 3;
+};
+
 if (window.__luaNotebookContentScriptInjected) {
-  throw new Error("Content script already injected");
+  return;
 }
 window.__luaNotebookContentScriptInjected = true;
 
@@ -159,9 +174,9 @@ const handlers = {
     const obj = asRecord(params);
     const maxNodes =
       typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-    console.log("[content-script] snapshot called, maxNodes:", maxNodes, "document.body:", !!document.body);
+    logger.debug("[content-script] snapshot called, maxNodes:", maxNodes, "document.body:", !!document.body);
     const r = inlineSnapshot(maxNodes);
-    console.log("[content-script] snapshot result nodes:", r.data.nodes.length);
+    logger.debug("[content-script] snapshot result nodes:", r.data.nodes.length);
     return r;
   },
 
@@ -203,10 +218,10 @@ const handlers = {
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   const action = request?.action;
-  console.log("[content-script] received action:", action, "params:", request?.params);
+  logger.debug("[content-script] received action:", action, "params:", request?.params);
   const handler = handlers[action];
   if (!handler) {
-    console.log("[content-script] no handler for action:", action);
+    logger.debug("[content-script] no handler for action:", action);
     sendResponse({
       ok: false,
       error: `Unknown content script action: ${action}`,
@@ -219,22 +234,22 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (result instanceof Promise) {
       result
         .then((value) => {
-          console.log("[content-script] async response for", action, ":", typeof value);
+          logger.debug("[content-script] async response for", action, ":", typeof value);
           sendResponse(value);
         })
         .catch((err) => {
           const msg = err instanceof Error ? err.message : String(err);
-          console.log("[content-script] async error for", action, ":", msg);
+          logger.debug("[content-script] async error for", action, ":", msg);
           sendResponse({ ok: false, error: msg || String(err) });
         });
       return true;
     }
-    console.log("[content-script] sync response for", action, ":", typeof result);
+    logger.debug("[content-script] sync response for", action, ":", typeof result);
     sendResponse(result);
     return false;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log("[content-script] sync error for", action, ":", msg);
+    logger.debug("[content-script] sync error for", action, ":", msg);
     sendResponse({ ok: false, error: msg || String(err) });
     return false;
   }

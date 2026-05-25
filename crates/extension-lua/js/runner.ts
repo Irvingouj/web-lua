@@ -1,6 +1,7 @@
 // Main-thread command executor for extension-lua runner
 // Handles all commands relayed from the extension Worker.
 
+import { logger } from "./logger";
 import {
   init as initDomSnapshot,
   collectDocument,
@@ -511,12 +512,12 @@ export async function executeMainThreadCommand(
       const optRec = asRecord(opts);
       const maxNodes =
         typeof optRec.max_nodes === "number" ? optRec.max_nodes : 500;
-      console.log("[runner] tab_snapshot → tabId:", tabId, "maxNodes:", maxNodes);
+      logger.debug("[runner] tab_snapshot → tabId:", tabId, "maxNodes:", maxNodes);
       const r = await sendMessageToTab(tabId, {
         action: "snapshot",
         params: { max_nodes: maxNodes },
       });
-      console.log("[runner] tab_snapshot ← result:", r);
+      logger.debug("[runner] tab_snapshot ← result:", r);
       return r;
     }
     case "cookies_get":
@@ -819,11 +820,11 @@ async function sendMessageToTab(
       },
     };
   }
-  console.log("[sendMessageToTab] targetTab:", targetTab, "message:", message);
+  logger.debug("[sendMessageToTab] targetTab:", targetTab, "message:", message);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const result = await chrome.tabs.sendMessage(targetTab, message);
-      console.log("[sendMessageToTab] raw result:", result);
+      logger.debug("[sendMessageToTab] raw result:", result);
       // Content-script handlers may return { ok: false, error: msg } on failure.
       // Flatten that so Lua consumers always see a single error shape.
       if (
@@ -833,7 +834,7 @@ async function sendMessageToTab(
       ) {
         const raw = (result as Record<string, unknown>).error;
         const msg = typeof raw === "string" ? raw : String(raw);
-        console.log("[sendMessageToTab] content-script error:", msg);
+        logger.debug("[sendMessageToTab] content-script error:", msg);
         return {
           ok: false,
           error: {
@@ -842,7 +843,7 @@ async function sendMessageToTab(
           },
         };
       }
-      console.log("[sendMessageToTab] success, result:", result);
+      logger.debug("[sendMessageToTab] success, result:", result);
       return { ok: true, value: result };
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : String(err)) || "";
