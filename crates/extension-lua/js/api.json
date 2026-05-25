@@ -1,0 +1,2449 @@
+[
+  {
+    "namespace": "web",
+    "name": "mock_async",
+    "action": "mock_async",
+    "description": "Yield for testing, resumes with provided value.",
+    "params": [
+      {
+        "name": "label",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "Test label"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Test label echoed back"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web",
+    "name": "fetch",
+    "action": "fetch",
+    "description": "Perform an HTTP fetch request.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.url",
+    "name": "parse",
+    "action": "url_parse",
+    "description": "Parse a URL string into components.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL string to parse"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Parsed URL components: protocol, host, pathname, search, hash"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.url",
+    "name": "encode",
+    "action": "url_encode",
+    "description": "Encode a table into a query string.",
+    "params": [
+      {
+        "name": "params",
+        "lua_type": "table",
+        "required": true,
+        "description": "Key-value pairs to encode"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "URL-encoded query string"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web",
+    "name": "log",
+    "action": "web_log",
+    "description": "Log a message to the browser console.",
+    "params": [
+      {
+        "name": "message",
+        "lua_type": "any",
+        "required": true,
+        "description": "Value to log"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web",
+    "name": "sleep",
+    "action": "sleep",
+    "description": "Pause execution for a duration.",
+    "params": [
+      {
+        "name": "ms",
+        "lua_type": "number",
+        "required": false,
+        "description": "Milliseconds to sleep (default 1000)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "get",
+    "action": "storage_get",
+    "description": "Get a value from web storage.",
+    "params": [
+      {
+        "name": "key",
+        "lua_type": "string",
+        "required": true,
+        "description": "Storage key"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "Stored value or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "set",
+    "action": "storage_set",
+    "description": "Set a value in web storage.",
+    "params": [
+      {
+        "name": "key",
+        "lua_type": "string",
+        "required": true,
+        "description": "Storage key"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Value to store"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "delete",
+    "action": "storage_delete",
+    "description": "Remove a key from web storage.",
+    "params": [
+      {
+        "name": "key",
+        "lua_type": "string",
+        "required": true,
+        "description": "Storage key to remove"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.storage",
+    "name": "list",
+    "action": "storage_list",
+    "description": "List all keys in web storage.",
+    "params": [],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of key strings"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "query",
+    "action": "tab_query",
+    "description": "Query Chrome tabs matching given criteria.",
+    "params": [
+      {
+        "name": "query_info",
+        "lua_type": "table",
+        "required": false,
+        "description": "Query filter: active, currentWindow, url, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of matching tab objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "create",
+    "action": "tab_create",
+    "description": "Create a new tab.",
+    "params": [
+      {
+        "name": "create_properties",
+        "lua_type": "table",
+        "required": false,
+        "description": "URL, windowId, active, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "activate",
+    "action": "tab_activate",
+    "description": "Activate (focus) a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID to activate"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether activation succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "close",
+    "action": "tab_close",
+    "description": "Close a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID to close"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "execute_script",
+    "action": "tab_execute_script",
+    "description": "Execute JavaScript in a target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "script",
+        "lua_type": "string | table",
+        "required": true,
+        "description": "Script code or injection details"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Injection results"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "click",
+    "action": "tab_click",
+    "description": "Click an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether the click succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "fill",
+    "action": "tab_fill",
+    "description": "Fill an input element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether fill succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "snapshot",
+    "action": "tab_snapshot",
+    "description": "Take a DOM snapshot of the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Simplified inline DOM snapshot with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "scroll_to",
+    "action": "tab_scroll_to",
+    "description": "Scroll to an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether scroll succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "evaluate",
+    "action": "tab_evaluate",
+    "description": "Evaluate JavaScript in a target tab and return the result.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "script",
+        "lua_type": "string",
+        "required": true,
+        "description": "JavaScript code to evaluate"
+      }
+    ],
+    "returns": {
+      "lua_type": "any",
+      "description": "Evaluation result"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "back",
+    "action": "tab_back",
+    "description": "Navigate back in a target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether navigation succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "wait_for_load",
+    "action": "tab_wait_for_load",
+    "description": "Wait for a tab to finish loading.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether the tab loaded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "fetch",
+    "action": "tab_fetch",
+    "description": "Perform an HTTP fetch inside a target tab origin.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "get",
+    "action": "cookies_get",
+    "description": "Get a cookie by name and URL.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "Cookie query: name, url, storeId"
+      }
+    ],
+    "returns": {
+      "lua_type": "table | nil",
+      "description": "Cookie object or nil if not found"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "set",
+    "action": "cookies_set",
+    "description": "Set a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "Cookie to set: name, value, url, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Set cookie object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "delete",
+    "action": "cookies_delete",
+    "description": "Delete a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "Cookie to delete: name, url"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.cookies",
+    "name": "list",
+    "action": "cookies_list",
+    "description": "List cookies matching a filter.",
+    "params": [
+      {
+        "name": "filter",
+        "lua_type": "table",
+        "required": false,
+        "description": "Filter: url, name, domain, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of cookie objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.history",
+    "name": "search",
+    "action": "history_search",
+    "description": "Search browser history.",
+    "params": [
+      {
+        "name": "query",
+        "lua_type": "table",
+        "required": true,
+        "description": "Search query: text, startTime, endTime, maxResults"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of history items"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.history",
+    "name": "delete",
+    "action": "history_delete",
+    "description": "Delete a URL from browser history.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to remove from history"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.bookmarks",
+    "name": "search",
+    "action": "bookmarks_search",
+    "description": "Search bookmarks.",
+    "params": [
+      {
+        "name": "query",
+        "lua_type": "string | table",
+        "required": true,
+        "description": "Search string or query object"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of bookmark nodes"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.bookmarks",
+    "name": "create",
+    "action": "bookmarks_create",
+    "description": "Create a bookmark or folder.",
+    "params": [
+      {
+        "name": "bookmark",
+        "lua_type": "table",
+        "required": true,
+        "description": "Bookmark properties: parentId, title, url"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created bookmark node"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.bookmarks",
+    "name": "delete",
+    "action": "bookmarks_delete",
+    "description": "Delete a bookmark.",
+    "params": [
+      {
+        "name": "id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Bookmark node ID to delete"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.notifications",
+    "name": "create",
+    "action": "notifications_create",
+    "description": "Create a browser notification.",
+    "params": [
+      {
+        "name": "id",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "Notification ID (nil for auto-generated)"
+      },
+      {
+        "name": "options",
+        "lua_type": "table",
+        "required": true,
+        "description": "Notification options: type, title, message, iconUrl"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Notification ID"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.notifications",
+    "name": "clear",
+    "action": "notifications_clear",
+    "description": "Clear a browser notification.",
+    "params": [
+      {
+        "name": "id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Notification ID to clear"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether notification was cleared"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.clipboard",
+    "name": "read",
+    "action": "clipboard_read",
+    "description": "Read text from the system clipboard.",
+    "params": [],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "Clipboard text or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.clipboard",
+    "name": "write",
+    "action": "clipboard_write",
+    "description": "Write text to the system clipboard.",
+    "params": [
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to write"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether write succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.runtime",
+    "name": "sendMessage",
+    "action": "chrome_runtime_sendMessage",
+    "description": "Send a message to the extension background script or another extension.",
+    "params": [
+      {
+        "name": "message",
+        "lua_type": "any",
+        "required": true,
+        "description": "Message payload"
+      },
+      {
+        "name": "options",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: to, includeTlsChannelId"
+      }
+    ],
+    "returns": {
+      "lua_type": "any",
+      "description": "Response from the recipient"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "query",
+    "action": "chrome_tabs_query",
+    "description": "Query Chrome tabs matching given criteria.",
+    "params": [
+      {
+        "name": "query_info",
+        "lua_type": "table",
+        "required": true,
+        "description": "Query filter: active, currentWindow, url, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of matching tab objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "create",
+    "action": "chrome_tabs_create",
+    "description": "Create a new Chrome tab.",
+    "params": [
+      {
+        "name": "create_properties",
+        "lua_type": "table",
+        "required": false,
+        "description": "URL, windowId, active, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "update",
+    "action": "chrome_tabs_update",
+    "description": "Update properties of a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number | nil",
+        "required": false,
+        "description": "Tab ID (nil for active tab)"
+      },
+      {
+        "name": "update_properties",
+        "lua_type": "table",
+        "required": true,
+        "description": "Properties: url, active, muted, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Updated tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "remove",
+    "action": "chrome_tabs_remove",
+    "description": "Close one or more tabs.",
+    "params": [
+      {
+        "name": "tab_ids",
+        "lua_type": "number | table",
+        "required": true,
+        "description": "Tab ID or array of tab IDs"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "get",
+    "action": "chrome_tabs_get",
+    "description": "Get a tab by ID.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "reload",
+    "action": "chrome_tabs_reload",
+    "description": "Reload a tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number | nil",
+        "required": false,
+        "description": "Tab ID (nil for active tab)"
+      },
+      {
+        "name": "reload_properties",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "bypassCache"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether reload succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.tabs",
+    "name": "sendMessage",
+    "action": "chrome_tabs_sendMessage",
+    "description": "Send a message to a specific tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "message",
+        "lua_type": "any",
+        "required": true,
+        "description": "Message payload"
+      },
+      {
+        "name": "options",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: frameId"
+      }
+    ],
+    "returns": {
+      "lua_type": "any",
+      "description": "Response from the tab"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.alarms",
+    "name": "create",
+    "action": "chrome_alarms_create",
+    "description": "Create an alarm.",
+    "params": [
+      {
+        "name": "name",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "Alarm name"
+      },
+      {
+        "name": "alarm_info",
+        "lua_type": "table",
+        "required": true,
+        "description": "When: delayInMinutes, periodInMinutes"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether creation succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.alarms",
+    "name": "clear",
+    "action": "chrome_alarms_clear",
+    "description": "Clear an alarm.",
+    "params": [
+      {
+        "name": "name",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "Alarm name (nil clears all)"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether any alarm was cleared"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setBadgeText",
+    "action": "chrome_action_setBadgeText",
+    "description": "Set the badge text on the extension action icon.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "text, tabId"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setBadgeBackgroundColor",
+    "action": "chrome_action_setBadgeBackgroundColor",
+    "description": "Set the badge background color.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "color, tabId"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setTitle",
+    "action": "chrome_action_setTitle",
+    "description": "Set the title of the extension action.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "title, tabId"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.action",
+    "name": "setIcon",
+    "action": "chrome_action_setIcon",
+    "description": "Set the icon of the extension action.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "imageData, path, tabId"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether set succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.contextMenus",
+    "name": "create",
+    "action": "chrome_contextMenus_create",
+    "description": "Create a context menu item.",
+    "params": [
+      {
+        "name": "create_properties",
+        "lua_type": "table",
+        "required": true,
+        "description": "id, title, contexts, onclick"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | number",
+      "description": "Created item ID"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.contextMenus",
+    "name": "remove",
+    "action": "chrome_contextMenus_remove",
+    "description": "Remove a context menu item.",
+    "params": [
+      {
+        "name": "menuItemId",
+        "lua_type": "string | number",
+        "required": true,
+        "description": "Item ID to remove"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "getAll",
+    "action": "chrome_windows_getAll",
+    "description": "Get all browser windows.",
+    "params": [
+      {
+        "name": "get_info",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "populate, windowTypes"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of window objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "create",
+    "action": "chrome_windows_create",
+    "description": "Create a new browser window.",
+    "params": [
+      {
+        "name": "create_data",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "url, type, focused, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created window object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "update",
+    "action": "chrome_windows_update",
+    "description": "Update a browser window.",
+    "params": [
+      {
+        "name": "window_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Window ID"
+      },
+      {
+        "name": "update_info",
+        "lua_type": "table",
+        "required": true,
+        "description": "focused, state, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Updated window object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.windows",
+    "name": "remove",
+    "action": "chrome_windows_remove",
+    "description": "Close a browser window.",
+    "params": [
+      {
+        "name": "window_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Window ID to close"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.sidePanel",
+    "name": "setOptions",
+    "action": "chrome_sidePanel_setOptions",
+    "description": "Configure the side panel behavior.",
+    "params": [
+      {
+        "name": "options",
+        "lua_type": "table",
+        "required": true,
+        "description": "enabled, path"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether options were set"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "get",
+    "action": "chrome_cookies_get",
+    "description": "Get a cookie by details.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "name, url, storeId"
+      }
+    ],
+    "returns": {
+      "lua_type": "table | nil",
+      "description": "Cookie object or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "set",
+    "action": "chrome_cookies_set",
+    "description": "Set a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "name, value, url, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Set cookie object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "remove",
+    "action": "chrome_cookies_remove",
+    "description": "Remove a cookie.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": true,
+        "description": "name, url"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.cookies",
+    "name": "getAll",
+    "action": "chrome_cookies_getAll",
+    "description": "Get all cookies matching a filter.",
+    "params": [
+      {
+        "name": "details",
+        "lua_type": "table",
+        "required": false,
+        "description": "url, name, domain, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of cookie objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.bookmarks",
+    "name": "search",
+    "action": "chrome_bookmarks_search",
+    "description": "Search bookmarks.",
+    "params": [
+      {
+        "name": "query",
+        "lua_type": "string | table",
+        "required": true,
+        "description": "Search string or query object"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of bookmark nodes"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.bookmarks",
+    "name": "create",
+    "action": "chrome_bookmarks_create",
+    "description": "Create a bookmark.",
+    "params": [
+      {
+        "name": "bookmark",
+        "lua_type": "table",
+        "required": true,
+        "description": "parentId, title, url, index"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created bookmark node"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.bookmarks",
+    "name": "remove",
+    "action": "chrome_bookmarks_remove",
+    "description": "Remove a bookmark.",
+    "params": [
+      {
+        "name": "id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Bookmark node ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether removal succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.history",
+    "name": "search",
+    "action": "chrome_history_search",
+    "description": "Search browser history.",
+    "params": [
+      {
+        "name": "query",
+        "lua_type": "table",
+        "required": true,
+        "description": "text, startTime, endTime, maxResults"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of history items"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.history",
+    "name": "deleteUrl",
+    "action": "chrome_history_deleteUrl",
+    "description": "Delete a URL from history.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to remove"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether deletion succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.notifications",
+    "name": "create",
+    "action": "chrome_notifications_create",
+    "description": "Create a notification.",
+    "params": [
+      {
+        "name": "id",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "Notification ID"
+      },
+      {
+        "name": "options",
+        "lua_type": "table",
+        "required": true,
+        "description": "type, title, message, iconUrl"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Notification ID"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.notifications",
+    "name": "clear",
+    "action": "chrome_notifications_clear",
+    "description": "Clear a notification.",
+    "params": [
+      {
+        "name": "id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Notification ID to clear"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether notification was cleared"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "chrome.scripting",
+    "name": "executeScript",
+    "action": "chrome_scripting_executeScript",
+    "description": "Inject JavaScript into a page.",
+    "params": [
+      {
+        "name": "target",
+        "lua_type": "table",
+        "required": true,
+        "description": "tabId, frameIds, allFrames"
+      },
+      {
+        "name": "func",
+        "lua_type": "string | table | nil",
+        "required": false,
+        "description": "Function or script to inject"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of injection results"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "dom",
+    "name": "snapshot",
+    "action": "dom_snapshot",
+    "description": "Take a semantic DOM snapshot of the current page.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_depth, include_hidden, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Semantic DOM tree snapshot"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "dom",
+    "name": "format",
+    "action": "dom_format",
+    "description": "Format a DOM snapshot into a text representation.",
+    "params": [
+      {
+        "name": "snapshot",
+        "lua_type": "table",
+        "required": true,
+        "description": "DOM snapshot object"
+      },
+      {
+        "name": "format",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "Output format: compact-text, markdown, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Formatted text representation"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "snapshot",
+    "action": "page_snapshot",
+    "description": "Take a DOM snapshot of the current page.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: refId, maxDepth, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "DOM snapshot object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "click",
+    "action": "page_click",
+    "description": "Click an element by refId in the current page.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "dblclick",
+    "action": "page_dblclick",
+    "description": "Double-click an element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "fill",
+    "action": "page_fill",
+    "description": "Fill an input element by refId with a value.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "type",
+    "action": "page_type",
+    "description": "Append text to an input element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "press",
+    "action": "page_press",
+    "description": "Press a keyboard key.",
+    "params": [
+      {
+        "name": "key",
+        "lua_type": "string",
+        "required": true,
+        "description": "Key name: Enter, Escape, ArrowDown, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "select",
+    "action": "page_select",
+    "description": "Select an option in a dropdown by refId and value.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Option value to select"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "check",
+    "action": "page_check",
+    "description": "Check or uncheck a checkbox by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "checked",
+        "lua_type": "boolean",
+        "required": false,
+        "description": "Checked state (default true)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "hover",
+    "action": "page_hover",
+    "description": "Hover over an element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "unhover",
+    "action": "page_unhover",
+    "description": "Move mouse away from any hovered element.",
+    "params": [],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "scroll",
+    "action": "page_scroll",
+    "description": "Scroll the page by direction and amount.",
+    "params": [
+      {
+        "name": "direction",
+        "lua_type": "string",
+        "required": false,
+        "description": "up, down, left, right (default down)"
+      },
+      {
+        "name": "amount",
+        "lua_type": "number",
+        "required": false,
+        "description": "Pixels to scroll (default 300)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "scroll_to",
+    "action": "page_scroll_to",
+    "description": "Scroll to an element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "url",
+    "action": "page_url",
+    "description": "Get the current page URL.",
+    "params": [],
+    "returns": {
+      "lua_type": "string",
+      "description": "Current URL"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "title",
+    "action": "page_title",
+    "description": "Get the current page title.",
+    "params": [],
+    "returns": {
+      "lua_type": "string",
+      "description": "Current page title"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "screenshot",
+    "action": "page_screenshot",
+    "description": "Take a screenshot of the current page.",
+    "params": [],
+    "returns": {
+      "lua_type": "string",
+      "description": "Base64-encoded screenshot image"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "goto",
+    "action": "page_goto",
+    "description": "Navigate to a URL.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to navigate to"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "back",
+    "action": "page_back",
+    "description": "Navigate back in history.",
+    "params": [],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "forward",
+    "action": "page_forward",
+    "description": "Navigate forward in history.",
+    "params": [],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "reload",
+    "action": "page_reload",
+    "description": "Reload the current page.",
+    "params": [],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "wait",
+    "action": "page_wait",
+    "description": "Wait for a duration.",
+    "params": [
+      {
+        "name": "ms",
+        "lua_type": "number",
+        "required": false,
+        "description": "Milliseconds to wait (default 1000)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "tabs",
+    "action": "page_tabs",
+    "description": "Get all tabs in the current window (extension mode).",
+    "params": [],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of tab objects"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "switch",
+    "action": "page_switch",
+    "description": "Switch to a tab by ID.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID to switch to"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "new_tab",
+    "action": "page_new_tab",
+    "description": "Open a new tab (optionally with a URL).",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "URL to open in the new tab"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created tab object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "close",
+    "action": "page_close",
+    "description": "Close a tab by ID.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID to close"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "active_tab",
+    "action": "page_active_tab",
+    "description": "Get the currently active tab ID.",
+    "params": [],
+    "returns": {
+      "lua_type": "number | nil",
+      "description": "Active tab ID or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "host",
+    "name": "call",
+    "action": "host_call",
+    "description": "Call a registered host handler by name.",
+    "params": [
+      {
+        "name": "action",
+        "lua_type": "string",
+        "required": true,
+        "description": "Handler action name"
+      },
+      {
+        "name": "params",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Parameters to pass to handler"
+      }
+    ],
+    "returns": {
+      "lua_type": "any",
+      "description": "Handler response"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "runtime",
+    "name": "inspect",
+    "action": "runtime_inspect",
+    "description": "Inspect all global variables in the Lua state.",
+    "params": [],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of global variable descriptors: name, type, keys, value"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "tab",
+    "name": "current",
+    "action": "",
+    "description": "Get the active tab ID.",
+    "params": [],
+    "returns": {
+      "lua_type": "number | nil",
+      "description": "Tab ID or nil"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "url",
+    "action": "",
+    "description": "Get the URL of a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number | nil",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "URL or nil"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "title",
+    "action": "",
+    "description": "Get the title of a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number | nil",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "Title or nil"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "open",
+    "action": "",
+    "description": "Create a new tab and return its ID.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "URL to open"
+      }
+    ],
+    "returns": {
+      "lua_type": "number | nil",
+      "description": "New tab ID or nil"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "focus",
+    "action": "",
+    "description": "Activate (focus) a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number | nil",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "number | nil",
+      "description": "Focused tab ID or nil"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "reload",
+    "action": "",
+    "description": "Reload a tab (defaults to current tab).",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number | nil",
+        "required": false,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "number | nil",
+      "description": "Reloaded tab ID or nil"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "query",
+    "action": "tab_query",
+    "description": "Alias for web.tab.query.",
+    "params": [
+      {
+        "name": "query_info",
+        "lua_type": "table",
+        "required": false,
+        "description": "Query filter"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of matching tabs"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "create",
+    "action": "tab_create",
+    "description": "Alias for web.tab.create.",
+    "params": [
+      {
+        "name": "create_properties",
+        "lua_type": "table",
+        "required": false,
+        "description": "Tab properties"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created tab object"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "activate",
+    "action": "tab_activate",
+    "description": "Alias for web.tab.activate.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether activation succeeded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "close",
+    "action": "tab_close",
+    "description": "Alias for web.tab.close.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether close succeeded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "execute_script",
+    "action": "tab_execute_script",
+    "description": "Alias for web.tab.execute_script.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "script",
+        "lua_type": "string | table",
+        "required": true,
+        "description": "Script to inject"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Injection results"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "click",
+    "action": "tab_click",
+    "description": "Alias for web.tab.click.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether click succeeded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "fill",
+    "action": "tab_fill",
+    "description": "Alias for web.tab.fill.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether fill succeeded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "snapshot",
+    "action": "tab_snapshot",
+    "description": "Alias for web.tab.snapshot.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "DOM snapshot"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "scroll_to",
+    "action": "tab_scroll_to",
+    "description": "Alias for web.tab.scroll_to.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether scroll succeeded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "evaluate",
+    "action": "tab_evaluate",
+    "description": "Alias for web.tab.evaluate.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "script",
+        "lua_type": "string",
+        "required": true,
+        "description": "JavaScript to evaluate"
+      }
+    ],
+    "returns": {
+      "lua_type": "any",
+      "description": "Evaluation result"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "back",
+    "action": "tab_back",
+    "description": "Alias for web.tab.back.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether navigation succeeded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "wait_for_load",
+    "action": "tab_wait_for_load",
+    "description": "Alias for web.tab.wait_for_load.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether tab loaded"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "tab",
+    "name": "fetch",
+    "action": "tab_fetch",
+    "description": "Alias for web.tab.fetch.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Tab ID"
+      },
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL"
+      },
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "runtime",
+    "name": "fetch",
+    "action": "fetch",
+    "description": "Alias for web.fetch.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL"
+      },
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "runtime",
+    "name": "sleep",
+    "action": "sleep",
+    "description": "Alias for web.sleep.",
+    "params": [
+      {
+        "name": "ms",
+        "lua_type": "number",
+        "required": false,
+        "description": "Milliseconds"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "runtime",
+    "name": "storage",
+    "action": "",
+    "description": "Alias for web.storage.",
+    "params": [],
+    "returns": {
+      "lua_type": "table",
+      "description": "Storage API table"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "runtime",
+    "name": "clipboard",
+    "action": "",
+    "description": "Alias for web.clipboard.",
+    "params": [],
+    "returns": {
+      "lua_type": "table",
+      "description": "Clipboard API table"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "runtime",
+    "name": "notifications",
+    "action": "",
+    "description": "Alias for web.notifications.",
+    "params": [],
+    "returns": {
+      "lua_type": "table",
+      "description": "Notifications API table"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "page",
+    "name": "fetch",
+    "action": "",
+    "description": "Fetch a URL using the active tab origin (wrapper for tab.fetch).",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: method, body, headers, timeout"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "{ status, ok, body, headers }"
+    },
+    "source": "injected_lua"
+  }
+]
