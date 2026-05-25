@@ -16,6 +16,7 @@
     "README.md"
   ],
   "dependencies": {
+    "@pi-oxide/dom-semantic-tree": "^0.1.0",
     "@pi-oxide/lua-types": "^0.1.0"
   },
   "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"

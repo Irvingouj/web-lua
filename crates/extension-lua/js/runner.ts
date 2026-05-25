@@ -2,16 +2,18 @@
 // Handles all commands relayed from the extension Worker.
 
 import {
+  init as initDomSnapshot,
   collectDocument,
   formatSnapshot,
 } from "@pi-oxide/dom-semantic-tree";
 
-let domSnapshotReady = false;
+let domSnapshotReady: Promise<void> | null = null;
 
-function ensureDomSnapshot(): void {
+function ensureDomSnapshot(): Promise<void> {
   if (!domSnapshotReady) {
-    domSnapshotReady = true;
+    domSnapshotReady = initDomSnapshot();
   }
+  return domSnapshotReady;
 }
 
 // ─── Runner lifecycle abort signal ───────────────────────────────
@@ -853,6 +855,7 @@ async function handlePageAction(
   action: string,
   params: unknown,
 ): Promise<unknown> {
+  const obj = asRecord(params);
   const refId = extractRefId(params);
   const element = refId ? getElementByRefId(refId) : null;
 
