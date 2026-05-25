@@ -1,0 +1,9 @@
+{
+  "name": "@pi-oxide/workspace",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "web"
+  ]
+}

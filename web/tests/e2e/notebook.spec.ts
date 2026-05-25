@@ -1,9 +1,15 @@
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
-  getCell, getCellEditor, getCellOutput, getCellStatus,
-  getCellRunButton, setCellCode, runCell, addCell,
-  waitForCellStatus, waitForKernelReady, restartKernel,
-  expectCellOutputContains, expectCellErrorContains,
+  addCell,
+  expectCellErrorContains,
+  expectCellOutputContains,
+  getCell,
+  getCellOutput,
+  restartKernel,
+  runCell,
+  setCellCode,
+  waitForCellStatus,
+  waitForKernelReady,
 } from "../helpers";
 
 test.describe("Piccolo Notebook", () => {
@@ -14,7 +20,9 @@ test.describe("Piccolo Notebook", () => {
   test("1: app loads and kernel becomes ready", async ({ page }) => {
     await expect(page.locator('[data-testid="app-root"]')).toBeVisible();
     await waitForKernelReady(page);
-    await expect(page.locator('[data-testid="kernel-status"]')).toContainText("ready");
+    await expect(page.locator('[data-testid="kernel-status"]')).toContainText(
+      "ready",
+    );
   });
 
   test("2: basic print", async ({ page }) => {
@@ -70,14 +78,20 @@ end`;
     await setCellCode(page, 0, code);
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    const output = getCellOutput(page, 0);
+    const _output = getCellOutput(page, 0);
     await page.waitForFunction(
       (idx) => {
-        const el = document.querySelectorAll('[data-testid="cell-output"]')[idx] as HTMLElement;
-        return el?.textContent?.includes("0") && el?.textContent?.includes("1") && el?.textContent?.includes("2");
+        const el = document.querySelectorAll('[data-testid="cell-output"]')[
+          idx
+        ] as HTMLElement;
+        return (
+          el?.textContent?.includes("0") &&
+          el?.textContent?.includes("1") &&
+          el?.textContent?.includes("2")
+        );
       },
       0,
-      { timeout: 10_000 }
+      { timeout: 10_000 },
     );
   });
 
@@ -156,7 +170,9 @@ end`;
     await setCellCode(page, 2, 'print("C")');
 
     // Move C (index 2) up once → order becomes A, C, B
-    const moveUpBtn = getCell(page, 2).locator('[data-testid="cell-move-up-button"]');
+    const moveUpBtn = getCell(page, 2).locator(
+      '[data-testid="cell-move-up-button"]',
+    );
     await moveUpBtn.click();
     await page.waitForTimeout(100);
 
@@ -174,7 +190,9 @@ end`;
     await expectCellOutputContains(page, 2, "B");
 
     // Delete one cell
-    await getCell(page, 1).locator('[data-testid="cell-delete-button"]').click();
+    await getCell(page, 1)
+      .locator('[data-testid="cell-delete-button"]')
+      .click();
     await page.waitForTimeout(100);
 
     // Should have 2 cells now
@@ -212,7 +230,7 @@ end`;
     await page.waitForTimeout(200);
 
     // Write some markdown
-    const editor = mdCell.locator('.cm-content');
+    const editor = mdCell.locator(".cm-content");
     await editor.click();
     await page.keyboard.insertText("# Hello World\n\nThis is **bold** text.");
 
@@ -231,11 +249,13 @@ end`;
     await page.waitForTimeout(200);
 
     // Should be back in editor mode
-    const editor2 = mdCell.locator('.cm-content');
+    const editor2 = mdCell.locator(".cm-content");
     await expect(editor2).toBeVisible();
   });
 
-  test("12: markdown Ctrl+Enter renders, Escape exits editing", async ({ page }) => {
+  test("12: markdown Ctrl+Enter renders, Escape exits editing", async ({
+    page,
+  }) => {
     await waitForKernelReady(page);
 
     // Add a markdown cell and enter edit mode
@@ -246,7 +266,7 @@ end`;
     await mdCell.locator('button[data-action="toggleEdit"]').click();
     await page.waitForTimeout(200);
 
-    const editor = mdCell.locator('.cm-content');
+    const editor = mdCell.locator(".cm-content");
     await editor.click();
     await page.keyboard.insertText("## Heading Two");
 
@@ -263,7 +283,7 @@ end`;
     await preview.dblclick();
     await page.waitForTimeout(200);
 
-    const editor2 = mdCell.locator('.cm-content');
+    const editor2 = mdCell.locator(".cm-content");
     await expect(editor2).toBeVisible();
 
     // Press Escape to exit editing
@@ -297,11 +317,13 @@ end`;
 
     // Should be code again
     await expect(codeCell.locator(".cell-kind-badge")).toHaveText("Lua");
-    const editor = codeCell.locator('.cm-content');
+    const editor = codeCell.locator(".cm-content");
     await expect(editor).toBeVisible();
   });
 
-  test("14: markdown lists, code blocks, and links render", async ({ page }) => {
+  test("14: markdown lists, code blocks, and links render", async ({
+    page,
+  }) => {
     await waitForKernelReady(page);
 
     await page.locator('[data-testid="add-md-button"]').click();
@@ -311,9 +333,11 @@ end`;
     await mdCell.locator('button[data-action="toggleEdit"]').click();
     await page.waitForTimeout(200);
 
-    const editor = mdCell.locator('.cm-content');
+    const editor = mdCell.locator(".cm-content");
     await editor.click();
-    await page.keyboard.insertText("- item one\n- item two\n\n`inline code`\n\n```\ncode block\n```\n\n[piccolo](https://github.com/kyren/piccolo)");
+    await page.keyboard.insertText(
+      "- item one\n- item two\n\n`inline code`\n\n```\ncode block\n```\n\n[piccolo](https://github.com/kyren/piccolo)",
+    );
 
     // Render
     await mdCell.locator('button[data-action="toggleEdit"]').click();
@@ -328,7 +352,10 @@ end`;
 
     // Check link
     const link = preview.locator("a");
-    await expect(link).toHaveAttribute("href", "https://github.com/kyren/piccolo");
+    await expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/kyren/piccolo",
+    );
     await expect(link).toHaveText("piccolo");
   });
 

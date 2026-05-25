@@ -1,4 +1,4 @@
-import { type Page, type Locator } from '@playwright/test';
+import type { Locator, Page } from "@playwright/test";
 
 /**
  * Get the cell locator by index.
@@ -12,7 +12,7 @@ export function getCell(page: Page, index: number): Locator {
  * CodeMirror renders a contenteditable div inside .cm-content.
  */
 export function getCellEditor(page: Page, index: number): Locator {
-  return getCell(page, index).locator('.cm-content');
+  return getCell(page, index).locator(".cm-content");
 }
 
 /**
@@ -51,9 +51,9 @@ export async function setCellCode(page: Page, index: number, code: string) {
   const editor = getCellEditor(page, index);
   await editor.click();
   // Select all existing content
-  await page.keyboard.press('Meta+a');
+  await page.keyboard.press("Meta+a");
   // Delete it
-  await page.keyboard.press('Backspace');
+  await page.keyboard.press("Backspace");
   // Type new content (split into chunks for reliability with special chars)
   await page.keyboard.insertText(code);
 }
@@ -82,18 +82,19 @@ export async function waitForCellStatus(
   timeout = 15_000,
 ) {
   const statusEl = getCellStatus(page, index);
-  await statusEl.waitFor({ state: 'visible', timeout });
+  await statusEl.waitFor({ state: "visible", timeout });
   // Force re-check with text
   await page.waitForFunction(
     ({ idx, expected }) => {
       const cells = document.querySelectorAll('[data-testid="cell-status"]');
       const cell = cells[idx] as HTMLElement;
       if (!cell) return false;
-      if (expected instanceof RegExp) return expected.test(cell.textContent || '');
+      if (expected instanceof RegExp)
+        return expected.test(cell.textContent || "");
       return cell.textContent?.includes(expected);
     },
     { idx: index, expected: status },
-    { timeout }
+    { timeout },
   );
 }
 
@@ -102,13 +103,15 @@ export async function waitForCellStatus(
  */
 export async function waitForKernelReady(page: Page, timeout = 15_000) {
   const el = page.locator('[data-testid="kernel-status"]');
-  await el.waitFor({ state: 'visible', timeout });
+  await el.waitFor({ state: "visible", timeout });
   await page.waitForFunction(
     () => {
-      const el = document.querySelector('[data-testid="kernel-status"]') as HTMLElement;
-      return el?.textContent?.includes('ready');
+      const el = document.querySelector(
+        '[data-testid="kernel-status"]',
+      ) as HTMLElement;
+      return el?.textContent?.includes("ready");
     },
-    { timeout }
+    { timeout },
   );
 }
 
@@ -135,7 +138,7 @@ export async function expectCellOutputContains(
       return cell?.textContent?.includes(expected);
     },
     { idx: index, expected: text },
-    { timeout: 10_000 }
+    { timeout: 10_000 },
   );
 }
 
@@ -148,17 +151,21 @@ export async function expectCellErrorContains(
   text: string | RegExp,
 ) {
   const errorEl = getCellError(page, index);
-  await errorEl.first().waitFor({ state: 'visible' });
-  if (typeof text === 'string') {
+  await errorEl.first().waitFor({ state: "visible" });
+  if (typeof text === "string") {
     await page.waitForFunction(
       ({ idx, expected }) => {
         const cells = document.querySelectorAll('[data-testid="cell"]');
-        const errors = cells[idx]?.querySelectorAll('[data-testid="cell-error"]');
+        const errors = cells[idx]?.querySelectorAll(
+          '[data-testid="cell-error"]',
+        );
         if (!errors || errors.length === 0) return false;
-        return Array.from(errors).some(e => e.textContent?.includes(expected));
+        return Array.from(errors).some((e) =>
+          e.textContent?.includes(expected),
+        );
       },
       { idx: index, expected: text },
-      { timeout: 10_000 }
+      { timeout: 10_000 },
     );
   }
 }

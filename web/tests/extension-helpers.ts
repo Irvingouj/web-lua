@@ -1,6 +1,6 @@
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { type BrowserContext, chromium, type Page } from "@playwright/test";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.resolve(__dirname, "../dist");
@@ -38,18 +38,18 @@ export async function launchExtensionContext(): Promise<{
 
 // Re-export all regular test helpers for use in extension tests
 export {
+  addCell,
+  expectCellErrorContains,
+  expectCellOutputContains,
   getCell,
   getCellEditor,
-  getCellOutput,
   getCellError,
-  getCellStatus,
+  getCellOutput,
   getCellRunButton,
-  setCellCode,
+  getCellStatus,
+  restartKernel,
   runCell,
-  addCell,
+  setCellCode,
   waitForCellStatus,
   waitForKernelReady,
-  restartKernel,
-  expectCellOutputContains,
-  expectCellErrorContains,
 } from "./helpers";

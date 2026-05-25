@@ -460,6 +460,14 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
         "tab_execute_script",
         host_state
     );
+    register_ext_api!(tab_table, "click", "tab_click", host_state);
+    register_ext_api!(tab_table, "fill", "tab_fill", host_state);
+    register_ext_api!(tab_table, "snapshot", "tab_snapshot", host_state);
+    register_ext_api!(tab_table, "scroll_to", "tab_scroll_to", host_state);
+    register_ext_api!(tab_table, "evaluate", "tab_evaluate", host_state);
+    register_ext_api!(tab_table, "back", "tab_back", host_state);
+    register_ext_api!(tab_table, "wait_for_load", "tab_wait_for_load", host_state);
+    register_ext_api!(tab_table, "fetch", "tab_fetch", host_state);
     web_table.set_field(ctx, "tab", tab_table);
 
     // web.cookies sub-module
@@ -520,6 +528,8 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     register_ext_api!(tabs_table, "create", "chrome_tabs_create", host_state);
     register_ext_api!(tabs_table, "update", "chrome_tabs_update", host_state);
     register_ext_api!(tabs_table, "remove", "chrome_tabs_remove", host_state);
+    register_ext_api!(tabs_table, "get", "chrome_tabs_get", host_state);
+    register_ext_api!(tabs_table, "reload", "chrome_tabs_reload", host_state);
     register_ext_api!(
         tabs_table,
         "sendMessage",

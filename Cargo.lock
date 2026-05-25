@@ -229,13 +229,13 @@ dependencies = [
 [[package]]
 name = "dom-semantic-tree"
 version = "0.1.0"
-source = "git+https://github.com/Irvingouj/dom-semantic-tree.git#49aed0b041f924585416de28c3861f9216e84c30"
 dependencies = [
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
  "wasm-bindgen",
+ "wasm-bindgen-test",
  "web-sys",
 ]
 
@@ -272,6 +272,23 @@ name = "error-code"
 version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
+
+[[package]]
+name = "extension-lua"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "piccolo-notebook-core",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "tsify",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "web-lua-base",
+ "web-sys",
+]
 
 [[package]]
 name = "fd-lock"
@@ -1288,6 +1305,36 @@ name = "wasm-bindgen-test-shared"
 version = "0.2.122"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "684365b586a9a6256c1cc3544eee8680de48d6041142f581776ec7b139622ae9"
+
+[[package]]
+name = "web-lua"
+version = "0.1.0"
+dependencies = [
+ "dom-semantic-tree",
+ "js-sys",
+ "piccolo-notebook-core",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "tsify",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+ "web-lua-base",
+ "web-sys",
+]
+
+[[package]]
+name = "web-lua-base"
+version = "0.1.0"
+dependencies = [
+ "piccolo-notebook-core",
+ "serde",
+ "serde_json",
+ "tsify",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
 
 [[package]]
 name = "web-sys"

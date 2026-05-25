@@ -4,8 +4,12 @@ members = [
     "crates/piccolo",
     "crates/piccolo-notebook-core",
     "crates/piccolo-notebook-wasm",
+    "crates/web-lua-base",
+    "crates/web-lua",
+    "crates/extension-lua",
     "crates/notebook-plugin-crypto",
     "crates/dom-snapshot-wasm",
+    "crates/dom-semantic-tree",
 ]
 
 [workspace.package]
@@ -20,4 +24,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 url = "2"
-dom-semantic-tree = { git = "https://github.com/Irvingouj/dom-semantic-tree.git", features = ["wasm"] }
+dom-semantic-tree = { path = "crates/dom-semantic-tree", features = ["wasm"] }

@@ -1,4 +1,7 @@
-import type { CellError as CellErrorType, RunResult as RunResultType } from './generated';
+import type {
+  CellError as CellErrorType,
+  RunResult as RunResultType,
+} from "./generated";
 
 export type CellError = CellErrorType;
 export type RunResult = RunResultType;
@@ -8,13 +11,13 @@ export interface WorkerRunResult {
   stderr: string[];
   result: string | null;
   error: CellError | null;
-  commands: any[];
+  commands: unknown[];
   fuel_exhausted: boolean;
   execution_count: number;
-  status: 'done' | 'async_pending';
+  status: "done" | "async_pending";
   pending_command: {
     call_id: number;
     action: string;
-    params: any;
+    params: unknown;
   } | null;
 }

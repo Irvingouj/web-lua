@@ -12,3 +12,11 @@ node_modules/
 target/
 web/dist/
 web/pkg/
+web/pkg-extension/
+crates/*/pkg/
+crates/web-lua/js/web_lua.js
+crates/web-lua/js/web_lua.d.ts
+crates/extension-lua/js/extension_lua.js
+crates/extension-lua/js/extension_lua.d.ts
+web/public/dom_snapshot_wasm.js
+web/public/dom_snapshot_wasm_bg.wasm

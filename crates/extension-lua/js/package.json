@@ -1,0 +1,19 @@
+{
+  "name": "@pi-oxide/extension-lua",
+  "version": "0.1.0",
+  "description": "Chrome Extension Lua runtime with tab, chrome, and runtime APIs",
+  "main": "index.ts",
+  "types": "index.ts",
+  "files": [
+    "index.ts",
+    "runner.ts",
+    "worker.ts",
+    "extension_lua.js",
+    "extension_lua.d.ts",
+    "README.md"
+  ],
+  "dependencies": {
+    "@pi-oxide/lua-types": "^0.1.0"
+  },
+  "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
+}

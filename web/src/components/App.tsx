@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import type { Cell as CellType, CellKind, Notebook } from '../notebook';
 import { createCell, createNotebook, serializeNotebook, deserializeNotebook } from '../notebook';
 import { useKernel, type KernelStatus } from '../hooks/useKernel';
+import { useExtensionKernel } from '../hooks/useExtensionKernel';
 import { useAutoSave, loadFromIndexedDB } from '../hooks/useAutoSave';
 import { useTheme } from '../hooks/useTheme';
 import type { WorkerRunResult } from '../types';
@@ -60,7 +61,10 @@ const App: FunctionalComponent = () => {
     console.error('[kernel error]', error);
   }, []);
 
-  const kernel = useKernel(handleResult, handleError);
+  const isExtensionContext = typeof window !== 'undefined' && !!(window as any).chrome?.runtime?.id;
+  const webKernel = useKernel(handleResult, handleError);
+  const extKernel = useExtensionKernel(handleResult, handleError);
+  const kernel = isExtensionContext ? extKernel : webKernel;
 
   // ─── Auto-save on notebook changes ─────────────────────────────
   useEffect(() => {

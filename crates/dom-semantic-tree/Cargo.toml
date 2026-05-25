@@ -1,0 +1,53 @@
+[package]
+name = "dom-semantic-tree"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "DOM-derived semantic tree extractor for browser agents"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["wasm"]
+wasm = ["dep:wasm-bindgen", "dep:web-sys", "dep:js-sys", "dep:serde-wasm-bindgen"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+wasm-bindgen = { version = "0.2", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+[dependencies.web-sys]
+version = "0.3"
+optional = true
+features = [
+  "console",
+  "Document",
+  "Element",
+  "HtmlElement",
+  "HtmlInputElement",
+  "HtmlTextAreaElement",
+  "HtmlSelectElement",
+  "HtmlButtonElement",
+  "HtmlAnchorElement",
+  "HtmlImageElement",
+  "HtmlLabelElement",
+  "HtmlOptionElement",
+  "Node",
+  "NodeList",
+  "Window",
+  "DomRect",
+  "CssStyleDeclaration",
+  "HtmlCollection",
+  "CharacterData",
+]
+
+[dependencies.js-sys]
+version = "0.3"
+optional = true
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

@@ -1,6 +1,6 @@
 // Notebook state and logic
 
-export type CellKind = 'code' | 'markdown';
+export type CellKind = "code" | "markdown";
 
 export interface Cell {
   id: string;
@@ -9,7 +9,7 @@ export interface Cell {
   outputs: string[];
   errors: string[];
   executionCount: number | null;
-  status: 'idle' | 'running' | 'success' | 'error' | 'stopped';
+  status: "idle" | "running" | "success" | "error" | "stopped";
 }
 
 export interface Notebook {
@@ -21,7 +21,7 @@ export interface Notebook {
   };
 }
 
-export function createCell(source = '', kind: CellKind = 'code'): Cell {
+export function createCell(source = "", kind: CellKind = "code"): Cell {
   return {
     id: crypto.randomUUID(),
     kind,
@@ -29,19 +29,17 @@ export function createCell(source = '', kind: CellKind = 'code'): Cell {
     outputs: [],
     errors: [],
     executionCount: null,
-    status: 'idle',
+    status: "idle",
   };
 }
 
 export function createNotebook(): Notebook {
   return {
     version: 1,
-    cells: [
-      createCell('print("Hello, Lua! 🌙")'),
-    ],
+    cells: [createCell('print("Hello, Lua! 🌙")')],
     metadata: {
-      runtime: 'piccolo',
-      language: 'lua-like',
+      runtime: "piccolo",
+      language: "lua-like",
     },
   };
 }
@@ -56,7 +54,7 @@ export function deserializeNotebook(json: string): Notebook | null {
     if (obj.version === 1 && Array.isArray(obj.cells)) {
       // Ensure every cell has a kind field (backwards compat)
       for (const cell of obj.cells) {
-        if (!cell.kind) cell.kind = 'code';
+        if (!cell.kind) cell.kind = "code";
       }
       return obj as Notebook;
     }

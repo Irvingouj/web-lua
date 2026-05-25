@@ -76,8 +76,9 @@ pub struct GlobalsSnapshot {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct AsyncCommand {
     pub call_id: u32,
+    // FIXME: Use ENUM HERE! STOP USE RAW STRING
     pub action: String,
-    #[ts(type = "any")]
+    #[ts(type = "unknown")]
     pub params: serde_json::Value,
 }
 
@@ -103,7 +104,7 @@ pub struct RunResult {
     pub stderr: Vec<String>,
     pub result: Option<String>,
     pub error: Option<CellError>,
-    #[ts(type = "any[]")]
+    #[ts(type = "unknown[]")]
     pub commands: Vec<serde_json::Value>,
     pub fuel_exhausted: bool,
     pub execution_count: u32,

@@ -1,11 +1,11 @@
-import { useCallback, useRef, useEffect } from 'preact/hooks';
-import type { Notebook } from '../notebook';
-import { serializeNotebook, deserializeNotebook } from '../notebook';
+import { useCallback, useEffect, useRef } from "preact/hooks";
+import type { Notebook } from "../notebook";
+import { deserializeNotebook, serializeNotebook } from "../notebook";
 
-const DB_NAME = 'web-lua-notebook';
+const DB_NAME = "web-lua-notebook";
 const DB_VERSION = 1;
-const STORE_NAME = 'notebooks';
-const NOTEBOOK_KEY = 'default';
+const STORE_NAME = "notebooks";
+const NOTEBOOK_KEY = "default";
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -24,7 +24,7 @@ function openDB(): Promise<IDBDatabase> {
 async function saveToIndexedDB(nb: Notebook): Promise<void> {
   try {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(STORE_NAME, "readwrite");
     tx.objectStore(STORE_NAME).put(serializeNotebook(nb), NOTEBOOK_KEY);
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
@@ -32,14 +32,14 @@ async function saveToIndexedDB(nb: Notebook): Promise<void> {
     });
     db.close();
   } catch (e) {
-    console.warn('[auto-save] failed:', e);
+    console.warn("[auto-save] failed:", e);
   }
 }
 
 export async function loadFromIndexedDB(): Promise<Notebook | null> {
   try {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readonly');
+    const tx = db.transaction(STORE_NAME, "readonly");
     const req = tx.objectStore(STORE_NAME).get(NOTEBOOK_KEY);
     const result = await new Promise<string | undefined>((resolve, reject) => {
       req.onsuccess = () => resolve(req.result as string | undefined);
@@ -51,7 +51,7 @@ export async function loadFromIndexedDB(): Promise<Notebook | null> {
     }
     return null;
   } catch (e) {
-    console.warn('[auto-load] failed:', e);
+    console.warn("[auto-load] failed:", e);
     return null;
   }
 }
@@ -76,8 +76,8 @@ export function useAutoSave() {
       // This fires before unload — can't pass current state easily
       // The App component should call saveNow on beforeunload separately
     };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
   }, []);
 
   return { scheduleSave, saveNow };
