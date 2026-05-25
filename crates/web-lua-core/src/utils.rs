@@ -1,6 +1,5 @@
 use crate::types::CellError;
 use piccolo::{Context, Value};
-use std::fmt;
 
 // ─── Error Classification ──────────────────────────────────────
 

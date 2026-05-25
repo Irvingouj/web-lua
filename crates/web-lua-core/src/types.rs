@@ -113,26 +113,6 @@ pub struct RunResult {
 }
 
 impl RunResult {
-    fn ok(
-        stdout: Vec<String>,
-        result: Option<String>,
-        commands: Vec<serde_json::Value>,
-        fuel_exhausted: bool,
-        execution_count: u32,
-    ) -> Self {
-        Self {
-            stdout,
-            stderr: vec![],
-            result,
-            error: None,
-            commands,
-            fuel_exhausted,
-            execution_count,
-            status: CellStatus::Done,
-            pending_command: None,
-        }
-    }
-
     pub(crate) fn err(error: CellError, execution_count: u32) -> Self {
         Self {
             stdout: vec![],

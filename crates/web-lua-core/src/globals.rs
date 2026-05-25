@@ -1,12 +1,10 @@
 use crate::json::register_json_module;
 use crate::state::HostState;
-use crate::types::{
-    AsyncCommand, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
-};
+use crate::types::CellError;
 use crate::utils::format_value;
 use crate::web::register_web_module;
 use piccolo::{
-    Callback, CallbackReturn, Context, Executor, ExecutorMode, Fuel, IntoValue, Lua,
+    Callback, CallbackReturn, Context, IntoValue,
     String as LuaString, Table, Value,
 };
 use std::cell::RefCell;
@@ -19,7 +17,7 @@ pub(crate) fn disable_dangerous_globals(ctx: Context) {
     for name in &[
         "io", "os", "debug", "package", "require", "dofile", "loadfile",
     ] {
-        ctx.set_global(*name, Value::Nil);
+        ctx.set_global(name, Value::Nil);
     }
 }
 
@@ -70,7 +68,7 @@ pub(crate) fn register_host_globals(ctx: Context, host_state: Rc<RefCell<HostSta
     // ── emit(value) ───────────────────────────────────────────
     let hs_emit = host_state.clone();
     let emit_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        if stack.len() > 0 {
+        if !stack.is_empty() {
             let val = stack.get(0);
             let formatted = format_value(ctx, val);
             let cmd = serde_json::json!({

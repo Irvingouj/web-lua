@@ -21,6 +21,12 @@ pub struct WebSession {
     aborted: Cell<bool>,
 }
 
+impl Default for WebSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl WebSession {
     /// Create a new web session.

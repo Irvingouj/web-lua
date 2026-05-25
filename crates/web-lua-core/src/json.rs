@@ -1,4 +1,3 @@
-use crate::types::AsyncCommand;
 use crate::utils::format_value;
 use piccolo::{Callback, CallbackReturn, Context, IntoValue, String as LuaString, Table, Value};
 use serde_json;
@@ -10,7 +9,7 @@ pub(crate) fn register_json_module(ctx: Context) {
 
     // json.encode(table) → JSON string
     let encode_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let val = if stack.len() > 0 {
+        let val = if !stack.is_empty() {
             stack.get(0)
         } else {
             Value::Nil
@@ -33,10 +32,10 @@ pub(crate) fn register_json_module(ctx: Context) {
 
     // json.decode(string) → Lua table/value
     let decode_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let input = if stack.len() > 0 {
+        let input = if !stack.is_empty() {
             match stack.get(0) {
                 Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
-                other => format!("{}", format_value(ctx, other)),
+                other => format_value(ctx, other).to_string(),
             }
         } else {
             String::new()
@@ -59,7 +58,7 @@ pub(crate) fn register_json_module(ctx: Context) {
 
     // json.pretty(table) → formatted JSON string
     let pretty_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let val = if stack.len() > 0 {
+        let val = if !stack.is_empty() {
             stack.get(0)
         } else {
             Value::Nil
@@ -183,7 +182,7 @@ pub(crate) fn json_value_to_lua<'gc>(ctx: Context<'gc>, val: &serde_json::Value)
         serde_json::Value::Bool(b) => Value::Boolean(*b),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
-                Value::Integer(i as i64)
+                Value::Integer(i)
             } else if let Some(f) = n.as_f64() {
                 Value::Number(f)
             } else {

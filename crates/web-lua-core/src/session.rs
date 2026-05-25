@@ -7,8 +7,8 @@ use crate::types::{
 };
 use crate::utils::{classify_extern_error, format_value};
 use piccolo::{
-    Callback, CallbackReturn, Closure, Context, Executor, ExecutorMode, Fuel, IntoValue, Lua,
-    StashedExecutor, String as LuaString, Table, Value,
+    Closure, Executor, ExecutorMode, Fuel, IntoValue, Lua,
+    StashedExecutor, Value,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -411,10 +411,8 @@ impl NotebookSession {
         let hs = self.host_state.borrow();
         let error = if hs.fuel_exhausted {
             Some(CellError::FuelExhausted)
-        } else if let Some(cell_err) = hs.cell_errors.first().cloned() {
-            Some(cell_err)
         } else {
-            None
+            hs.cell_errors.first().cloned()
         };
 
         RunResult {
@@ -487,7 +485,7 @@ impl NotebookSession {
                     .as_ref()
                     .map(|e| e.message.clone())
                     .unwrap_or_else(|| "unknown async error".into());
-                exec.resume_err(&*ctx, err_msg.into_value(ctx).into())
+                exec.resume_err(&ctx, err_msg.into_value(ctx).into())
                     .unwrap();
             });
             Ok(())
@@ -597,10 +595,8 @@ impl NotebookSession {
         let hs = self.host_state.borrow();
         let error = if hs.fuel_exhausted {
             Some(CellError::FuelExhausted)
-        } else if let Some(cell_err) = hs.cell_errors.first().cloned() {
-            Some(cell_err)
         } else {
-            None
+            hs.cell_errors.first().cloned()
         };
 
         RunResult {

@@ -1,6 +1,6 @@
 use crate::json::lua_value_to_json;
 use crate::state::HostState;
-use crate::types::{AsyncCommand, AsyncError, AsyncResponse, CellError};
+use crate::types::AsyncCommand;
 use crate::utils::{format_value, percent_encode};
 use piccolo::{Callback, CallbackReturn, Context, IntoValue, String as LuaString, Table, Value};
 use serde_json;
@@ -15,7 +15,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // web.mock_async(label) — yields for testing, resumes with provided value
     let hs_mock = host_state.clone();
     let mock_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let label = if stack.len() > 0 {
+        let label = if !stack.is_empty() {
             match stack.get(0) {
                 Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                 other => format_value(ctx, other),
@@ -56,7 +56,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // web.fetch(url [, opts]) — async HTTP request
     let hs_fetch = host_state.clone();
     let fetch_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let url = if stack.len() > 0 {
+        let url = if !stack.is_empty() {
             match stack.get(0) {
                 Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                 other => format_value(ctx, other),
@@ -151,7 +151,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     let url_table = Table::new(&ctx);
 
     let url_parse_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let url_str = if stack.len() > 0 {
+        let url_str = if !stack.is_empty() {
             match stack.get(0) {
                 Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                 other => format_value(ctx, other),
@@ -238,7 +238,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
 
     // ── web.url.encode(params_table) → string ──
     let url_encode_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let params = if stack.len() > 0 {
+        let params = if !stack.is_empty() {
             match stack.get(0) {
                 Value::Table(t) => t,
                 other => {
@@ -326,7 +326,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // ── web.sleep(ms) — async, yields to worker ──
     let hs_sleep = host_state.clone();
     let sleep_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let duration = if stack.len() > 0 {
+        let duration = if !stack.is_empty() {
             match stack.get(0) {
                 Value::Integer(i) => i as u64,
                 Value::Number(f) => f as u64,
@@ -382,7 +382,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
         Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
             let params = match action {
                 "storage_get" => {
-                    let key = if stack.len() > 0 {
+                    let key = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                             other => format_value(ctx, other),
@@ -394,7 +394,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     serde_json::json!({ "key": key })
                 }
                 "storage_set" => {
-                    let key = if stack.len() > 0 {
+                    let key = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                             other => format_value(ctx, other),
@@ -418,7 +418,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     serde_json::json!({ "key": key, "value": value })
                 }
                 "storage_delete" => {
-                    let key = if stack.len() > 0 {
+                    let key = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                             other => format_value(ctx, other),
@@ -527,7 +527,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             {
                 let hs_ext = $hs.clone();
                 let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-                    let params = if stack.len() == 0 {
+                    let params = if stack.is_empty() {
                         serde_json::json!({})
                     } else if stack.len() == 1 {
                         lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
@@ -558,21 +558,19 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                 });
                 $table.set_field(ctx, $name, cb);
 
-                let mut _params = Vec::new();
-                $(
-                    _params.push(crate::api_docs::ParamDoc {
-                        name: stringify!($pname).to_string(),
-                        lua_type: $ptype.to_string(),
-                        required: stringify!($preq) == "required",
-                        description: $pdesc.to_string(),
-                    });
-                )*
                 crate::api_docs::register(crate::api_docs::LuaApiDoc {
                     namespace: $ns.to_string(),
                     name: $name.to_string(),
                     action: Some($action.to_string()),
                     description: $desc.to_string(),
-                    params: _params,
+                    params: vec![$(
+                        crate::api_docs::ParamDoc {
+                            name: stringify!($pname).to_string(),
+                            lua_type: $ptype.to_string(),
+                            required: stringify!($preq) == "required",
+                            description: $pdesc.to_string(),
+                        }
+                    ),*],
                     returns: crate::api_docs::ReturnDoc {
                         lua_type: $rtype.to_string(),
                         description: $rdesc.to_string(),
@@ -1335,7 +1333,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_dom = host_state.clone();
         let dom_snapshot_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let params = if stack.len() == 0 {
+            let params = if stack.is_empty() {
                 serde_json::json!({})
             } else {
                 lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
@@ -1375,7 +1373,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_dom = host_state.clone();
         let dom_format_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            if stack.len() < 1 {
+            if stack.is_empty() {
                 let msg = "dom.format requires a snapshot argument".to_string();
                 return Err(msg.into_value(ctx).into());
             }
@@ -1432,7 +1430,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let params = if stack.len() == 0 {
+            let params = if stack.is_empty() {
                 serde_json::json!({})
             } else {
                 lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
@@ -1469,7 +1467,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1511,7 +1509,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1552,7 +1550,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1602,7 +1600,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1652,7 +1650,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let key = if stack.len() > 0 {
+            let key = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1691,7 +1689,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1743,7 +1741,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1794,7 +1792,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1834,7 +1832,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.unhover() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -1865,7 +1863,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let direction = if stack.len() > 0 {
+            let direction = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1914,7 +1912,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ref_id = if stack.len() > 0 {
+            let ref_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -1954,7 +1952,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.url() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -1984,7 +1982,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.title() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2014,7 +2012,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.screenshot() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2045,7 +2043,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let url = if stack.len() > 0 {
+            let url = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => format_value(ctx, other),
@@ -2083,7 +2081,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.back() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2113,7 +2111,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.forward() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2143,7 +2141,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.reload() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2173,8 +2171,8 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.wait(ms) — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let ms = if stack.len() > 0 {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+            let ms = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::Integer(i) => i as u64,
                     Value::Number(f) => f as u64,
@@ -2213,7 +2211,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.tabs() — async (extension mode)
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2244,7 +2242,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let tab_id = if stack.len() > 0 {
+            let tab_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::Integer(i) => i as f64,
                     Value::Number(f) => f,
@@ -2291,8 +2289,8 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.new_tab(url?) — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let url = if stack.len() > 0 {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+            let url = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => Some(String::from_utf8_lossy(s.as_bytes()).to_string()),
                     Value::Nil => None,
@@ -2332,7 +2330,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-            let tab_id = if stack.len() > 0 {
+            let tab_id = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::Integer(i) => i as f64,
                     Value::Number(f) => f,
@@ -2379,7 +2377,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.active_tab() — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -2413,7 +2411,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     let host_table = Table::new(&ctx);
 
     let host_call_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let action = if stack.len() > 0 {
+        let action = if !stack.is_empty() {
             match stack.get(0) {
                 Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                 other => {

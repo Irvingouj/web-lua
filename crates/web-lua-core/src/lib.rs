@@ -15,7 +15,6 @@ pub use plugin::*;
 pub use session::*;
 pub use state::*;
 pub use types::*;
-pub use utils::*;
 
 /// Register API metadata without generating a Lua callback.
 /// Use this for custom Callback::from_fn blocks or injected Lua aliases.
@@ -34,18 +33,14 @@ macro_rules! lua_api_doc {
             name: $name.to_string(),
             action: Some($action.to_string()),
             description: $desc.to_string(),
-            params: {
-                let mut _p = Vec::new();
-                $(
-                    _p.push($crate::api_docs::ParamDoc {
-                        name: stringify!($pname).to_string(),
-                        lua_type: $ptype.to_string(),
-                        required: stringify!($preq) == "required",
-                        description: $pdesc.to_string(),
-                    });
-                )*
-                _p
-            },
+            params: vec![$(
+                $crate::api_docs::ParamDoc {
+                    name: stringify!($pname).to_string(),
+                    lua_type: $ptype.to_string(),
+                    required: stringify!($preq) == "required",
+                    description: $pdesc.to_string(),
+                }
+            ),*],
             returns: $crate::api_docs::ReturnDoc {
                 lua_type: $rtype.to_string(),
                 description: $rdesc.to_string(),
@@ -68,18 +63,14 @@ macro_rules! lua_api_doc {
             name: $name.to_string(),
             action: Some($action.to_string()),
             description: $desc.to_string(),
-            params: {
-                let mut _p = Vec::new();
-                $(
-                    _p.push($crate::api_docs::ParamDoc {
-                        name: stringify!($pname).to_string(),
-                        lua_type: $ptype.to_string(),
-                        required: stringify!($preq) == "required",
-                        description: $pdesc.to_string(),
-                    });
-                )*
-                _p
-            },
+            params: vec![$(
+                $crate::api_docs::ParamDoc {
+                    name: stringify!($pname).to_string(),
+                    lua_type: $ptype.to_string(),
+                    required: stringify!($preq) == "required",
+                    description: $pdesc.to_string(),
+                }
+            ),*],
             returns: $crate::api_docs::ReturnDoc {
                 lua_type: $rtype.to_string(),
                 description: $rdesc.to_string(),

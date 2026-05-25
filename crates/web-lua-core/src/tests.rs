@@ -1,16 +1,11 @@
-use crate::globals::{disable_dangerous_globals, register_host_globals, setup_strict_mode};
-use crate::json::{json_value_to_lua, lua_value_to_json, register_json_module};
 use crate::plugin::LuaPlugin;
-use crate::session::{NotebookSession, SessionBuilder};
+use crate::session::NotebookSession;
 use crate::state::HostState;
 use crate::types::{
-    AsyncCommand, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
+    AsyncCommand, CellError, CellStatus, GlobalVariable, RunResult,
 };
-use crate::utils::{classify_extern_error, format_value};
-use crate::web::register_web_module;
 use piccolo::{
-    Callback, CallbackReturn, Closure, Context, Executor, ExecutorMode, Fuel, IntoValue, Lua,
-    StashedExecutor, String as LuaString, Table, Value,
+    Callback, CallbackReturn, Context, IntoValue, Table, Value,
 };
 use serde_json;
 use std::cell::RefCell;
@@ -20,6 +15,7 @@ use ts_rs::TS;
 // ─── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use super::*;
 
@@ -1715,7 +1711,7 @@ mod tests {
             fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
                 let t = Table::new(&ctx);
                 let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-                    let val = if stack.len() > 0 {
+                    let val = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::Integer(i) => i * 2,
                             other => {
@@ -1757,7 +1753,7 @@ mod tests {
             fn register(&self, ctx: Context, hs: Rc<RefCell<HostState>>) {
                 let hs_async = hs.clone();
                 let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
-                    let label = if stack.len() > 0 {
+                    let label = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                             _ => "default".to_string(),

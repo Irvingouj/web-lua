@@ -1,7 +1,4 @@
 use crate::types::{AsyncCommand, CellError};
-use serde_json::Value;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 // ─── Internal State ─────────────────────────────────────────────
 

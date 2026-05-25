@@ -24,6 +24,12 @@ pub struct ExtensionSession {
     base: BaseSession,
 }
 
+impl Default for ExtensionSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl ExtensionSession {
     /// Create a new extension session.

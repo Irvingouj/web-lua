@@ -729,7 +729,7 @@ pub async fn execute_page_press(params: serde_json::Value) -> WasmAsyncResponse 
             }
         }
     };
-    let mut init = web_sys::KeyboardEventInit::new();
+    let init = web_sys::KeyboardEventInit::new();
     init.set_key(key);
     let event = web_sys::KeyboardEvent::new_with_keyboard_event_init_dict("keydown", &init);
     let _ = document.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
