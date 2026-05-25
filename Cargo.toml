@@ -11,6 +11,8 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["Irving Ou"]
+license = "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
 
 [workspace.dependencies]
 piccolo = { path = "crates/piccolo" }
