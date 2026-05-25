@@ -13,7 +13,7 @@ use std::rc::Rc;
 use hmac::{Hmac, Mac};
 use md5::Md5;
 use piccolo::{Callback, CallbackReturn, Context, IntoValue, Table, Value};
-use piccolo_notebook_core::{HostState, LuaPlugin};
+use web_lua_core::{HostState, LuaPlugin};
 use sha2::{Digest, Sha256};
 
 type HmacSha256 = Hmac<Sha256>;
@@ -120,7 +120,7 @@ fn stack_arg_string<'gc>(
 
 #[cfg(test)]
 mod tests {
-    use piccolo_notebook_core::NotebookSession;
+    use web_lua_core::NotebookSession;
 
     use super::*;
 

@@ -266,7 +266,6 @@ name = "extension-lua"
 version = "0.1.0"
 dependencies = [
  "js-sys",
- "piccolo-notebook-core",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -275,6 +274,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-lua-base",
+ "web-lua-core",
  "web-sys",
 ]
 
@@ -639,18 +639,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "notebook-plugin-crypto"
-version = "0.1.0"
-dependencies = [
- "hex",
- "hmac",
- "md-5",
- "piccolo",
- "piccolo-notebook-core",
- "sha2",
-]
-
-[[package]]
 name = "nu-ansi-term"
 version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -707,18 +695,6 @@ dependencies = [
  "rand",
  "rustyline",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "piccolo-notebook-core"
-version = "0.1.0"
-dependencies = [
- "getrandom 0.3.4",
- "piccolo",
- "serde",
- "serde_json",
- "ts-rs",
- "url",
 ]
 
 [[package]]
@@ -1284,7 +1260,6 @@ version = "0.1.0"
 dependencies = [
  "dom-semantic-tree",
  "js-sys",
- "piccolo-notebook-core",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -1293,6 +1268,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-lua-base",
+ "web-lua-core",
  "web-sys",
 ]
 
@@ -1300,12 +1276,36 @@ dependencies = [
 name = "web-lua-base"
 version = "0.1.0"
 dependencies = [
- "piccolo-notebook-core",
  "serde",
  "serde_json",
  "tsify",
  "wasm-bindgen",
  "wasm-bindgen-test",
+ "web-lua-core",
+]
+
+[[package]]
+name = "web-lua-core"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "piccolo",
+ "serde",
+ "serde_json",
+ "ts-rs",
+ "url",
+]
+
+[[package]]
+name = "web-lua-plugin-crypto"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "hmac",
+ "md-5",
+ "piccolo",
+ "sha2",
+ "web-lua-core",
 ]
 
 [[package]]

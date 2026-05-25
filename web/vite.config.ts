@@ -24,7 +24,7 @@ export default defineConfig({
     alias: {
       '@pi-oxide/web-lua': path.resolve(__dirname, '../crates/web-lua/js/index.ts'),
       '@pi-oxide/extension-lua': path.resolve(__dirname, '../crates/extension-lua/js/index.ts'),
-      '@pi-oxide/dom-snapshot-wasm': path.resolve(__dirname, '../crates/dom-snapshot-wasm/pkg/dom_snapshot_wasm.js'),
+      '@pi-oxide/dom-semantic-tree': path.resolve(__dirname, '../crates/dom-semantic-tree/js/index.ts'),
       '@pi-oxide/lua-types': path.resolve(__dirname, '../packages/lua-types/dist/index.js'),
     },
   },

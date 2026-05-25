@@ -1,5 +1,5 @@
 use crate::types::*;
-use piccolo_notebook_core::NotebookSession;
+use web_lua_core::NotebookSession;
 
 // ─── BaseSession ────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ impl BaseSession {
     /// Used when the host handles some async calls itself and wants to pass
     /// the rest back to JS.
     pub fn restore_pending_command(&mut self, cmd: WasmAsyncCommand) {
-        let core_cmd = piccolo_notebook_core::AsyncCommand {
+        let core_cmd = web_lua_core::AsyncCommand {
             call_id: cmd.call_id,
             action: cmd.action,
             params: cmd.params,

@@ -1,0 +1,14 @@
+{
+  "name": "@pi-oxide/dom-semantic-tree",
+  "version": "0.1.0",
+  "description": "DOM-derived semantic tree extractor for browser agents",
+  "main": "index.ts",
+  "types": "index.ts",
+  "files": [
+    "index.ts",
+    "dom_semantic_tree.js",
+    "dom_semantic_tree.d.ts",
+    "README.md"
+  ],
+  "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
+}

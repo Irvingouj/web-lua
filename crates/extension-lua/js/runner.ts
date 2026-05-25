@@ -1,18 +1,17 @@
 // Main-thread command executor for extension-lua runner
 // Handles all commands relayed from the extension Worker.
 
-import wasmInit, {
+import {
   collectDocument,
   formatSnapshot,
-} from "@pi-oxide/dom-snapshot-wasm";
+} from "@pi-oxide/dom-semantic-tree";
 
-let domSnapshotReady: Promise<void> | null = null;
+let domSnapshotReady = false;
 
-function ensureDomSnapshotWasm(): Promise<void> {
+function ensureDomSnapshot(): void {
   if (!domSnapshotReady) {
-    domSnapshotReady = wasmInit();
+    domSnapshotReady = true;
   }
-  return domSnapshotReady;
 }
 
 // ─── Runner lifecycle abort signal ───────────────────────────────
@@ -1008,7 +1007,7 @@ async function handlePageAction(
 
 async function handleDomSnapshot(params: unknown): Promise<unknown> {
   try {
-    await ensureDomSnapshotWasm();
+    ensureDomSnapshot();
     const obj = asRecord(params);
     const options = {
       max_nodes: typeof obj.max_nodes === "number" ? obj.max_nodes : 500,
@@ -1034,7 +1033,7 @@ async function handleDomSnapshot(params: unknown): Promise<unknown> {
 
 async function handleDomFormat(params: unknown): Promise<unknown> {
   try {
-    await ensureDomSnapshotWasm();
+    ensureDomSnapshot();
     const obj = asRecord(params);
     const snapshot = obj.snapshot;
     const format = typeof obj.format === "string" ? obj.format : "compact-text";

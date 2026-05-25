@@ -68,7 +68,7 @@ Define a `LuaPlugin` trait that lets users create Rust crates exposing custom Lu
 
 ### Rust Changes
 
-#### `piccolo-notebook-core/src/lib.rs`
+#### `web-lua-core/src/lib.rs`
 
 ```rust
 /// A plugin that extends the Lua runtime with custom globals.
@@ -162,14 +162,14 @@ impl SessionBuilder {
 ### Example Plugin Crate
 
 ```
-notebook-plugin-crypto/
-  Cargo.toml          # depends on piccolo-notebook-core, sha2
+web-lua-plugin-crypto/
+  Cargo.toml          # depends on web-lua-core, sha2
   src/
     lib.rs            # CryptoPlugin struct + impl LuaPlugin
 ```
 
 ```rust
-// notebook-plugin-crypto/src/lib.rs
+// web-lua-plugin-crypto/src/lib.rs
 use piccolo_notebook_core::LuaPlugin;
 use piccolo::{Callback, CallbackReturn, Table, Context};
 use std::cell::RefCell;
@@ -712,10 +712,10 @@ impl SessionBuilder {
 
 Create example plugin crates demonstrating how to write Rust plugins.
 
-### Plugin: notebook-plugin-crypto
+### Plugin: web-lua-plugin-crypto
 
 ```
-crates/notebook-plugin-crypto/
+crates/web-lua-plugin-crypto/
   Cargo.toml
   src/lib.rs
 ```
@@ -800,11 +800,11 @@ Combined with existing 102 Rust + 27 E2E = **~150 total tests**.
 
 | File | Phase 1 | Phase 2 | Phase 3 | Phase 4 |
 |------|---------|---------|---------|---------|
-| `crates/piccolo-notebook-core/src/lib.rs` | ✏️ trait, builder | ✏️ host.call | ✏️ load_library | |
+| `crates/web-lua-core/src/lib.rs` | ✏️ trait, builder | ✏️ host.call | ✏️ load_library | |
 | `crates/piccolo-notebook-wasm/src/lib.rs` | ✏️ builder API | | ✏️ load_library | |
 | `web/src/worker.ts` | | ✏️ custom handlers | | |
 | `web/src/main.ts` | | ✏️ createNotebook | | |
-| `crates/notebook-plugin-crypto/` | 📄 new | | | 📄 new |
+| `crates/web-lua-plugin-crypto/` | 📄 new | | | 📄 new |
 | `crates/notebook-plugin-image/` | | | | 📄 new |
 | `crates/notebook-plugin-binary/` | | | | 📄 new |
 | `web/tests/e2e/host-call.spec.ts` | | 📄 new | | |

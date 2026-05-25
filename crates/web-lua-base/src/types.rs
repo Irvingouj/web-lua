@@ -89,37 +89,37 @@ pub struct WasmRunResult {
     pub pending_command: Option<WasmAsyncCommand>,
 }
 
-impl From<piccolo_notebook_core::CellStatus> for WasmCellStatus {
-    fn from(s: piccolo_notebook_core::CellStatus) -> Self {
+impl From<web_lua_core::CellStatus> for WasmCellStatus {
+    fn from(s: web_lua_core::CellStatus) -> Self {
         match s {
-            piccolo_notebook_core::CellStatus::Done => WasmCellStatus::Done,
-            piccolo_notebook_core::CellStatus::AsyncPending => WasmCellStatus::AsyncPending,
+            web_lua_core::CellStatus::Done => WasmCellStatus::Done,
+            web_lua_core::CellStatus::AsyncPending => WasmCellStatus::AsyncPending,
         }
     }
 }
 
-impl From<piccolo_notebook_core::CellError> for WasmCellError {
-    fn from(e: piccolo_notebook_core::CellError) -> Self {
+impl From<web_lua_core::CellError> for WasmCellError {
+    fn from(e: web_lua_core::CellError) -> Self {
         match e {
-            piccolo_notebook_core::CellError::Compile { message, line } => {
+            web_lua_core::CellError::Compile { message, line } => {
                 WasmCellError::Compile { message, line }
             }
-            piccolo_notebook_core::CellError::Runtime { message } => {
+            web_lua_core::CellError::Runtime { message } => {
                 WasmCellError::Runtime { message }
             }
-            piccolo_notebook_core::CellError::StrictMode { variable } => {
+            web_lua_core::CellError::StrictMode { variable } => {
                 WasmCellError::StrictMode { variable }
             }
-            piccolo_notebook_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
-            piccolo_notebook_core::CellError::Internal { message } => {
+            web_lua_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
+            web_lua_core::CellError::Internal { message } => {
                 WasmCellError::Internal { message }
             }
         }
     }
 }
 
-impl From<piccolo_notebook_core::GlobalVariable> for WasmGlobalVariable {
-    fn from(v: piccolo_notebook_core::GlobalVariable) -> Self {
+impl From<web_lua_core::GlobalVariable> for WasmGlobalVariable {
+    fn from(v: web_lua_core::GlobalVariable) -> Self {
         WasmGlobalVariable {
             name: v.name,
             type_name: v.type_name,
@@ -129,8 +129,8 @@ impl From<piccolo_notebook_core::GlobalVariable> for WasmGlobalVariable {
     }
 }
 
-impl From<piccolo_notebook_core::GlobalsSnapshot> for WasmGlobalsSnapshot {
-    fn from(s: piccolo_notebook_core::GlobalsSnapshot) -> Self {
+impl From<web_lua_core::GlobalsSnapshot> for WasmGlobalsSnapshot {
+    fn from(s: web_lua_core::GlobalsSnapshot) -> Self {
         WasmGlobalsSnapshot {
             variables: s.variables.into_iter().map(Into::into).collect(),
             execution_count: s.execution_count,
@@ -138,8 +138,8 @@ impl From<piccolo_notebook_core::GlobalsSnapshot> for WasmGlobalsSnapshot {
     }
 }
 
-impl From<piccolo_notebook_core::AsyncCommand> for WasmAsyncCommand {
-    fn from(c: piccolo_notebook_core::AsyncCommand) -> Self {
+impl From<web_lua_core::AsyncCommand> for WasmAsyncCommand {
+    fn from(c: web_lua_core::AsyncCommand) -> Self {
         WasmAsyncCommand {
             call_id: c.call_id,
             action: c.action,
@@ -148,8 +148,8 @@ impl From<piccolo_notebook_core::AsyncCommand> for WasmAsyncCommand {
     }
 }
 
-impl From<piccolo_notebook_core::RunResult> for WasmRunResult {
-    fn from(r: piccolo_notebook_core::RunResult) -> Self {
+impl From<web_lua_core::RunResult> for WasmRunResult {
+    fn from(r: web_lua_core::RunResult) -> Self {
         WasmRunResult {
             stdout: r.stdout,
             stderr: r.stderr,

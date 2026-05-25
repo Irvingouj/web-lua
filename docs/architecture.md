@@ -31,7 +31,7 @@
                    │
                    ▼
 ┌──────────────────────────────────────────────────┐
-│  Core Session (piccolo-notebook-core)            │
+│  Core Session (web-lua-core)            │
 │  - NotebookSession: persistent Lua state         │
 │  - Host globals: print, input, read, emit        │
 │  - Fuel-limited execution loop                   │

@@ -34,7 +34,7 @@
 
 ### 实现内容
 
-在 `piccolo-notebook-core/src/lib.rs` 中注册 `json` 全局 table：
+在 `web-lua-core/src/lib.rs` 中注册 `json` 全局 table：
 
 ```lua
 json.encode({a = 1, b = "hello"})  → '{"a":1,"b":"hello"}'
@@ -972,7 +972,7 @@ test('web.tab.query in extension context', async ({ page }) => {
 
 | 文件 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6 |
 |------|---------|---------|---------|---------|---------|---------|
-| `crates/piccolo-notebook-core/src/lib.rs` | ✏️ json | ✏️ coroutine | ✏️ fetch | ✏️ url/log | | ✏️ tabs |
+| `crates/web-lua-core/src/lib.rs` | ✏️ json | ✏️ coroutine | ✏️ fetch | ✏️ url/log | | ✏️ tabs |
 | `crates/piccolo-notebook-wasm/src/lib.rs` | | ✏️ resume_cell | | | | |
 | `web/src/worker.ts` | | ✏️ async loop | ✏️ fetch handler | ✏️ sleep | ✏️ relay | ✏️ chrome |
 | `web/src/main.ts` | | | | | ✏️ relay handler | |

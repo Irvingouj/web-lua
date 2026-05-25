@@ -39,8 +39,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "dom_snapshot_wasm.js",
-        "dom_snapshot_wasm_bg.wasm"
+        "dom_semantic_tree.js"
       ],
       "matches": ["<all_urls>"]
     }

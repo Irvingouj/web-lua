@@ -52,23 +52,7 @@ function getElementRole(el) {
   return "generic";
 }
 
-// ─── Lazy-loaded dom-snapshot-wasm ─────────────────────────────
-
-let domSnapshotModule = null;
-
-async function loadDomSnapshotWasm() {
-  if (domSnapshotModule) return domSnapshotModule;
-  try {
-    const moduleUrl = chrome.runtime.getURL("dom_snapshot_wasm.js");
-    const mod = await import(moduleUrl);
-    await mod.default();
-    domSnapshotModule = mod;
-    return mod;
-  } catch (e) {
-    console.warn("Failed to load dom-snapshot-wasm in content script:", e);
-    return null;
-  }
-}
+// ─── DOM snapshot (inline JS fallback) ───────────────────────────
 
 function inlineSnapshot(maxNodes) {
   const all = document.body.querySelectorAll("*");
@@ -170,12 +154,6 @@ const handlers = {
     const obj = asRecord(params);
     const maxNodes =
       typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-    const wasm = await loadDomSnapshotWasm();
-    if (wasm) {
-      const snap = wasm.collectDocument({ max_nodes: maxNodes });
-      const text = wasm.formatSnapshot(snap, "compact-text");
-      return { data: snap, text };
-    }
     return inlineSnapshot(maxNodes);
   },
 

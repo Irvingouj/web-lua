@@ -25,7 +25,7 @@ mod tests {
 
     #[test]
     fn test_export_types() {
-        // Resolve the workspace root: MANIFEST_DIR is crates/piccolo-notebook-core,
+        // Resolve the workspace root: MANIFEST_DIR is crates/web-lua-core,
         // so going two levels up gives us the workspace root.
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let workspace_root = std::path::Path::new(&manifest_dir)

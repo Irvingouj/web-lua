@@ -1,6 +1,10 @@
 # 🧡 Piccolo Notebook
 
-A browser-based Jupyter-style notebook for Lua-like scripting, powered by [piccolo](https://github.com/kyren/piccolo) — a pure Rust Lua VM compiled to WebAssembly.
+A browser-based Jupyter-style notebook for Lua scripting, powered by [piccolo](https://github.com/kyren/piccolo) — a pure Rust Lua VM compiled to WebAssembly.
+
+The core runtime is delivered as two self-contained npm packages:
+- **[@pi-oxide/web-lua](crates/web-lua/js/)** — main-thread WASM runtime
+- **[@pi-oxide/extension-lua](crates/extension-lua/js/)** — extension-context WASM runtime (Web Worker + Chrome APIs)
 
 ## Why Piccolo
 
@@ -59,7 +63,7 @@ npm run dev
 ```bash
 # Use rustup's cargo, not Homebrew's
 export PATH="$(rustup which cargo | xargs dirname):$PATH"
-cargo test -p piccolo-notebook-core
+cargo test -p web-lua-core
 ```
 
 ### Run E2E Browser Tests
@@ -79,9 +83,9 @@ npm run test:e2e:headed
 
 | Command | Description |
 |---------|-------------|
-| `./build-wasm.sh` | Build WASM + JS bindings |
+| `node scripts/build.js` | Build all WASM targets + JS bindings |
 | `cd web && npm run dev` | Start dev server |
-| `cargo test -p piccolo-notebook-core` | Run core tests |
+| `cargo test -p web-lua-core` | Run core tests |
 | `cd web && npm run test:e2e` | Run Playwright E2E tests |
 | `cd web && npm run test:e2e:headed` | Run E2E tests with visible browser |
 
@@ -168,11 +172,19 @@ Host APIs (`print`, `input`, `read`, `emit`) are the only bridge between Lua and
 ## Architecture
 
 ```
-Browser UI (TypeScript + HTML)
-  → Web Worker kernel
-    → wasm-bindgen wrapper (WasmSession)
-      → piccolo-notebook-core (NotebookSession)
-        → vendored piccolo runtime (Lua VM)
+Browser UI (TypeScript + Preact)
+  → WebSession (@pi-oxide/web-lua)
+    → wasm-bindgen wrapper (WebSession)
+      → web-lua-base (BaseSession)
+        → web-lua-core (NotebookSession)
+          → piccolo runtime (Lua VM)
+
+Extension Context (Web Worker)
+  → ExtensionSession (@pi-oxide/extension-lua)
+    → wasm-bindgen wrapper (ExtensionSession)
+      → web-lua-base (BaseSession)
+        → web-lua-core (NotebookSession)
+          → piccolo runtime (Lua VM)
 ```
 
 See `docs/architecture.md` for full details.
@@ -181,16 +193,22 @@ See `docs/architecture.md` for full details.
 
 ```
 /
-  vendor/piccolo/           # Vendored piccolo Lua VM source
   crates/
-    piccolo-notebook-core/  # Rust wrapper: session, host APIs, fuel
-    piccolo-notebook-wasm/  # wasm-bindgen exports
+    piccolo/                # Vendored piccolo Lua VM source
+    web-lua-core/           # Rust core: session, host APIs, fuel, tsify types
+    web-lua-base/           # BaseSession shared by web-lua and extension-lua
+    web-lua/                # Main-thread WASM runtime
+    extension-lua/          # Extension-context WASM runtime
+    dom-semantic-tree/      # DOM snapshot crate
+    web-lua-plugin-crypto/  # Crypto plugin
   web/
-    src/                    # UI, worker, styles
-    pkg/                    # Generated WASM + JS bindings
-    index.html              # Entry point
+    src/                    # Notebook UI, hooks, styles
+    public/                 # Extension assets
+  packages/
+    lua-types/              # Shared TypeScript type definitions
+  scripts/
+    build.js                # Unified WASM build CLI
   docs/                     # Documentation
-  build-wasm.sh             # WASM build script
 ```
 
 ## Credits

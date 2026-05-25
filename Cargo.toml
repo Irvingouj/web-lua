@@ -2,11 +2,11 @@
 resolver = "2"
 members = [
     "crates/piccolo",
-    "crates/piccolo-notebook-core",
+    "crates/web-lua-core",
     "crates/web-lua-base",
     "crates/web-lua",
     "crates/extension-lua",
-    "crates/notebook-plugin-crypto",
+    "crates/web-lua-plugin-crypto",
     "crates/dom-semantic-tree",
 ]
 

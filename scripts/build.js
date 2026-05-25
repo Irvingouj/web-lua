@@ -48,6 +48,13 @@ const targets = [
     outDir: "crates/extension-lua/pkg",
     bundleScript: "crates/extension-lua/scripts/bundle-wasm.js",
   },
+  {
+    name: "dom-semantic-tree",
+    crate: "dom-semantic-tree",
+    wasm: "dom_semantic_tree.wasm",
+    outDir: "crates/dom-semantic-tree/pkg",
+    bundleScript: "crates/dom-semantic-tree/scripts/bundle-wasm.js",
+  },
 ];
 
 function buildTarget(target) {
@@ -98,9 +105,11 @@ const args = process.argv.slice(2);
 const buildAll = args.length === 0;
 const buildWeb = buildAll || args.includes("web");
 const buildExt = buildAll || args.includes("extension");
+const buildDom = buildAll || args.includes("dom");
 
 if (buildWeb) buildTarget(targets[0]);
 if (buildExt) buildTarget(targets[1]);
+if (buildDom) buildTarget(targets[2]);
 if (buildExt) copyExtensionAssets();
 
 console.log("\n🎉 All builds complete!");

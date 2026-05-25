@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 web-lua-base = { path = "../web-lua-base" }
-piccolo-notebook-core = { path = "../piccolo-notebook-core" }
+web-lua-core = { path = "../web-lua-core" }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 serde.workspace = true
