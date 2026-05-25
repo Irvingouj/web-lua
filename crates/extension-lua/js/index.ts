@@ -48,6 +48,12 @@ export class ExtensionSession {
    * Initialize the extension-lua runtime.
    * Automatically detects extension context, spawns the Worker,
    * starts the main-thread runner loop, and returns [session, runner].
+   *
+   * The spawned Worker uses `new Worker(..., { type: "module" })`. Your bundler
+   * must support emitting module Workers as separate chunks.
+   *
+   * AbortController is module-global: only one active session per extension
+   * page is fully safe. Concurrent sessions race on the same abort signal.
    */
   static async init(): Promise<[ExtensionSession, Promise<void>]> {
     const session = new ExtensionSession();
@@ -198,6 +204,11 @@ export class ExtensionSession {
    * Clean up the session, terminate the Worker, and release resources.
    * Accepts the runner Promise returned by init() so it can be awaited
    * for graceful shutdown.
+   *
+   * Sends a reset message to the Worker, then waits only 50 ms before
+   * forcefully calling worker.terminate(). If WASM cleanup takes longer,
+   * the Worker is killed mid-operation. Pending async calls are rejected
+   * with "ExtensionSession stopped".
    */
   async stopWith(runner: Promise<void>): Promise<void> {
     if (this.disposed) return;

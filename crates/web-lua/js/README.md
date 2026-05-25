@@ -31,7 +31,7 @@ await vm.stopWith(runner);
 - `WebSession.init()` — Returns `[WebSession, Promise<void>]`. The runner promise resolves when the session is stopped.
 - `vm.runCellAsync(code, stdin?)` — Execute Lua code. Returns `LuaRunResult` with `stdout`, `stderr`, `result`, `error`.
 - `vm.reset()` — Clear all Lua state.
-- `vm.stopWith(runner)` — Clean up the session and release resources.
+- `vm.stopWith(runner)` — Clean up the session and release resources. Sets an internal abort flag; in-flight async operations finish their current step and then exit on the next iteration.
 - `vm.inspectGlobals()` — Inspect all global variables.
 - `vm.setFuelLimit(limit)` — Set execution fuel limit.
 - `vm.loadLibrary(source)` — Load a Lua library.

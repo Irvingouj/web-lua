@@ -819,6 +819,23 @@ async function sendMessageToTab(
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const result = await chrome.tabs.sendMessage(targetTab, message);
+      // Content-script handlers may return { ok: false, error: msg } on failure.
+      // Flatten that so Lua consumers always see a single error shape.
+      if (
+        result &&
+        typeof result === "object" &&
+        (result as Record<string, unknown>).ok === false
+      ) {
+        const raw = (result as Record<string, unknown>).error;
+        const msg = typeof raw === "string" ? raw : String(raw);
+        return {
+          ok: false,
+          error: {
+            message: msg || "Content script error",
+            code: "E_CONTENT_SCRIPT",
+          },
+        };
+      }
       return { ok: true, value: result };
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : String(err)) || "";
@@ -840,6 +857,10 @@ async function sendMessageToTab(
 }
 
 // ─── Page actions (side panel / main document) ─────────────────
+//
+// IMPORTANT: page.* actions operate on the extension popup/sidepanel DOM,
+// NOT the active browser tab. To interact with the active tab, use tab.*
+// APIs which relay commands to the content script via sendMessageToTab.
 
 function getElementByRefId(refId: string): Element | null {
   return document.querySelector(`[data-ref-id='${refId}']`);
