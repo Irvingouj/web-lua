@@ -9,6 +9,7 @@ use std::cell::Cell;
 use wasm_bindgen::prelude::*;
 use web_lua_base::types::*;
 use web_lua_base::BaseSession;
+use web_lua_core::command_params::*;
 
 // ─── WebSession ─────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ sleep = web.sleep
     }
 
     /// Load a Lua library by executing its source code.
-    pub fn load_library(&mut self, source: &str) -> CellResult {
+    pub fn load_library(&mut self, source: &str) -> WasmRunResult {
         self.base.load_library(source).into()
     }
 
@@ -113,7 +114,7 @@ sleep = web.sleep
     /// Run a cell, automatically resolving all async calls
     /// directly via web_sys without yielding to JS.
     #[wasm_bindgen(js_name = runCellAsync)]
-    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> CellResult {
+    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> WasmRunResult {
         self.aborted.set(false);
         let mut result = self.base.run_cell(&code, &stdin);
 
@@ -177,9 +178,21 @@ impl WebSession {
         cmd: &WasmAsyncCommand,
     ) -> Result<WasmAsyncResponse, String> {
         match cmd.action.as_str() {
-            "fetch" => Ok(execute_fetch(cmd.params.clone()).await),
-            "sleep" => Ok(execute_sleep(cmd.params.clone()).await),
-            "page_wait" => Ok(execute_page_wait(cmd.params.clone()).await),
+            "fetch" => {
+                let params = cmd.parse_params::<FetchParams>()
+                    .map_err(|e| format!("Invalid fetch params: {}", e))?;
+                Ok(execute_fetch(params).await)
+            }
+            "sleep" => {
+                let params = cmd.parse_params::<SleepParams>()
+                    .map_err(|e| format!("Invalid sleep params: {}", e))?;
+                Ok(execute_sleep(params).await)
+            }
+            "page_wait" => {
+                let params = cmd.parse_params::<PageWaitParams>()
+                    .map_err(|e| format!("Invalid page_wait params: {}", e))?;
+                Ok(execute_page_wait(params).await)
+            }
 
             "page_url" => {
                 let window = web_sys::window().ok_or("No window available")?;
@@ -203,19 +216,16 @@ impl WebSession {
                 })
             }
             "page_click" => {
-                let ref_id = cmd
-                    .params
-                    .get("refId")
-                    .and_then(|v| v.as_str())
-                    .ok_or("page_click requires refId")?;
+                let params = cmd.parse_params::<PageClickParams>()
+                    .map_err(|e| format!("Invalid page_click params: {}", e))?;
                 let document = web_sys::window()
                     .ok_or("No window available")?
                     .document()
                     .ok_or("No document available")?;
                 let element = document
-                    .query_selector(&format!("[data-ref-id='{}']", ref_id))
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
                 element
                     .dyn_ref::<web_sys::HtmlElement>()
                     .ok_or("Element is not clickable")?
@@ -227,26 +237,18 @@ impl WebSession {
                 })
             }
             "page_fill" => {
-                let ref_id = cmd
-                    .params
-                    .get("refId")
-                    .and_then(|v| v.as_str())
-                    .ok_or("page_fill requires refId")?;
-                let value = cmd
-                    .params
-                    .get("value")
-                    .and_then(|v| v.as_str())
-                    .ok_or("page_fill requires value")?;
+                let params = cmd.parse_params::<PageFillParams>()
+                    .map_err(|e| format!("Invalid page_fill params: {}", e))?;
                 let document = web_sys::window()
                     .ok_or("No window available")?
                     .document()
                     .ok_or("No document available")?;
                 let element = document
-                    .query_selector(&format!("[data-ref-id='{}']", ref_id))
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
-                    input.set_value(value);
+                    input.set_value(&params.value);
                 } else {
                     return Err("Element is not an input".into());
                 }
@@ -259,15 +261,12 @@ impl WebSession {
                 })
             }
             "page_goto" => {
-                let url = cmd
-                    .params
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .ok_or("page_goto requires url")?;
+                let params = cmd.parse_params::<PageGotoParams>()
+                    .map_err(|e| format!("Invalid page_goto params: {}", e))?;
                 let window = web_sys::window().ok_or("No window available")?;
                 window
                     .location()
-                    .set_href(url)
+                    .set_href(&params.url)
                     .map_err(|e| format!("{:?}", e))?;
                 Ok(WasmAsyncResponse {
                     ok: true,
@@ -310,8 +309,16 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_snapshot" | "dom_snapshot" => Ok(execute_dom_snapshot(cmd.params.clone())),
-            "dom_format" => Ok(execute_dom_format(cmd.params.clone())),
+            "page_snapshot" | "dom_snapshot" => {
+                let params = cmd.parse_params::<DomSnapshotParams>()
+                    .map_err(|e| format!("Invalid snapshot params: {}", e))?;
+                Ok(execute_dom_snapshot(params))
+            }
+            "dom_format" => {
+                let params = cmd.parse_params::<DomFormatParams>()
+                    .map_err(|e| format!("Invalid dom_format params: {}", e))?;
+                Ok(execute_dom_format(params))
+            }
             "page_screenshot" => Ok(WasmAsyncResponse {
                 ok: false,
                 value: None,
@@ -320,15 +327,47 @@ impl WebSession {
                     code: "E_NOT_IMPLEMENTED".into(),
                 }),
             }),
-            "page_type" => Ok(execute_page_type(cmd.params.clone()).await),
-            "page_press" => Ok(execute_page_press(cmd.params.clone()).await),
-            "page_select" => Ok(execute_page_select(cmd.params.clone()).await),
-            "page_check" => Ok(execute_page_check(cmd.params.clone()).await),
-            "page_hover" => Ok(execute_page_hover(cmd.params.clone()).await),
-            "page_unhover" => Ok(execute_page_unhover(cmd.params.clone()).await),
-            "page_scroll" => Ok(execute_page_scroll(cmd.params.clone()).await),
-            "page_scroll_to" => Ok(execute_page_scroll_to(cmd.params.clone()).await),
-            "page_dblclick" => Ok(execute_page_dblclick(cmd.params.clone()).await),
+            "page_type" => {
+                let params = cmd.parse_params::<PageTypeParams>()
+                    .map_err(|e| format!("Invalid page_type params: {}", e))?;
+                Ok(execute_page_type(params).await)
+            }
+            "page_press" => {
+                let params = cmd.parse_params::<PagePressParams>()
+                    .map_err(|e| format!("Invalid page_press params: {}", e))?;
+                Ok(execute_page_press(params).await)
+            }
+            "page_select" => {
+                let params = cmd.parse_params::<PageSelectParams>()
+                    .map_err(|e| format!("Invalid page_select params: {}", e))?;
+                Ok(execute_page_select(params).await)
+            }
+            "page_check" => {
+                let params = cmd.parse_params::<PageCheckParams>()
+                    .map_err(|e| format!("Invalid page_check params: {}", e))?;
+                Ok(execute_page_check(params).await)
+            }
+            "page_hover" => {
+                let params = cmd.parse_params::<PageHoverParams>()
+                    .map_err(|e| format!("Invalid page_hover params: {}", e))?;
+                Ok(execute_page_hover(params).await)
+            }
+            "page_unhover" => Ok(execute_page_unhover().await),
+            "page_scroll" => {
+                let params = cmd.parse_params::<PageScrollParams>()
+                    .map_err(|e| format!("Invalid page_scroll params: {}", e))?;
+                Ok(execute_page_scroll(params).await)
+            }
+            "page_scroll_to" => {
+                let params = cmd.parse_params::<PageScrollToParams>()
+                    .map_err(|e| format!("Invalid page_scroll_to params: {}", e))?;
+                Ok(execute_page_scroll_to(params).await)
+            }
+            "page_dblclick" => {
+                let params = cmd.parse_params::<PageDblClickParams>()
+                    .map_err(|e| format!("Invalid page_dblclick params: {}", e))?;
+                Ok(execute_page_dblclick(params).await)
+            }
             // Extension-only APIs: return error in web context
             "tab_query"
             | "tab_create"
@@ -397,10 +436,22 @@ impl WebSession {
                 "{} is not available in web-lua context",
                 cmd.action
             )),
-            "storage_get" => Ok(execute_storage_get(cmd.params.clone()).await),
-            "storage_set" => Ok(execute_storage_set(cmd.params.clone()).await),
-            "storage_delete" => Ok(execute_storage_delete(cmd.params.clone()).await),
-            "storage_list" => Ok(execute_storage_list(cmd.params.clone()).await),
+            "storage_get" => {
+                let params = cmd.parse_params::<StorageGetParams>()
+                    .map_err(|e| format!("Invalid storage_get params: {}", e))?;
+                Ok(execute_storage_get(params).await)
+            }
+            "storage_set" => {
+                let params = cmd.parse_params::<StorageSetParams>()
+                    .map_err(|e| format!("Invalid storage_set params: {}", e))?;
+                Ok(execute_storage_set(params).await)
+            }
+            "storage_delete" => {
+                let params = cmd.parse_params::<StorageDeleteParams>()
+                    .map_err(|e| format!("Invalid storage_delete params: {}", e))?;
+                Ok(execute_storage_delete(params).await)
+            }
+            "storage_list" => Ok(execute_storage_list().await),
             "mock_async" => {
                 // Test-only: just return empty success
                 Ok(WasmAsyncResponse {

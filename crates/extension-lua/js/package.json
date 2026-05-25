@@ -25,5 +25,8 @@
   "dependencies": {
     "@pi-oxide/dom-semantic-tree": "^0.1.0"
   },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268"
+  },
   "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
 }

@@ -15,7 +15,57 @@ export type CellError = { "kind": "compile", message: string, line: number | nul
  */
 export type CellStatus = "done" | "async_pending";
 
+export type DomFormatParams = { snapshot: unknown, format: string, };
+
+export type DomSnapshotParams = { interactive_only: boolean, max_nodes: bigint, };
+
+export type FetchParams = { url: string, method: string, headers: { [key in string]: string }, body: string | null, timeout: bigint, };
+
+export type PageCheckParams = { refId: string, checked: boolean, };
+
+export type PageClickParams = { refId: string, };
+
+export type PageDblClickParams = { refId: string, };
+
+export type PageFillParams = { refId: string, value: string, };
+
+export type PageGotoParams = { url: string, };
+
+export type PageHoverParams = { refId: string, };
+
+export type PagePressParams = { key: string, };
+
+export type PageScrollParams = { direction: string, amount: number, };
+
+export type PageScrollToParams = { refId: string, };
+
+export type PageSelectParams = { refId: string, value: string, };
+
+export type PageTypeParams = { refId: string, text: string, };
+
+export type PageWaitParams = { duration: bigint, };
+
 /**
  * Result of running a single cell.
  */
 export type RunResult = { stdout: Array<string>, stderr: Array<string>, result: string | null, error: CellError | null, commands: unknown[], fuel_exhausted: boolean, execution_count: number, status: CellStatus, pending_command: AsyncCommand | null, };
+
+export type SleepParams = { duration: bigint, };
+
+export type StorageDeleteParams = { key: string, };
+
+export type StorageGetParams = { key: string, };
+
+export type StorageSetParams = { key: string, value: string, };
+
+export type TabBackParams = { tabId: bigint, };
+
+export type TabClickParams = { tabId: bigint, refId: string, };
+
+export type TabEvaluateParams = { tabId: bigint, script: string, };
+
+export type TabFillParams = { tabId: bigint, refId: string, value: string, };
+
+export type TabScrollToParams = { tabId: bigint, x: number, y: number, refId: string | null, };
+
+export type TabWaitForLoadParams = { tabId: bigint, };

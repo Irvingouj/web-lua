@@ -1,3 +1,4 @@
+/// <reference types="chrome" />
 // Main-thread command executor for extension-lua runner
 // Handles all commands relayed from the extension Worker.
 
@@ -36,107 +37,38 @@ function throwIfAborted(): void {
   }
 }
 
-// ─── Minimal Chrome API types to avoid `any` ───────────────────
+// ─── Generated types from Rust ts-rs ───────────────────────────
 
-interface ChromeRuntime {
-  id?: string;
-  sendMessage: (message: unknown) => Promise<unknown>;
-}
-
-interface ChromeTabs {
-  get: (tabId: number) => Promise<{ status: string }>;
-  query: (queryInfo: unknown) => Promise<unknown>;
-  create: (createProperties: unknown) => Promise<unknown>;
-  update: (tabId: number | null, updateProperties: unknown) => Promise<unknown>;
-  remove: (tabId: unknown) => Promise<void>;
-  reload: (
-    tabId: number | undefined,
-    reloadProperties: unknown,
-  ) => Promise<void>;
-  sendMessage: (tabId: unknown, message: unknown) => Promise<unknown>;
-  onUpdated: {
-    addListener: (
-      callback: (tabId: number, changeInfo: { status?: string }) => void,
-    ) => void;
-    removeListener: (
-      callback: (tabId: number, changeInfo: { status?: string }) => void,
-    ) => void;
-  };
-}
-
-interface ChromeScripting {
-  executeScript: (details: unknown) => Promise<{ result?: unknown }[]>;
-}
-
-interface ChromeAction {
-  setBadgeText: (details: unknown) => Promise<void>;
-  setBadgeBackgroundColor: (details: unknown) => Promise<void>;
-  setTitle: (details: unknown) => Promise<void>;
-  setIcon: (details: unknown) => Promise<unknown>;
-}
-
-interface ChromeContextMenus {
-  create: (createProperties: unknown) => Promise<unknown>;
-  remove: (menuItemId: unknown) => Promise<void>;
-}
-
-interface ChromeWindows {
-  getAll: (getInfo: unknown) => Promise<unknown>;
-  create: (createData: unknown) => Promise<unknown>;
-  update: (windowId: unknown, updateInfo: unknown) => Promise<unknown>;
-  remove: (windowId: unknown) => Promise<void>;
-}
-
-interface ChromeSidePanel {
-  setOptions: (options: unknown) => Promise<void>;
-}
-
-interface ChromeCookies {
-  get: (details: unknown) => Promise<unknown>;
-  set: (details: unknown) => Promise<unknown>;
-  remove: (details: unknown) => Promise<unknown>;
-  getAll: (details: unknown) => Promise<unknown>;
-}
-
-interface ChromeBookmarks {
-  search: (query: unknown) => Promise<unknown>;
-  create: (bookmark: unknown) => Promise<unknown>;
-  remove: (id: unknown) => Promise<void>;
-}
-
-interface ChromeHistory {
-  search: (query: unknown) => Promise<unknown>;
-  deleteUrl: (details: unknown) => Promise<void>;
-}
-
-interface ChromeNotifications {
-  create: (notificationId: string, options: unknown) => Promise<unknown>;
-  clear: (notificationId: string) => Promise<unknown>;
-}
-
-interface ChromeAlarms {
-  create: (name: string, alarmInfo: unknown) => Promise<void>;
-  clear: (name: string) => Promise<boolean>;
-}
-
-interface ChromeApi {
-  runtime: ChromeRuntime;
-  tabs: ChromeTabs;
-  scripting: ChromeScripting;
-  action: ChromeAction;
-  contextMenus: ChromeContextMenus;
-  windows: ChromeWindows;
-  sidePanel: ChromeSidePanel;
-  cookies: ChromeCookies;
-  bookmarks: ChromeBookmarks;
-  history: ChromeHistory;
-  notifications: ChromeNotifications;
-  alarms: ChromeAlarms;
-}
+import type {
+  FetchParams,
+  SleepParams,
+  PageClickParams,
+  PageDblClickParams,
+  PageFillParams,
+  PageTypeParams,
+  PagePressParams,
+  PageSelectParams,
+  PageCheckParams,
+  PageHoverParams,
+  PageScrollParams,
+  PageScrollToParams,
+  PageGotoParams,
+  PageWaitParams,
+  StorageGetParams,
+  StorageSetParams,
+  StorageDeleteParams,
+  DomSnapshotParams,
+  DomFormatParams,
+  TabClickParams,
+  TabFillParams,
+  TabEvaluateParams,
+  TabBackParams,
+  TabWaitForLoadParams,
+  TabScrollToParams,
+} from "../../../web/src/types/generated";
 
 declare global {
   interface Window {
-    chrome?: ChromeApi;
     __hostHandlers?: Record<string, (params: unknown) => Promise<unknown>>;
   }
 }
@@ -150,6 +82,43 @@ interface Command {
   params: unknown;
 }
 
+// ─── Shared response types ─────────────────────────────────────
+
+type AsyncError = {
+  message: string;
+  code: string;
+  category?: string;
+};
+
+type AsyncResponse<T = unknown> =
+  | { ok: true; value: T }
+  | { ok: false; error: AsyncError };
+
+type FetchValue = {
+  status: number;
+  ok: boolean;
+  headers: Record<string, string>;
+  body: string;
+};
+
+type DomSnapshotValue = {
+  data: unknown;
+  text: string;
+};
+
+type TabMessage =
+  | { action: "click"; params: { refId: string } }
+  | { action: "fill"; params: { refId: string; value: string } }
+  | { action: "scrollTo"; params: { x: number; y: number; refId?: string } }
+  | { action: "back"; params: Record<string, never> };
+
+type DomNode = {
+  refId: number;
+  role: string;
+  tag: string;
+  name?: string;
+};
+
 // ─── Host handler registry ─────────────────────────────────────
 
 const hostHandlers: Record<string, HostHandler> = {};
@@ -160,6 +129,12 @@ export function registerHostHandler(action: string, handler: HostHandler) {
 
 export function registerHostHandlers(handlers: Record<string, HostHandler>) {
   Object.assign(hostHandlers, handlers);
+}
+
+// ─── Typed params helper ───────────────────────────────────────
+
+function expectParams<T>(params: unknown): T {
+  return params as T;
 }
 
 // ─── Helpers for extracting values from unknown params ─────────
@@ -216,12 +191,12 @@ function getNumberParam(
 
 export async function executeMainThreadCommand(
   command: Command,
-): Promise<unknown> {
+): Promise<AsyncResponse> {
   const params = command.params;
   switch (command.action) {
     case "storage_get": {
       try {
-        const key = getStringParam(params, "key");
+        const { key } = expectParams<StorageGetParams>(params);
         const value = localStorage.getItem(key);
         return { ok: true, value };
       } catch (err: unknown) {
@@ -234,8 +209,7 @@ export async function executeMainThreadCommand(
     }
     case "storage_set": {
       try {
-        const key = getStringParam(params, "key");
-        const value = getStringParam(params, "value");
+        const { key, value } = expectParams<StorageSetParams>(params);
         localStorage.setItem(key, value);
         return { ok: true, value: null };
       } catch (err: unknown) {
@@ -248,7 +222,7 @@ export async function executeMainThreadCommand(
     }
     case "storage_delete": {
       try {
-        const key = getStringParam(params, "key");
+        const { key } = expectParams<StorageDeleteParams>(params);
         localStorage.removeItem(key);
         return { ok: true, value: null };
       } catch (err: unknown) {
@@ -312,11 +286,11 @@ export async function executeMainThreadCommand(
       }
     }
     case "fetch": {
-      return handleFetch(params);
+      return handleFetch(expectParams<FetchParams>(params));
     }
     case "sleep": {
-      const duration = getNumberParam(params, "duration", 0);
-      await new Promise((resolve) => setTimeout(resolve, duration));
+      const { duration } = expectParams<SleepParams>(params);
+      await new Promise((resolve) => setTimeout(resolve, Number(duration)));
       return { ok: true, value: null };
     }
     case "page_url": {
@@ -326,7 +300,7 @@ export async function executeMainThreadCommand(
       return { ok: true, value: document.title };
     }
     case "page_goto": {
-      const url = getStringParam(params, "url");
+      const { url } = expectParams<PageGotoParams>(params);
       window.location.href = url;
       return { ok: true, value: true };
     }
@@ -343,14 +317,8 @@ export async function executeMainThreadCommand(
       return { ok: true, value: true };
     }
     case "page_wait": {
-      const obj = asRecord(params);
-      const ms =
-        typeof obj.ms === "number"
-          ? obj.ms
-          : typeof obj.duration === "number"
-            ? obj.duration
-            : 1000;
-      await new Promise((resolve) => setTimeout(resolve, ms));
+      const { duration } = expectParams<PageWaitParams>(params);
+      await new Promise((resolve) => setTimeout(resolve, Number(duration)));
       return { ok: true, value: true };
     }
     case "page_click":
@@ -368,10 +336,10 @@ export async function executeMainThreadCommand(
     }
     case "page_snapshot":
     case "dom_snapshot": {
-      return handleDomSnapshot(params);
+      return handleDomSnapshot(expectParams<DomSnapshotParams>(params));
     }
     case "dom_format": {
-      return handleDomFormat(params);
+      return handleDomFormat(expectParams<DomFormatParams>(params));
     }
     case "page_close": {
       const obj = asRecord(params);
@@ -447,8 +415,8 @@ export async function executeMainThreadCommand(
     case "tab_scroll_to": {
       const tabId = extractTabId(params);
       const obj = asRecord(params);
-      const x = extractArg(params, 1, obj.x ?? 0);
-      const y = extractArg(params, 2, obj.y ?? 0);
+      const x = Number(extractArg(params, 1, obj.x ?? 0));
+      const y = Number(extractArg(params, 2, obj.y ?? 0));
       const refId = extractArg(params, 3, obj.refId ?? obj.ref_id);
       return sendMessageToTab(tabId, {
         action: "scrollTo",
@@ -465,9 +433,9 @@ export async function executeMainThreadCommand(
       );
       return executeInTab(
         tabId,
-        (code: string) => {
+        (code: unknown) => {
           // biome-ignore lint/security/noGlobalEval: intentional eval for tab.evaluate API
-          return eval(code);
+          return eval(String(code));
         },
         [String(script)],
       );
@@ -590,7 +558,7 @@ export async function executeMainThreadCommand(
 
           function inlineSnapshot(maxNodes: number) {
             const all = document.body.querySelectorAll("*");
-            const nodes: Array<Record<string, unknown>> = [];
+            const nodes: DomNode[] = [];
             const lines: string[] = [];
             for (let i = 0; i < all.length && nodes.length < maxNodes; i++) {
               const el = all[i];
@@ -601,10 +569,10 @@ export async function executeMainThreadCommand(
               if (role === "generic") continue;
               const refId = i + 1;
               el.setAttribute("data-ref-id", String(refId));
-              const node: Record<string, unknown> = { refId, role, tag };
+              const node: DomNode = { refId, role, tag };
               const name =
                 el.ariaLabel ||
-                el.title ||
+                (el as HTMLElement).title ||
                 el.textContent?.slice(0, 30) ||
                 "";
               if (name) node.name = name;
@@ -703,18 +671,13 @@ export async function executeMainThreadCommand(
 
 // ─── Fetch handler ───────────────────────────────────────────────
 
-async function handleFetch(params: unknown): Promise<unknown> {
+async function handleFetch(params: FetchParams): Promise<AsyncResponse<FetchValue>> {
   throwIfAborted();
-  const obj = asRecord(params);
-  const url = obj.url as string;
-  const method = (obj.method as string) || "GET";
-  const headers = obj.headers ?? {};
-  const body = obj.body ?? null;
-  const timeout = typeof obj.timeout === "number" ? obj.timeout : 30_000;
+  const { url, method, headers, body, timeout } = params;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout || 30_000);
+    const timeoutId = setTimeout(() => controller.abort(), Number(timeout) || 30_000);
     const fetchOpts: RequestInit = {
       method: method || "GET",
       headers:
@@ -768,10 +731,10 @@ async function handleFetch(params: unknown): Promise<unknown> {
 // ─── Tab script execution ──────────────────────────────────────
 
 async function executeInTab(
-  tabId: unknown,
+  tabId: number | null,
   func: (...args: unknown[]) => unknown,
   args: unknown[],
-): Promise<unknown> {
+): Promise<AsyncResponse> {
   throwIfAborted();
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
@@ -786,6 +749,16 @@ async function executeInTab(
   }
   try {
     const targetTab = typeof tabId === "number" ? tabId : null;
+    if (targetTab === null) {
+      return {
+        ok: false,
+        error: {
+          message: "tab_evaluate requires a valid tabId",
+          code: "E_MISSING_PARAM",
+          category: "resource",
+        },
+      };
+    }
     const results = await chrome.scripting.executeScript({
       target: { tabId: targetTab },
       func,
@@ -801,7 +774,7 @@ async function executeInTab(
   }
 }
 
-async function waitForTabLoad(tabId: unknown): Promise<unknown> {
+async function waitForTabLoad(tabId: number | null): Promise<AsyncResponse<boolean>> {
   throwIfAborted();
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
@@ -886,9 +859,9 @@ export function initExtensionListeners(): void {
   // Initialize activeTabId from current state
   chrome.tabs
     .query({ active: true, currentWindow: true })
-    .then((tabs: unknown) => {
+    .then((tabs: chrome.tabs.Tab[]) => {
       const t = Array.isArray(tabs) ? tabs : [];
-      const first = t[0] as Record<string, unknown> | undefined;
+      const first = t[0] as chrome.tabs.Tab | undefined;
       if (first && typeof first.id === "number") {
         activeTabId = first.id;
       }
@@ -906,9 +879,9 @@ export function removeExtensionListeners(): void {
 }
 
 async function sendMessageToTab(
-  tabId: unknown,
-  message: Record<string, unknown>,
-): Promise<unknown> {
+  tabId: number | null,
+  message: TabMessage,
+): Promise<AsyncResponse> {
   throwIfAborted();
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
@@ -1007,7 +980,7 @@ function extractRefId(params: unknown): string | undefined {
 async function handlePageAction(
   action: string,
   params: unknown,
-): Promise<unknown> {
+): Promise<AsyncResponse<null>> {
   const obj = asRecord(params);
   const refId = extractRefId(params);
   const element = refId ? getElementByRefId(refId) : null;
@@ -1038,7 +1011,7 @@ async function handlePageAction(
           ok: false,
           error: { message: `Element ${refId} not found`, code: "ENOTFOUND" },
         };
-      const value = (obj.value as string) || "";
+      const { value } = expectParams<PageFillParams>(params);
       if (
         element instanceof HTMLInputElement ||
         element instanceof HTMLTextAreaElement
@@ -1060,7 +1033,7 @@ async function handlePageAction(
           ok: false,
           error: { message: `Element ${refId} not found`, code: "ENOTFOUND" },
         };
-      const text = (obj.text as string) || "";
+      const { text } = expectParams<PageTypeParams>(params);
       if (
         element instanceof HTMLInputElement ||
         element instanceof HTMLTextAreaElement
@@ -1072,7 +1045,7 @@ async function handlePageAction(
       return { ok: true, value: null };
     }
     case "page_press": {
-      const key = (obj.key as string) || "";
+      const { key } = expectParams<PagePressParams>(params);
       const ev = new KeyboardEvent("keydown", { key, bubbles: true });
       document.dispatchEvent(ev);
       const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
@@ -1085,7 +1058,7 @@ async function handlePageAction(
           ok: false,
           error: { message: `Element ${refId} not found`, code: "ENOTFOUND" },
         };
-      const value = (obj.value as string) || "";
+      const { value } = expectParams<PageSelectParams>(params);
       if (element instanceof HTMLSelectElement) {
         element.value = value;
       } else {
@@ -1102,7 +1075,7 @@ async function handlePageAction(
           ok: false,
           error: { message: `Element ${refId} not found`, code: "ENOTFOUND" },
         };
-      const checked = typeof obj.checked === "boolean" ? obj.checked : true;
+      const { checked } = expectParams<PageCheckParams>(params);
       if (element instanceof HTMLInputElement && element.type === "checkbox") {
         element.checked = checked;
       } else {
@@ -1134,8 +1107,7 @@ async function handlePageAction(
       return { ok: true, value: null };
     }
     case "page_scroll": {
-      const direction = (obj.direction as string) || "down";
-      const amount = typeof obj.amount === "number" ? obj.amount : 300;
+      const { direction, amount } = expectParams<PageScrollParams>(params);
       window.scrollBy({
         top: direction === "down" ? amount : -amount,
         behavior: "smooth",
@@ -1161,16 +1133,13 @@ async function handlePageAction(
 
 // ─── DOM snapshot ──────────────────────────────────────────────
 
-async function handleDomSnapshot(params: unknown): Promise<unknown> {
+async function handleDomSnapshot(params: DomSnapshotParams): Promise<AsyncResponse<DomSnapshotValue>> {
   try {
     ensureDomSnapshot();
-    const obj = asRecord(params);
+    const { max_nodes, interactive_only } = params;
     const options = {
-      max_nodes: typeof obj.max_nodes === "number" ? obj.max_nodes : 500,
-      interactive_only:
-        typeof obj.interactive_only === "boolean"
-          ? obj.interactive_only
-          : false,
+      max_nodes,
+      interactive_only,
     };
     const snap = collectDocument(options);
     const text = formatSnapshot(snap, "compact-text");
@@ -1187,12 +1156,10 @@ async function handleDomSnapshot(params: unknown): Promise<unknown> {
   }
 }
 
-async function handleDomFormat(params: unknown): Promise<unknown> {
+async function handleDomFormat(params: DomFormatParams): Promise<AsyncResponse<string>> {
   try {
     ensureDomSnapshot();
-    const obj = asRecord(params);
-    const snapshot = obj.snapshot;
-    const format = typeof obj.format === "string" ? obj.format : "compact-text";
+    const { snapshot, format } = params;
     const text = formatSnapshot(snapshot, format);
     return { ok: true, value: text };
   } catch (err: unknown) {
@@ -1240,7 +1207,7 @@ function getElementRole(el: Element): string {
 async function handleHostCallAction(
   action: string,
   params: unknown,
-): Promise<unknown> {
+): Promise<AsyncResponse> {
   const handler = hostHandlers[action] ?? window.__hostHandlers?.[action];
   if (!handler) {
     return {
@@ -1270,10 +1237,7 @@ async function handleHostCallAction(
 
 // ─── Chrome error normalizer ───────────────────────────────────
 
-function normalizeChromeError(err: unknown): {
-  ok: false;
-  error: { message: string; code: string; category: string };
-} {
+function normalizeChromeError(err: unknown): { ok: false; error: AsyncError } {
   const msg = (err instanceof Error ? err.message : String(err)) || "";
   if (msg.includes("permission") || msg.includes("Permission")) {
     return {
@@ -1303,7 +1267,7 @@ function normalizeChromeError(err: unknown): {
 
 // ─── Chrome API dispatcher ─────────────────────────────────────
 
-async function handleChromeApi(command: Command): Promise<unknown> {
+async function handleChromeApi(command: Command): Promise<AsyncResponse> {
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
     return {
@@ -1344,28 +1308,28 @@ async function handleChromeApi(command: Command): Promise<unknown> {
         const tabId = firstRec.tabId || first;
         const updateProps = firstRec.update || second || {};
         result = await chrome.tabs.update(
-          typeof tabId === "number" ? tabId : null,
-          updateProps,
+          typeof tabId === "number" ? tabId : (null as unknown as number),
+          updateProps as any,
         );
         break;
       }
       case "chrome_tabs_remove": {
         const tabId = firstRec.tabId || firstRec.id || first;
-        await chrome.tabs.remove(tabId);
+        await chrome.tabs.remove(tabId as number);
         result = null;
         break;
       }
       case "chrome_tabs_get": {
         const tabId = firstRec.tabId || firstRec.id || first;
-        result = await chrome.tabs.get(tabId);
+        result = await chrome.tabs.get(tabId as number);
         break;
       }
       case "chrome_tabs_reload": {
         const tabId = firstRec.tabId || first;
         const reloadProps = firstRec.reload || second || {};
         await chrome.tabs.reload(
-          typeof tabId === "number" ? tabId : undefined,
-          reloadProps,
+          typeof tabId === "number" ? tabId : (undefined as unknown as number),
+          reloadProps as any,
         );
         result = null;
         break;
@@ -1373,7 +1337,7 @@ async function handleChromeApi(command: Command): Promise<unknown> {
       case "chrome_tabs_sendMessage": {
         const tabId = firstRec.tabId || first;
         const message = firstRec.message || second || {};
-        result = await chrome.tabs.sendMessage(tabId, message);
+        result = await chrome.tabs.sendMessage(tabId as number, message);
         break;
       }
       case "chrome_alarms_create": {
@@ -1391,22 +1355,22 @@ async function handleChromeApi(command: Command): Promise<unknown> {
         break;
       }
       case "chrome_action_setBadgeText": {
-        await chrome.action.setBadgeText(firstRec || {});
+        await chrome.action.setBadgeText((firstRec || {}) as any);
         result = null;
         break;
       }
       case "chrome_action_setBadgeBackgroundColor": {
-        await chrome.action.setBadgeBackgroundColor(firstRec || {});
+        await chrome.action.setBadgeBackgroundColor((firstRec || {}) as any);
         result = null;
         break;
       }
       case "chrome_action_setTitle": {
-        await chrome.action.setTitle(firstRec || {});
+        await chrome.action.setTitle((firstRec || {}) as any);
         result = null;
         break;
       }
       case "chrome_action_setIcon": {
-        result = await chrome.action.setIcon(firstRec || {});
+        result = await chrome.action.setIcon((firstRec || {}) as any);
         break;
       }
       case "chrome_contextMenus_create": {
@@ -1445,19 +1409,19 @@ async function handleChromeApi(command: Command): Promise<unknown> {
         break;
       }
       case "chrome_cookies_get": {
-        result = await chrome.cookies.get(firstRec || {});
+        result = await chrome.cookies.get((firstRec || {}) as any);
         break;
       }
       case "chrome_cookies_set": {
-        result = await chrome.cookies.set(firstRec || {});
+        result = await chrome.cookies.set((firstRec || {}) as any);
         break;
       }
       case "chrome_cookies_remove": {
-        result = await chrome.cookies.remove(firstRec || {});
+        result = await chrome.cookies.remove((firstRec || {}) as any);
         break;
       }
       case "chrome_cookies_getAll": {
-        result = await chrome.cookies.getAll(firstRec || {});
+        result = await chrome.cookies.getAll((firstRec || {}) as any);
         break;
       }
       case "chrome_bookmarks_search": {
@@ -1477,7 +1441,7 @@ async function handleChromeApi(command: Command): Promise<unknown> {
         break;
       }
       case "chrome_history_search": {
-        result = await chrome.history.search(firstRec || {});
+        result = await chrome.history.search((firstRec || {}) as any);
         break;
       }
       case "chrome_history_deleteUrl": {
@@ -1499,7 +1463,7 @@ async function handleChromeApi(command: Command): Promise<unknown> {
         break;
       }
       case "chrome_scripting_executeScript": {
-        result = await chrome.scripting.executeScript(firstRec || {});
+        result = await chrome.scripting.executeScript((firstRec || {}) as any);
         break;
       }
       default:

@@ -3,36 +3,25 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_lua_base::types::WasmAsyncError;
 use web_lua_base::types::WasmAsyncResponse;
+use web_lua_core::command_params::*;
 
-pub async fn execute_fetch(params: serde_json::Value) -> WasmAsyncResponse {
-    let url = params.get("url").and_then(|v| v.as_str()).unwrap_or("");
-    let method = params
-        .get("method")
-        .and_then(|v| v.as_str())
-        .unwrap_or("GET");
-    let timeout = params
-        .get("timeout")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(30_000);
-
+pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
     let window = web_sys::window().unwrap();
 
     let request_init = web_sys::RequestInit::new();
-    request_init.set_method(method);
+    request_init.set_method(&params.method);
 
     // Headers
-    if let Some(headers_obj) = params.get("headers").and_then(|v| v.as_object()) {
+    if !params.headers.is_empty() {
         let headers = web_sys::Headers::new().unwrap();
-        for (key, val) in headers_obj.iter() {
-            if let Some(val_str) = val.as_str() {
-                headers.append(key, val_str).ok();
-            }
+        for (key, val) in &params.headers {
+            headers.append(key, val).ok();
         }
         request_init.set_headers(&headers);
     }
 
     // Body
-    if let Some(body_str) = params.get("body").and_then(|v| v.as_str()) {
+    if let Some(body_str) = &params.body {
         request_init.set_body(&JsValue::from_str(body_str));
     }
 
@@ -53,14 +42,14 @@ pub async fn execute_fetch(params: serde_json::Value) -> WasmAsyncResponse {
                 .dyn_into::<js_sys::Function>()
                 .unwrap();
             let abort_fn = js_sys::Reflect::get(&ac, &"abort".into()).unwrap();
-            let _ = set_timeout.call2(&window, &abort_fn, &JsValue::from_f64(timeout as f64));
+            let _ = set_timeout.call2(&window, &abort_fn, &JsValue::from_f64(params.timeout as f64));
 
             Some(ac)
         }
         _ => None,
     };
 
-    let request = match web_sys::Request::new_with_str_and_init(url, &request_init) {
+    let request = match web_sys::Request::new_with_str_and_init(&params.url, &request_init) {
         Ok(r) => r,
         Err(e) => {
             return WasmAsyncResponse {
@@ -79,7 +68,7 @@ pub async fn execute_fetch(params: serde_json::Value) -> WasmAsyncResponse {
         Err(e) => {
             let is_timeout = format!("{:?}", e).contains("AbortError");
             let msg = if is_timeout {
-                format!("Request timed out after {}ms", timeout)
+                format!("Request timed out after {}ms", params.timeout)
             } else {
                 format!("Network error: {:?}", e)
             };
@@ -136,9 +125,7 @@ pub async fn execute_fetch(params: serde_json::Value) -> WasmAsyncResponse {
     }
 }
 
-pub async fn execute_sleep(params: serde_json::Value) -> WasmAsyncResponse {
-    let duration = params.get("duration").and_then(|v| v.as_u64()).unwrap_or(0);
-
+pub async fn execute_sleep(params: SleepParams) -> WasmAsyncResponse {
     let window = web_sys::window().unwrap();
     let promise = js_sys::Promise::new(
         &mut |resolve: js_sys::Function, _reject: js_sys::Function| {
@@ -146,7 +133,7 @@ pub async fn execute_sleep(params: serde_json::Value) -> WasmAsyncResponse {
                 .unwrap()
                 .dyn_into::<js_sys::Function>()
                 .unwrap();
-            let _ = set_timeout.call2(&window, &resolve, &JsValue::from_f64(duration as f64));
+            let _ = set_timeout.call2(&window, &resolve, &JsValue::from_f64(params.duration as f64));
         },
     );
 
@@ -159,9 +146,8 @@ pub async fn execute_sleep(params: serde_json::Value) -> WasmAsyncResponse {
     }
 }
 
-pub async fn execute_page_wait(params: serde_json::Value) -> WasmAsyncResponse {
-    let ms = params.get("ms").and_then(|v| v.as_u64()).unwrap_or(1000);
-    let _ = execute_sleep(serde_json::json!({ "duration": ms })).await;
+pub async fn execute_page_wait(params: PageWaitParams) -> WasmAsyncResponse {
+    let _ = execute_sleep(SleepParams { duration: params.ms }).await;
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::Bool(true)),
@@ -177,10 +163,9 @@ fn get_local_storage() -> Result<web_sys::Storage, String> {
         .ok_or("localStorage not available".into())
 }
 
-pub async fn execute_storage_get(params: serde_json::Value) -> WasmAsyncResponse {
-    let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("");
+pub async fn execute_storage_get(params: StorageGetParams) -> WasmAsyncResponse {
     match get_local_storage() {
-        Ok(storage) => match storage.get_item(key) {
+        Ok(storage) => match storage.get_item(&params.key) {
             Ok(Some(val)) => WasmAsyncResponse {
                 ok: true,
                 value: Some(serde_json::Value::String(val)),
@@ -211,11 +196,9 @@ pub async fn execute_storage_get(params: serde_json::Value) -> WasmAsyncResponse
     }
 }
 
-pub async fn execute_storage_set(params: serde_json::Value) -> WasmAsyncResponse {
-    let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("");
-    let value = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
+pub async fn execute_storage_set(params: StorageSetParams) -> WasmAsyncResponse {
     match get_local_storage() {
-        Ok(storage) => match storage.set_item(key, value) {
+        Ok(storage) => match storage.set_item(&params.key, &params.value) {
             Ok(_) => WasmAsyncResponse {
                 ok: true,
                 value: Some(serde_json::Value::Null),
@@ -241,10 +224,9 @@ pub async fn execute_storage_set(params: serde_json::Value) -> WasmAsyncResponse
     }
 }
 
-pub async fn execute_storage_delete(params: serde_json::Value) -> WasmAsyncResponse {
-    let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("");
+pub async fn execute_storage_delete(params: StorageDeleteParams) -> WasmAsyncResponse {
     match get_local_storage() {
-        Ok(storage) => match storage.remove_item(key) {
+        Ok(storage) => match storage.remove_item(&params.key) {
             Ok(_) => WasmAsyncResponse {
                 ok: true,
                 value: Some(serde_json::Value::Null),
@@ -395,10 +377,10 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
 
 // ─── DOM Snapshot ───────────────────────────────────────────────
 
-pub fn execute_dom_snapshot(params: serde_json::Value) -> WasmAsyncResponse {
+pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
     let options = serde_json::json!({
-        "interactive_only": params.get("interactive_only").and_then(|v| v.as_bool()).unwrap_or(false),
-        "max_nodes": params.get("max_nodes").and_then(|v| v.as_u64()).unwrap_or(500) as usize,
+        "interactive_only": params.interactive_only,
+        "max_nodes": params.max_nodes as usize,
     });
 
     let js_options = match serde_wasm_bindgen::to_value(&options) {
@@ -476,39 +458,22 @@ pub fn execute_dom_snapshot(params: serde_json::Value) -> WasmAsyncResponse {
     }
 }
 
-pub fn execute_dom_format(params: serde_json::Value) -> WasmAsyncResponse {
-    let snapshot = match params.get("snapshot") {
-        Some(s) => s,
-        None => {
+pub fn execute_dom_format(params: DomFormatParams) -> WasmAsyncResponse {
+    let snapshot = &params.snapshot;
+    let snap: dom_semantic_tree::model::TreeSnapshot = match serde_json::from_value(snapshot.clone()) {
+        Ok(s) => s,
+        Err(_) => {
             return WasmAsyncResponse {
                 ok: false,
                 value: None,
                 error: Some(WasmAsyncError {
-                    message: "dom_format requires snapshot argument".into(),
+                    message: "Failed to parse snapshot for formatting".into(),
                     code: "E_FORMAT".into(),
                 }),
             }
         }
     };
-    let format = params
-        .get("format")
-        .and_then(|v| v.as_str())
-        .unwrap_or("compact-text");
-    let snap: dom_semantic_tree::model::TreeSnapshot =
-        match serde_json::from_value(snapshot.clone()) {
-            Ok(s) => s,
-            Err(_) => {
-                return WasmAsyncResponse {
-                    ok: false,
-                    value: None,
-                    error: Some(WasmAsyncError {
-                        message: "Failed to parse snapshot for formatting".into(),
-                        code: "E_FORMAT".into(),
-                    }),
-                }
-            }
-        };
-    let text = dom_semantic_tree::format::format_snapshot(&snap, format);
+    let text = dom_semantic_tree::format::format_snapshot(&snap, &params.format);
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::String(text)),
@@ -517,13 +482,6 @@ pub fn execute_dom_format(params: serde_json::Value) -> WasmAsyncResponse {
 }
 
 // ─── Page Agent Actions ─────────────────────────────────────────
-
-fn extract_ref_id(params: &serde_json::Value) -> Option<&str> {
-    if let Some(s) = params.as_str() {
-        return Some(s);
-    }
-    params.get("refId").and_then(|v| v.as_str())
-}
 
 fn get_element_by_ref_id(ref_id: &str) -> Result<web_sys::Element, String> {
     let document = web_sys::window()
@@ -536,9 +494,8 @@ fn get_element_by_ref_id(ref_id: &str) -> Result<web_sys::Element, String> {
         .ok_or_else(|| format!("Element with ref_id '{}' not found", ref_id))
 }
 
-pub async fn execute_page_hover(params: serde_json::Value) -> WasmAsyncResponse {
-    let ref_id = extract_ref_id(&params).unwrap_or("");
-    match get_element_by_ref_id(ref_id) {
+pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
+    match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
             let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
                 "mouseenter",
@@ -562,7 +519,7 @@ pub async fn execute_page_hover(params: serde_json::Value) -> WasmAsyncResponse 
     }
 }
 
-pub async fn execute_page_unhover(_params: serde_json::Value) -> WasmAsyncResponse {
+pub async fn execute_page_unhover() -> WasmAsyncResponse {
     let document = match web_sys::window().and_then(|w| w.document()) {
         Some(d) => d,
         None => {
@@ -591,15 +548,7 @@ pub async fn execute_page_unhover(_params: serde_json::Value) -> WasmAsyncRespon
     }
 }
 
-pub async fn execute_page_scroll(params: serde_json::Value) -> WasmAsyncResponse {
-    let direction = params
-        .get("direction")
-        .and_then(|v| v.as_str())
-        .unwrap_or("down");
-    let amount = params
-        .get("amount")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(300.0);
+pub async fn execute_page_scroll(params: PageScrollParams) -> WasmAsyncResponse {
     let window = match web_sys::window() {
         Some(w) => w,
         None => {
@@ -613,12 +562,12 @@ pub async fn execute_page_scroll(params: serde_json::Value) -> WasmAsyncResponse
             }
         }
     };
-    let (dx, dy) = match direction {
-        "down" => (0.0, amount),
-        "up" => (0.0, -amount),
-        "left" => (-amount, 0.0),
-        "right" => (amount, 0.0),
-        _ => (0.0, amount),
+    let (dx, dy) = match params.direction.as_str() {
+        "down" => (0.0, params.amount),
+        "up" => (0.0, -params.amount),
+        "left" => (-params.amount, 0.0),
+        "right" => (params.amount, 0.0),
+        _ => (0.0, params.amount),
     };
     window.scroll_by_with_x_and_y(dx, dy);
     WasmAsyncResponse {
@@ -628,9 +577,8 @@ pub async fn execute_page_scroll(params: serde_json::Value) -> WasmAsyncResponse
     }
 }
 
-pub async fn execute_page_scroll_to(params: serde_json::Value) -> WasmAsyncResponse {
-    let ref_id = extract_ref_id(&params).unwrap_or("");
-    match get_element_by_ref_id(ref_id) {
+pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResponse {
+    match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
             element.scroll_into_view();
             WasmAsyncResponse {
@@ -650,9 +598,8 @@ pub async fn execute_page_scroll_to(params: serde_json::Value) -> WasmAsyncRespo
     }
 }
 
-pub async fn execute_page_dblclick(params: serde_json::Value) -> WasmAsyncResponse {
-    let ref_id = extract_ref_id(&params).unwrap_or("");
-    match get_element_by_ref_id(ref_id) {
+pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncResponse {
+    match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
             let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
                 "dblclick",
@@ -676,16 +623,14 @@ pub async fn execute_page_dblclick(params: serde_json::Value) -> WasmAsyncRespon
     }
 }
 
-pub async fn execute_page_type(params: serde_json::Value) -> WasmAsyncResponse {
-    let ref_id = extract_ref_id(&params).unwrap_or("");
-    let text = params.get("text").and_then(|v| v.as_str()).unwrap_or("");
-    match get_element_by_ref_id(ref_id) {
+pub async fn execute_page_type(params: PageTypeParams) -> WasmAsyncResponse {
+    match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
             if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
-                let new_val = format!("{}{}", input.value(), text);
+                let new_val = format!("{}{}", input.value(), params.text);
                 input.set_value(&new_val);
             } else if let Some(textarea) = element.dyn_ref::<web_sys::HtmlTextAreaElement>() {
-                let new_val = format!("{}{}", textarea.value(), text);
+                let new_val = format!("{}{}", textarea.value(), params.text);
                 textarea.set_value(&new_val);
             } else {
                 return WasmAsyncResponse {
@@ -714,8 +659,7 @@ pub async fn execute_page_type(params: serde_json::Value) -> WasmAsyncResponse {
     }
 }
 
-pub async fn execute_page_press(params: serde_json::Value) -> WasmAsyncResponse {
-    let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("");
+pub async fn execute_page_press(params: PagePressParams) -> WasmAsyncResponse {
     let document = match web_sys::window().and_then(|w| w.document()) {
         Some(d) => d,
         None => {
@@ -730,7 +674,7 @@ pub async fn execute_page_press(params: serde_json::Value) -> WasmAsyncResponse 
         }
     };
     let init = web_sys::KeyboardEventInit::new();
-    init.set_key(key);
+    init.set_key(&params.key);
     let event = web_sys::KeyboardEvent::new_with_keyboard_event_init_dict("keydown", &init);
     let _ = document.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
     WasmAsyncResponse {
@@ -740,13 +684,11 @@ pub async fn execute_page_press(params: serde_json::Value) -> WasmAsyncResponse 
     }
 }
 
-pub async fn execute_page_select(params: serde_json::Value) -> WasmAsyncResponse {
-    let ref_id = extract_ref_id(&params).unwrap_or("");
-    let value = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
-    match get_element_by_ref_id(ref_id) {
+pub async fn execute_page_select(params: PageSelectParams) -> WasmAsyncResponse {
+    match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
             if let Some(select) = element.dyn_ref::<web_sys::HtmlSelectElement>() {
-                select.set_value(value);
+                select.set_value(&params.value);
             } else {
                 return WasmAsyncResponse {
                     ok: false,
@@ -774,18 +716,11 @@ pub async fn execute_page_select(params: serde_json::Value) -> WasmAsyncResponse
     }
 }
 
-pub async fn execute_page_check(params: serde_json::Value) -> WasmAsyncResponse {
-    let ref_id = extract_ref_id(&params).unwrap_or("");
-    let checked = params
-        .get("checked")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true);
-    match get_element_by_ref_id(ref_id) {
+pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
+    match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
             if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
-                input.set_checked(checked);
-            } else if let Some(checkbox) = element.dyn_ref::<web_sys::HtmlInputElement>() {
-                checkbox.set_checked(checked);
+                input.set_checked(params.checked);
             } else {
                 return WasmAsyncResponse {
                     ok: false,
@@ -813,7 +748,7 @@ pub async fn execute_page_check(params: serde_json::Value) -> WasmAsyncResponse 
     }
 }
 
-pub async fn execute_storage_list(_params: serde_json::Value) -> WasmAsyncResponse {
+pub async fn execute_storage_list() -> WasmAsyncResponse {
     match get_local_storage() {
         Ok(storage) => {
             let len = storage.length().unwrap_or(0);

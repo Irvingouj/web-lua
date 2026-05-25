@@ -82,6 +82,12 @@ pub struct AsyncCommand {
     pub params: serde_json::Value,
 }
 
+impl AsyncCommand {
+    pub fn parse_params<T: serde::de::DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
+        serde_json::from_value(self.params.clone())
+    }
+}
+
 /// Response to an async command, passed to resume_cell.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsyncResponse {

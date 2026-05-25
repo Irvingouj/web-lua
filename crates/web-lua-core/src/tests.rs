@@ -1,11 +1,16 @@
+use crate::globals::{disable_dangerous_globals, register_host_globals, setup_strict_mode};
+use crate::json::{json_value_to_lua, lua_value_to_json, register_json_module};
 use crate::plugin::LuaPlugin;
-use crate::session::NotebookSession;
+use crate::session::{NotebookSession, SessionBuilder};
 use crate::state::HostState;
 use crate::types::{
-    AsyncCommand, CellError, CellStatus, GlobalVariable, RunResult,
+    AsyncCommand, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
 };
+use crate::utils::{classify_extern_error, format_value};
+use crate::web::register_web_module;
 use piccolo::{
-    Callback, CallbackReturn, Context, IntoValue, Table, Value,
+    Callback, CallbackReturn, Closure, Context, Executor, ExecutorMode, Fuel, IntoValue, Lua,
+    StashedExecutor, String as LuaString, Table, Value,
 };
 use serde_json;
 use std::cell::RefCell;
@@ -15,7 +20,6 @@ use ts_rs::TS;
 // ─── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
-#[allow(clippy::module_inception)]
 mod tests {
     use super::*;
 
@@ -32,6 +36,31 @@ mod tests {
         let cfg = ts_rs::Config::new().with_out_dir(workspace_root);
         CellError::export_all(&cfg).unwrap();
         RunResult::export_all(&cfg).unwrap();
+        crate::command_params::FetchParams::export_all(&cfg).unwrap();
+        crate::command_params::SleepParams::export_all(&cfg).unwrap();
+        crate::command_params::PageClickParams::export_all(&cfg).unwrap();
+        crate::command_params::PageDblClickParams::export_all(&cfg).unwrap();
+        crate::command_params::PageFillParams::export_all(&cfg).unwrap();
+        crate::command_params::PageTypeParams::export_all(&cfg).unwrap();
+        crate::command_params::PagePressParams::export_all(&cfg).unwrap();
+        crate::command_params::PageSelectParams::export_all(&cfg).unwrap();
+        crate::command_params::PageCheckParams::export_all(&cfg).unwrap();
+        crate::command_params::PageHoverParams::export_all(&cfg).unwrap();
+        crate::command_params::PageScrollParams::export_all(&cfg).unwrap();
+        crate::command_params::PageScrollToParams::export_all(&cfg).unwrap();
+        crate::command_params::PageGotoParams::export_all(&cfg).unwrap();
+        crate::command_params::PageWaitParams::export_all(&cfg).unwrap();
+        crate::command_params::StorageGetParams::export_all(&cfg).unwrap();
+        crate::command_params::StorageSetParams::export_all(&cfg).unwrap();
+        crate::command_params::StorageDeleteParams::export_all(&cfg).unwrap();
+        crate::command_params::DomSnapshotParams::export_all(&cfg).unwrap();
+        crate::command_params::DomFormatParams::export_all(&cfg).unwrap();
+        crate::command_params::TabClickParams::export_all(&cfg).unwrap();
+        crate::command_params::TabFillParams::export_all(&cfg).unwrap();
+        crate::command_params::TabEvaluateParams::export_all(&cfg).unwrap();
+        crate::command_params::TabBackParams::export_all(&cfg).unwrap();
+        crate::command_params::TabWaitForLoadParams::export_all(&cfg).unwrap();
+        crate::command_params::TabScrollToParams::export_all(&cfg).unwrap();
     }
 
     #[test]
@@ -1711,7 +1740,7 @@ mod tests {
             fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
                 let t = Table::new(&ctx);
                 let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-                    let val = if !stack.is_empty() {
+                    let val = if stack.len() > 0 {
                         match stack.get(0) {
                             Value::Integer(i) => i * 2,
                             other => {
@@ -1753,7 +1782,7 @@ mod tests {
             fn register(&self, ctx: Context, hs: Rc<RefCell<HostState>>) {
                 let hs_async = hs.clone();
                 let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
-                    let label = if !stack.is_empty() {
+                    let label = if stack.len() > 0 {
                         match stack.get(0) {
                             Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                             _ => "default".to_string(),
@@ -2071,3 +2100,12 @@ mod tests {
         assert_eq!(r2.stdout, vec!["AB"]);
     }
 }
+
+#[cfg(test)]
+mod debug_tests {
+    use ts_rs::TS;
+
+}
+
+
+

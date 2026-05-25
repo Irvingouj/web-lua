@@ -73,6 +73,12 @@ pub struct WasmAsyncCommand {
     pub params: serde_json::Value,
 }
 
+impl WasmAsyncCommand {
+    pub fn parse_params<T: serde::de::DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
+        serde_json::from_value(self.params.clone())
+    }
+}
+
 /// Result of running a single cell.
 #[derive(Debug, Clone, Serialize, Tsify)]
 #[tsify(into_wasm_abi)]

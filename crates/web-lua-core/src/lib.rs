@@ -1,4 +1,5 @@
 pub mod api_docs;
+pub mod command_params;
 pub mod globals;
 pub mod json;
 pub mod plugin;

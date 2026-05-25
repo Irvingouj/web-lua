@@ -110,19 +110,28 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             }
         }
 
+        let params = serde_json::json!({
+            "url": url,
+            "method": method,
+            "headers": headers,
+            "body": body,
+            "timeout": timeout,
+        });
+        let _validated: crate::command_params::FetchParams = match serde_json::from_value(params.clone()) {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = format!("Invalid fetch params built from Lua: {}", e);
+                return Err(msg.into_value(ctx).into());
+            }
+        };
+
         let mut hs = hs_fetch.borrow_mut();
         hs.async_call_counter += 1;
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
             action: "fetch".to_string(),
-            params: serde_json::json!({
-                "url": url,
-                "method": method,
-                "headers": headers,
-                "body": body,
-                "timeout": timeout,
-            }),
+            params,
         };
         hs.pending_async_command = Some(command);
 
@@ -343,13 +352,22 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             return Err(msg.into_value(ctx).into());
         };
 
+        let params = serde_json::json!({ "duration": duration });
+        let _validated: crate::command_params::SleepParams = match serde_json::from_value(params.clone()) {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = format!("Invalid sleep params built from Lua: {}", e);
+                return Err(msg.into_value(ctx).into());
+            }
+        };
+
         let mut hs = hs_sleep.borrow_mut();
         hs.async_call_counter += 1;
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
             action: "sleep".to_string(),
-            params: serde_json::json!({ "duration": duration }),
+            params,
         };
         hs.pending_async_command = Some(command);
 
@@ -436,6 +454,38 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     serde_json::json!({})
                 }
             };
+
+            // Defensive validation of params against typed structs
+            match action {
+                "storage_get" => {
+                    let _validated: crate::command_params::StorageGetParams = match serde_json::from_value(params.clone()) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let msg = format!("Invalid storage_get params built from Lua: {}", e);
+                            return Err(msg.into_value(ctx).into());
+                        }
+                    };
+                }
+                "storage_set" => {
+                    let _validated: crate::command_params::StorageSetParams = match serde_json::from_value(params.clone()) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let msg = format!("Invalid storage_set params built from Lua: {}", e);
+                            return Err(msg.into_value(ctx).into());
+                        }
+                    };
+                }
+                "storage_delete" => {
+                    let _validated: crate::command_params::StorageDeleteParams = match serde_json::from_value(params.clone()) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let msg = format!("Invalid storage_delete params built from Lua: {}", e);
+                            return Err(msg.into_value(ctx).into());
+                        }
+                    };
+                }
+                _ => {}
+            }
 
             let mut hs = hs_storage.borrow_mut();
             hs.async_call_counter += 1;
@@ -1339,6 +1389,14 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                 lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
             };
 
+            let _validated: crate::command_params::DomSnapshotParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid dom_snapshot params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_dom.borrow_mut();
             hs.async_call_counter += 1;
             let call_id = hs.async_call_counter;
@@ -1388,16 +1446,25 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                 "compact-text".to_string()
             };
 
+            let params = serde_json::json!({
+                "snapshot": snapshot,
+                "format": format,
+            });
+            let _validated: crate::command_params::DomFormatParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid dom_format params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_dom.borrow_mut();
             hs.async_call_counter += 1;
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
                 action: "dom_format".to_string(),
-                params: serde_json::json!({
-                    "snapshot": snapshot,
-                    "format": format,
-                }),
+                params,
             };
             hs.pending_async_command = Some(command);
 
@@ -1435,6 +1502,14 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
             };
+            let _validated: crate::command_params::DomSnapshotParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_snapshot params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
@@ -1477,12 +1552,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     .into_value(ctx)
                     .into());
             };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageClickParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_click params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_click".to_string(),
-                params: serde_json::json!({ "refId": ref_id }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1519,12 +1603,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     .into_value(ctx)
                     .into());
             };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageDblClickParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_dblclick params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_dblclick".to_string(),
-                params: serde_json::json!({ "refId": ref_id }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1568,12 +1661,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 return Err("page.fill requires a value argument".into_value(ctx).into());
             };
+            let params = serde_json::json!({ "refId": ref_id, "value": value });
+            let _validated: crate::command_params::PageFillParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_fill params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_fill".to_string(),
-                params: serde_json::json!({ "refId": ref_id, "value": value }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1618,12 +1720,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 return Err("page.type requires a text argument".into_value(ctx).into());
             };
+            let params = serde_json::json!({ "refId": ref_id, "text": text });
+            let _validated: crate::command_params::PageTypeParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_type params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_type".to_string(),
-                params: serde_json::json!({ "refId": ref_id, "text": text }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1658,12 +1769,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 return Err("page.press requires a key argument".into_value(ctx).into());
             };
+            let params = serde_json::json!({ "key": key });
+            let _validated: crate::command_params::PagePressParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_press params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_press".to_string(),
-                params: serde_json::json!({ "key": key }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1709,12 +1829,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     .into_value(ctx)
                     .into());
             };
+            let params = serde_json::json!({ "refId": ref_id, "value": value });
+            let _validated: crate::command_params::PageSelectParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_select params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_select".to_string(),
-                params: serde_json::json!({ "refId": ref_id, "value": value }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1760,12 +1889,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 true
             };
+            let params = serde_json::json!({ "refId": ref_id, "checked": checked });
+            let _validated: crate::command_params::PageCheckParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_check params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_check".to_string(),
-                params: serde_json::json!({ "refId": ref_id, "checked": checked }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1802,12 +1940,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     .into_value(ctx)
                     .into());
             };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageHoverParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_hover params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_hover".to_string(),
-                params: serde_json::json!({ "refId": ref_id }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1880,12 +2027,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 300.0
             };
+            let params = serde_json::json!({ "direction": direction, "amount": amount });
+            let _validated: crate::command_params::PageScrollParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_scroll params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_scroll".to_string(),
-                params: serde_json::json!({ "direction": direction, "amount": amount }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -1922,12 +2078,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
                     .into_value(ctx)
                     .into());
             };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageScrollToParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_scroll_to params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_scroll_to".to_string(),
-                params: serde_json::json!({ "refId": ref_id }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -2051,12 +2216,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 return Err("page.goto requires a URL argument".into_value(ctx).into());
             };
+            let params = serde_json::json!({ "url": url });
+            let _validated: crate::command_params::PageGotoParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_goto params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_goto".to_string(),
-                params: serde_json::json!({ "url": url }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
@@ -2171,7 +2345,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     // page.wait(ms) — async
     {
         let hs_page = host_state.clone();
-        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
             let ms = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::Integer(i) => i as u64,
@@ -2181,12 +2355,21 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
             } else {
                 1000
             };
+            let params = serde_json::json!({ "ms": ms });
+            let _validated: crate::command_params::PageWaitParams = match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = format!("Invalid page_wait params built from Lua: {}", e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
             let mut hs = hs_page.borrow_mut();
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
                 action: "page_wait".to_string(),
-                params: serde_json::json!({ "ms": ms }),
+                params,
             };
             hs.pending_async_command = Some(command);
             stack.clear();
