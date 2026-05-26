@@ -504,12 +504,43 @@ mod tests {
     #[test]
     fn test_string_rep() {
         let mut session = NotebookSession::new();
-        // string.rep may not be available in piccolo's stdlib; test gracefully
         let result = session.run_cell("print(string.rep(\"ab\", 3))", "");
-        if result.error.is_none() && !result.stdout.is_empty() {
-            assert_eq!(result.stdout[0], "ababab");
-        }
-        // If string.rep doesn't exist, that's a known limitation
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["ababab"]);
+        let r2 = session.run_cell("print(string.rep(\"x\", 2, \"-\"))", "");
+        assert_eq!(r2.stdout, vec!["x-x"]);
+        let r3 = session.run_cell("print(string.rep(\"a\", 0))", "");
+        assert_eq!(r3.stdout, vec![""]);
+    }
+
+    #[test]
+    fn test_string_find() {
+        let mut session = NotebookSession::new();
+        let r1 = session.run_cell("print(string.find(\"hello world\", \"world\"))", "");
+        assert!(r1.error.is_none(), "got error: {:?}", r1.error);
+        assert_eq!(r1.stdout, vec!["7\t11"]);
+        let r2 = session.run_cell("print(string.find(\"hello world\", \"o\", 5))", "");
+        assert_eq!(r2.stdout, vec!["5\t5"]);
+        let r3 = session.run_cell("print(string.find(\"hello\", \"z\"))", "");
+        assert_eq!(r3.stdout, vec!["nil"]);
+    }
+
+    #[test]
+    fn test_string_format() {
+        let mut session = NotebookSession::new();
+        let r1 = session.run_cell("print(string.format(\"%s %d\", \"hello\", 42))", "");
+        assert!(r1.error.is_none(), "got error: {:?}", r1.error);
+        assert_eq!(r1.stdout, vec!["hello 42"]);
+        let r2 = session.run_cell("print(string.format(\"hex: %x\", 255))", "");
+        assert_eq!(r2.stdout, vec!["hex: ff"]);
+        let r3 = session.run_cell("print(string.format(\"HEX: %X\", 255))", "");
+        assert_eq!(r3.stdout, vec!["HEX: FF"]);
+        let r4 = session.run_cell(r#"print(string.format("q: %q", "a\"b"))"#, "");
+        assert_eq!(r4.stdout, vec!["q: \"a\\\"b\""]);
+        let r5 = session.run_cell("print(string.format(\"%%\"))", "");
+        assert_eq!(r5.stdout, vec!["%"]);
+        let r6 = session.run_cell("print(string.format(\"%f\", 3.14))", "");
+        assert!(r6.stdout[0].contains("3.14"), "got: {:?}", r6.stdout);
     }
 
     // ── Math library ────────────────────────────────────────────
@@ -1598,6 +1629,53 @@ mod tests {
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
         assert_eq!(cmd.action.as_str(), "tab_create");
+    }
+
+    #[test]
+    fn test_tab_wait_for_load_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok = web.tab.wait_for_load(123)
+            print(ok)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "tab_wait_for_load");
+        assert_eq!(cmd.params, serde_json::json!(123));
+    }
+
+    #[test]
+    fn test_tab_wait_for_load_with_timeout() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok = web.tab.wait_for_load(123, 5000)
+            print(ok)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.params, serde_json::json!([123, 5000]));
+    }
+
+    #[test]
+    fn test_tab_wait_for_load_params_default_timeout() {
+        let params: crate::command_params::TabWaitForLoadParams =
+            serde_json::from_value(serde_json::json!({"tabId": 123})).unwrap();
+        assert_eq!(params.tab_id, 123);
+        assert_eq!(params.timeout, 30_000);
+    }
+
+    #[test]
+    fn test_tab_wait_for_load_params_custom_timeout() {
+        let params: crate::command_params::TabWaitForLoadParams =
+            serde_json::from_value(serde_json::json!({"tabId": 123, "timeout": 5000})).unwrap();
+        assert_eq!(params.tab_id, 123);
+        assert_eq!(params.timeout, 5_000);
     }
 
     #[test]
