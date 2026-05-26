@@ -199,7 +199,7 @@ mod tests {
         let mut session = make_session();
         let r1 = session.run_cell(r#"print(json.encode({a = 1}))"#, "");
         assert!(r1.error.is_none());
-        let r2 = session.run_cell(r#"print(crypto.sha256("test"):sub(1, 8))"#, "");
+        let r2 = session.run_cell(r#"print(string.sub(crypto.sha256("test"), 1, 8))"#, "");
         assert!(r2.error.is_none());
     }
 }

@@ -881,7 +881,7 @@ mod tests {
         let result = session.run_cell("local x = web.mock_async(\"test\")\nprint(x)", "");
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "mock_async");
+        assert_eq!(cmd.action.as_str(), "mock_async");
     }
 
     #[test]
@@ -1026,7 +1026,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "fetch");
+        assert_eq!(cmd.action.as_str(), "fetch");
         assert_eq!(cmd.params["url"], "https://example.com/api");
         assert_eq!(cmd.params["method"], "GET");
     }
@@ -1049,7 +1049,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "fetch");
+        assert_eq!(cmd.action.as_str(), "fetch");
         assert_eq!(cmd.params["method"], "POST");
         assert_eq!(cmd.params["timeout"], 5000);
     }
@@ -1452,7 +1452,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         assert!(result.pending_command.is_some());
-        assert_eq!(result.pending_command.unwrap().action, "sleep");
+        assert_eq!(result.pending_command.unwrap().action.as_str(), "sleep");
 
         // Resume with ok
         let resume_result = session.resume_cell(r#"{"ok": true, "value": null}"#);
@@ -1500,7 +1500,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "storage_get");
+        assert_eq!(cmd.action.as_str(), "storage_get");
         assert_eq!(cmd.params["key"], "mykey");
     }
 
@@ -1515,7 +1515,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "storage_set");
+        assert_eq!(cmd.action.as_str(), "storage_set");
         assert_eq!(cmd.params["key"], "mykey");
         assert_eq!(cmd.params["value"], "myvalue");
     }
@@ -1531,7 +1531,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "storage_delete");
+        assert_eq!(cmd.action.as_str(), "storage_delete");
         assert_eq!(cmd.params["key"], "mykey");
     }
 
@@ -1547,7 +1547,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "storage_list");
+        assert_eq!(cmd.action.as_str(), "storage_list");
     }
 
     #[test]
@@ -1582,7 +1582,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "tab_query");
+        assert_eq!(cmd.action.as_str(), "tab_query");
     }
 
     #[test]
@@ -1597,7 +1597,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "tab_create");
+        assert_eq!(cmd.action.as_str(), "tab_create");
     }
 
     #[test]
@@ -1612,7 +1612,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "cookies_get");
+        assert_eq!(cmd.action.as_str(), "cookies_get");
     }
 
     #[test]
@@ -1627,7 +1627,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "history_search");
+        assert_eq!(cmd.action.as_str(), "history_search");
     }
 
     #[test]
@@ -1642,7 +1642,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "bookmarks_search");
+        assert_eq!(cmd.action.as_str(), "bookmarks_search");
     }
 
     #[test]
@@ -1657,7 +1657,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "clipboard_read");
+        assert_eq!(cmd.action.as_str(), "clipboard_read");
     }
 
     #[test]
@@ -1671,7 +1671,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "notifications_create");
+        assert_eq!(cmd.action.as_str(), "notifications_create");
     }
 
     #[test]
@@ -1795,7 +1795,7 @@ mod tests {
                     hs.async_call_counter += 1;
                     let command = AsyncCommand {
                         call_id: hs.async_call_counter,
-                        action: format!("plugin_action_{}", label),
+                        action: crate::action::Action::Other(format!("plugin_action_{}", label)),
                         params: serde_json::json!({ "label": label }),
                     };
                     hs.pending_async_command = Some(command);
@@ -1823,7 +1823,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "plugin_action_hello");
+        assert_eq!(cmd.action.as_str(), "plugin_action_hello");
 
         // Resume with a value
         let resume = session.resume_cell(r#"{"ok": true, "value": "world"}"#);
@@ -1964,7 +1964,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "host_my_action");
+        assert_eq!(cmd.action.as_str(), "host_my_action");
         assert_eq!(cmd.params["key"], "value");
     }
 
@@ -1980,7 +1980,7 @@ mod tests {
         );
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
-        assert_eq!(cmd.action, "host_ping");
+        assert_eq!(cmd.action.as_str(), "host_ping");
     }
 
     #[test]

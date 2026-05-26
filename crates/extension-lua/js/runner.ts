@@ -1135,7 +1135,7 @@ async function handlePageAction(
 
 async function handleDomSnapshot(params: DomSnapshotParams): Promise<AsyncResponse<DomSnapshotValue>> {
   try {
-    ensureDomSnapshot();
+    await ensureDomSnapshot();
     const { max_nodes, interactive_only } = params;
     const options = {
       max_nodes,
@@ -1158,7 +1158,7 @@ async function handleDomSnapshot(params: DomSnapshotParams): Promise<AsyncRespon
 
 async function handleDomFormat(params: DomFormatParams): Promise<AsyncResponse<string>> {
   try {
-    ensureDomSnapshot();
+    await ensureDomSnapshot();
     const { snapshot, format } = params;
     const text = formatSnapshot(snapshot, format);
     return { ok: true, value: text };
