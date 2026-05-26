@@ -10,6 +10,33 @@ export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnaps
 export { registerHostHandler, registerHostHandlers } from "./registry.js";
 export { generateApiDocs };
 
+export interface LuaApiDoc {
+  namespace: string;
+  name: string;
+  action: string | null;
+  description: string;
+  params: {
+    name: string;
+    lua_type: string;
+    required: boolean;
+    description: string;
+  }[];
+  returns: {
+    lua_type: string;
+    description: string;
+  };
+  source: string;
+}
+
+/**
+ * Generate API documentation as a parsed JSON array.
+ * Returns structured docs so callers can filter, search, or
+ * transform the registry without manual JSON.parse.
+ */
+export function generateApiDocsJson(): LuaApiDoc[] {
+  return JSON.parse(generateApiDocs("json"));
+}
+
 export class WebSession {
   private raw: RawWebSession;
 
