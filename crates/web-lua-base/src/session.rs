@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::types::*;
 use web_lua_core::NotebookSession;
 
@@ -67,4 +69,70 @@ impl BaseSession {
         };
         self.inner.restore_pending_command(core_cmd);
     }
+}
+
+// ─── Shared async loop ──────────────────────────────────────────
+
+/// Run a cell and resolve all async yields via the provided handler.
+///
+/// The `handle_command` callback receives each yielded `WasmAsyncCommand`
+/// and must return a `WasmAsyncResponse` (or an error). The loop
+/// automatically serialises responses and resumes the Lua executor.
+///
+/// If `aborted` is provided, a `true` flag causes the loop to resume
+/// with an `E_ABORTED` error so the executor unwinds cleanly.
+pub async fn run_cell_async_loop<F, Fut>(
+    base: &mut BaseSession,
+    code: &str,
+    stdin: &str,
+    mut handle_command: F,
+    aborted: Option<&Cell<bool>>,
+) -> WasmRunResult
+where
+    F: FnMut(WasmAsyncCommand) -> Fut,
+    Fut: std::future::Future<Output = Result<WasmAsyncResponse, WasmAsyncError>>,
+{
+    let mut result = base.run_cell(code, stdin);
+
+    while result.status == WasmCellStatus::AsyncPending {
+        if let Some(flag) = aborted {
+            if flag.get() {
+                let err_json = serde_json::to_string(&WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Runner aborted".into(),
+                        code: "E_ABORTED".into(),
+                    }),
+                })
+                .unwrap_or_default();
+                result = base.resume_cell(&err_json);
+                continue;
+            }
+        }
+
+        let cmd = match result.pending_command.as_ref() {
+            Some(c) => c.clone(),
+            None => break,
+        };
+
+        let response = match handle_command(cmd).await {
+            Ok(r) => r,
+            Err(e) => {
+                let err_json = serde_json::to_string(&WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(e),
+                })
+                .unwrap_or_default();
+                result = base.resume_cell(&err_json);
+                continue;
+            }
+        };
+
+        let json = serde_json::to_string(&response).unwrap_or_default();
+        result = base.resume_cell(&json);
+    }
+
+    result
 }

@@ -116,51 +116,21 @@ sleep = web.sleep
     #[wasm_bindgen(js_name = runCellAsync)]
     pub async fn run_cell_async(&mut self, code: String, stdin: String) -> WasmRunResult {
         self.aborted.set(false);
-        let mut result = self.base.run_cell(&code, &stdin);
-
-        while result.status == WasmCellStatus::AsyncPending {
-            // Cooperative abort: if stop_with was called, resume with an error
-            // so the executor unwinds and the loop exits cleanly.
-            if self.aborted.get() {
-                let err_json = serde_json::to_string(&WasmAsyncResponse {
-                    ok: false,
-                    value: None,
-                    error: Some(WasmAsyncError {
-                        message: "Runner aborted".into(),
-                        code: "E_ABORTED".into(),
-                    }),
-                })
-                .unwrap_or_default();
-                result = self.base.resume_cell(&err_json);
-                continue;
-            }
-
-            let cmd = match result.pending_command {
-                Some(ref c) => c,
-                None => break,
-            };
-
-            let response = match self.handle_command(cmd).await {
-                Ok(r) => r,
-                Err(e) => {
-                    // Resume with error so Lua gets a clean failure
-                    let err_json = serde_json::to_string(&WasmAsyncResponse {
-                        ok: false,
-                        value: None,
-                        error: Some(WasmAsyncError {
-                            message: e,
-                            code: "E_UNSUPPORTED".into(),
-                        }),
+        let result = web_lua_base::run_cell_async_loop(
+            &mut self.base,
+            &code,
+            &stdin,
+            |cmd| async move {
+                WebSession::handle_command(&cmd)
+                    .await
+                    .map_err(|e| WasmAsyncError {
+                        message: e,
+                        code: "E_UNSUPPORTED".into(),
                     })
-                    .unwrap_or_default();
-                    result = self.base.resume_cell(&err_json);
-                    continue;
-                }
-            };
-
-            let json = serde_json::to_string(&response).unwrap_or_default();
-            result = self.base.resume_cell(&json);
-        }
+            },
+            Some(&self.aborted),
+        )
+        .await;
 
         // If we exited because of abort, reset state so the session is clean
         if self.aborted.get() {
@@ -173,10 +143,7 @@ sleep = web.sleep
 }
 
 impl WebSession {
-    async fn handle_command(
-        &mut self,
-        cmd: &WasmAsyncCommand,
-    ) -> Result<WasmAsyncResponse, String> {
+    async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
         use web_lua_core::action::Action;
         match Action::from(cmd.action.as_str()) {
             Action::Fetch => {

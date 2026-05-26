@@ -311,54 +311,42 @@ end
     /// them to the main-thread runner via `__extension_lua_relay`.
     #[wasm_bindgen(js_name = runCellAsync)]
     pub async fn run_cell_async(&mut self, code: String, stdin: String) -> CellResult {
-        let mut result = self.base.run_cell(&code, &stdin);
-
-        while result.status == WasmCellStatus::AsyncPending {
-            let cmd = match result.pending_command {
-                Some(ref c) => c,
-                None => break,
-            };
-
-            let response = match self.handle_command(cmd).await {
-                Ok(r) => {
-                    log_debug(&format!(
-                        "[ExtensionSession] async response: action={}",
-                        cmd.action
-                    ));
-                    r
-                }
-                Err(e) => {
-                    log_error(&format!(
-                        "[ExtensionSession] async relay error: action={}, err={}",
-                        cmd.action, e
-                    ));
-                    let err_json = serde_json::to_string(&WasmAsyncResponse {
-                        ok: false,
-                        value: None,
-                        error: Some(WasmAsyncError {
+        let result = web_lua_base::run_cell_async_loop(
+            &mut self.base,
+            &code,
+            &stdin,
+            |cmd| async move {
+                let action = cmd.action.clone();
+                match ExtensionSession::handle_command(&cmd).await {
+                    Ok(r) => {
+                        log_debug(&format!(
+                            "[ExtensionSession] async response: action={}",
+                            action
+                        ));
+                        Ok(r)
+                    }
+                    Err(e) => {
+                        log_error(&format!(
+                            "[ExtensionSession] async relay error: action={}, err={}",
+                            action, e
+                        ));
+                        Err(WasmAsyncError {
                             message: e,
                             code: "E_RELAY_ERROR".into(),
-                        }),
-                    })
-                    .unwrap_or_default();
-                    result = self.base.resume_cell(&err_json);
-                    continue;
+                        })
+                    }
                 }
-            };
-
-            let json = serde_json::to_string(&response).unwrap_or_default();
-            result = self.base.resume_cell(&json);
-        }
+            },
+            None,
+        )
+        .await;
 
         result.into()
     }
 }
 
 impl ExtensionSession {
-    async fn handle_command(
-        &mut self,
-        cmd: &WasmAsyncCommand,
-    ) -> Result<WasmAsyncResponse, String> {
+    async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
         // Serialize command to a JSON string, then parse to a JS object.
         // This avoids serde_wasm_bindgen's default map-to-JS-Map behavior,
         // ensuring serde_json::Value::Object becomes a plain JS Object.
