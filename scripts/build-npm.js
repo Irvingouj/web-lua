@@ -84,6 +84,10 @@ for (const file of [...pkg.wasm, ...pkg.extra]) {
 }
 
 // Patch worker URL in compiled output: .ts → .js
+// NOTE: tsc declaration emit sometimes captures the runtime `new URL(...)`
+// expression from our source. This is a pragmatic workaround — the proper fix
+// is to restructure Worker construction so the type declaration doesn't inline
+// the implementation detail. See maintainability review item 3.4.
 const indexJs = path.join(distDir, "index.js");
 const indexDts = path.join(distDir, "index.d.ts");
 if (fs.existsSync(indexJs)) {

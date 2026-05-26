@@ -97,6 +97,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
     case "stop": {
+      // Reject all pending async relays so their Promises don't dangle
+      for (const [relayId, reject] of pendingRelays) {
+        reject({
+          ok: false,
+          error: { message: "Worker stopped", code: "E_STOPPED" },
+        });
+        pendingRelays.delete(relayId);
+      }
       self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
       break;
     }

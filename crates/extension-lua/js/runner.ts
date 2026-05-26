@@ -439,8 +439,12 @@ export async function executeMainThreadCommand(
       return executeInTab(
         tabId,
         (code: unknown) => {
-          // biome-ignore lint/security/noGlobalEval: intentional eval for tab.evaluate API
-          return eval(String(code));
+          const codeStr = String(code);
+          if (typeof code !== "string") {
+            throw new Error("tab.evaluate requires a string argument");
+          }
+          // Use new Function to avoid capturing local scope (marginally safer than eval)
+          return new Function(codeStr)();
         },
         [String(script)],
       );

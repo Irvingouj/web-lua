@@ -89,6 +89,10 @@ export class ExtensionSession {
       readyReject(new Error(e.message));
     };
 
+    w.onmessageerror = (e: MessageEvent) => {
+      readyReject(new Error(`Worker message deserialization error: ${e.data}`));
+    };
+
     w.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       const msg = e.data;
       switch (msg.type) {

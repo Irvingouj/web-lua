@@ -157,8 +157,11 @@ const handlers = {
 
   evaluate: (params) => {
     const code = getStringParam(params, "code");
-    // biome-ignore lint/security/noGlobalEval: intentional eval for tab.evaluate API
-    return eval(code);
+    if (typeof code !== "string") {
+      throw new Error("evaluate requires a string argument");
+    }
+    // Use new Function to avoid capturing local scope (marginally safer than eval)
+    return new Function(code)();
   },
 
   back: () => {
