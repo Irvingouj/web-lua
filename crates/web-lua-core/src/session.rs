@@ -6,10 +6,7 @@ use crate::types::{
     AsyncCommand, AsyncResponse, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
 };
 use crate::utils::{classify_extern_error, format_value};
-use piccolo::{
-    Closure, Executor, ExecutorMode, Fuel, IntoValue, Lua,
-    StashedExecutor, Value,
-};
+use piccolo::{Closure, Executor, ExecutorMode, Fuel, IntoValue, Lua, StashedExecutor, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 

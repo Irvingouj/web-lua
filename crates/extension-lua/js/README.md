@@ -28,22 +28,80 @@ await vm.stopWith(runner);
 
 ## API
 
-- `ExtensionSession.init()` — Returns `[ExtensionSession, Promise<void>]`. Automatically spawns the Web Worker and starts the main-thread runner.
+- `ExtensionSession.init()` — Returns `[ExtensionSession, Promise<void>]`. Automatically spawns the Web Worker and starts the main-thread runner loop.
 - `vm.runCellAsync(code, stdin?)` — Execute Lua code. Returns `LuaRunResult`.
 - `vm.reset()` — Clear all Lua state.
 - `vm.stopWith(runner)` — Clean up: abort in-flight operations, remove Chrome listeners, terminate Worker, release resources.
 - `vm.inspectGlobals()` — Inspect all global variables.
 - `vm.setFuelLimit(limit)` — Set execution fuel limit.
 - `vm.loadLibrary(source)` — Load a Lua library.
+- `generateApiDocs()` — Generate API documentation as Markdown + JSON from the Rust source.
 
 ## Lua APIs available in extension environment
 
-- `tab.*` — Browser tab operations: `tab.open`, `tab.close`, `tab.current`, `tab.focus`, `tab.click`, `tab.fill`, `tab.snapshot`, `tab.evaluate`, `tab.fetch`
-- `chrome.*` — Chrome Extension APIs: `chrome.tabs`, `chrome.cookies`, `chrome.bookmarks`, `chrome.history`, `chrome.notifications`, etc.
-- `runtime.*` — Extension runtime: `runtime.fetch` (extension origin)
-- `page.*` — Side panel / popup self-environment
-- `sleep(ms)`
-- `host.call(action, params)` — Optional extension point
+### Tab helpers (injected aliases)
+
+| Alias | Maps to |
+|-------|---------|
+| `tab.open(url?)` | `chrome.tabs.create` |
+| `tab.current()` | `chrome.tabs.query({active, currentWindow})` |
+| `tab.focus(tab_id?)` | `chrome.tabs.update(id, {active})` |
+| `tab.url(tab_id?)` | `chrome.tabs.get(id)` → `.url` |
+| `tab.title(tab_id?)` | `chrome.tabs.get(id)` → `.title` |
+| `tab.reload(tab_id?)` | `chrome.tabs.reload(id)` |
+
+### Chrome Extension APIs
+
+- `chrome.tabs.*` — `query`, `create`, `update`, `remove`, `get`, `reload`, `sendMessage`
+- `chrome.cookies.*` — `get`, `set`, `remove`, `getAll`
+- `chrome.bookmarks.*` — `search`, `create`, `remove`
+- `chrome.history.*` — `search`, `deleteUrl`
+- `chrome.notifications.*` — `create`, `clear`
+- `chrome.runtime.*` — `sendMessage`
+- `chrome.scripting.*` — `executeScript`
+- `chrome.action.*` — `setBadgeText`, `setBadgeBackgroundColor`, `setTitle`, `setIcon`
+- `chrome.alarms.*` — `create`, `clear`
+- `chrome.contextMenus.*` — `create`, `remove`
+- `chrome.windows.*` — `getAll`, `create`, `update`, `remove`
+- `chrome.sidePanel.*` — `setOptions`
+
+### Runtime helpers (injected aliases)
+
+| Alias | Maps to |
+|-------|---------|
+| `runtime.fetch` | `web.fetch` |
+| `runtime.sleep` | `web.sleep` |
+| `runtime.storage` | `web.storage` |
+| `runtime.clipboard` | `web.clipboard` |
+| `runtime.notifications` | `web.notifications` |
+
+### Page & DOM (popup / side panel self-environment)
+
+- `page.url()` / `page.title()` / `page.snapshot()`
+- `page.click(ref_id)` / `page.dblclick(ref_id)` / `page.fill(ref_id, text)` / `page.type(ref_id, text)`
+- `page.press(key)` / `page.select(ref_id, value)` / `page.check(ref_id, checked?)`
+- `page.hover(ref_id)` / `page.unhover()`
+- `page.scroll(direction, amount)` / `page.scroll_to(ref_id)`
+- `page.goto(url)` / `page.back()` / `page.forward()` / `page.reload()`
+- `page.screenshot()` / `page.wait(ms)`
+- `page.fetch(url, opts?)` — Fetch using the active tab origin (wrapper for `tab.fetch`)
+- `dom.snapshot(opts?)` — Semantic DOM tree snapshot
+- `dom.format(snapshot, format?)` — Format snapshot to text
+
+### Utilities
+
+- `web.fetch(url, opts?)` — Generic HTTP fetch
+- `web.log(...)` — Log to browser console
+- `web.url.parse(url)` / `web.url.encode(params)`
+- `web.storage.get(key)` / `web.storage.set(key, value)` / `web.storage.delete(key)` / `web.storage.list()`
+- `web.clipboard.read()` / `web.clipboard.write(text)`
+- `web.notifications.create(id?, options)` / `web.notifications.clear(id)`
+- `web.cookies.get(details)` / `web.cookies.set(details)` / `web.cookies.delete(details)` / `web.cookies.list(filter?)`
+- `web.bookmarks.search(query)` / `web.bookmarks.create(bookmark)` / `web.bookmarks.delete(id)`
+- `web.history.search(query)` / `web.history.delete(url)`
+- `sleep(ms)` — Global alias for `web.sleep`
+- `runtime.inspect()` — Inspect all Lua globals
+- `host.call(action, params?)` — Optional extension point for JS handler registration
 
 ## Important Gotchas for Extension Developers
 
@@ -152,6 +210,10 @@ This package assumes Chrome Manifest V3 APIs (`chrome.scripting.executeScript`, 
 ### 12. Broad permissions trigger store review
 
 Using `host_permissions: ["<all_urls>"]` with `content_scripts.matches: ["<all_urls>"]` is a sensitive combination that often triggers manual review in the Chrome Web Store. Consider narrowing to specific domains if possible.
+
+## Auto-generated docs
+
+The package includes `API.md` and `api.json` in the crate root, generated automatically from Rust `lua_api_doc!` macros. These list every Lua function with parameter types, return shapes, and source locations.
 
 ## License
 

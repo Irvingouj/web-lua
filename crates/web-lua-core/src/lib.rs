@@ -1,3 +1,4 @@
+pub mod action;
 pub mod api_docs;
 pub mod command_params;
 pub mod globals;

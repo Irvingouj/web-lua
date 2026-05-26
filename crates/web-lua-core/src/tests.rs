@@ -2104,8 +2104,4 @@ mod tests {
 #[cfg(test)]
 mod debug_tests {
     use ts_rs::TS;
-
 }
-
-
-

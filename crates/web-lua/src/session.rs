@@ -177,24 +177,28 @@ impl WebSession {
         &mut self,
         cmd: &WasmAsyncCommand,
     ) -> Result<WasmAsyncResponse, String> {
-        match cmd.action.as_str() {
-            "fetch" => {
-                let params = cmd.parse_params::<FetchParams>()
+        use web_lua_core::action::Action;
+        match Action::from(cmd.action.as_str()) {
+            Action::Fetch => {
+                let params = cmd
+                    .parse_params::<FetchParams>()
                     .map_err(|e| format!("Invalid fetch params: {}", e))?;
                 Ok(execute_fetch(params).await)
             }
-            "sleep" => {
-                let params = cmd.parse_params::<SleepParams>()
+            Action::Sleep => {
+                let params = cmd
+                    .parse_params::<SleepParams>()
                     .map_err(|e| format!("Invalid sleep params: {}", e))?;
                 Ok(execute_sleep(params).await)
             }
-            "page_wait" => {
-                let params = cmd.parse_params::<PageWaitParams>()
+            Action::PageWait => {
+                let params = cmd
+                    .parse_params::<PageWaitParams>()
                     .map_err(|e| format!("Invalid page_wait params: {}", e))?;
                 Ok(execute_page_wait(params).await)
             }
 
-            "page_url" => {
+            Action::PageUrl => {
                 let window = web_sys::window().ok_or("No window available")?;
                 let href = window.location().href().map_err(|e| format!("{:?}", e))?;
                 Ok(WasmAsyncResponse {
@@ -203,7 +207,7 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_title" => {
+            Action::PageTitle => {
                 let document = web_sys::window()
                     .ok_or("No window available")?
                     .document()
@@ -215,8 +219,9 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_click" => {
-                let params = cmd.parse_params::<PageClickParams>()
+            Action::PageClick => {
+                let params = cmd
+                    .parse_params::<PageClickParams>()
                     .map_err(|e| format!("Invalid page_click params: {}", e))?;
                 let document = web_sys::window()
                     .ok_or("No window available")?
@@ -236,8 +241,9 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_fill" => {
-                let params = cmd.parse_params::<PageFillParams>()
+            Action::PageFill => {
+                let params = cmd
+                    .parse_params::<PageFillParams>()
                     .map_err(|e| format!("Invalid page_fill params: {}", e))?;
                 let document = web_sys::window()
                     .ok_or("No window available")?
@@ -260,8 +266,9 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_goto" => {
-                let params = cmd.parse_params::<PageGotoParams>()
+            Action::PageGoto => {
+                let params = cmd
+                    .parse_params::<PageGotoParams>()
                     .map_err(|e| format!("Invalid page_goto params: {}", e))?;
                 let window = web_sys::window().ok_or("No window available")?;
                 window
@@ -274,7 +281,7 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_back" => {
+            Action::PageBack => {
                 let window = web_sys::window().ok_or("No window available")?;
                 window
                     .history()
@@ -287,7 +294,7 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_forward" => {
+            Action::PageForward => {
                 let window = web_sys::window().ok_or("No window available")?;
                 window
                     .history()
@@ -300,7 +307,7 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_reload" => {
+            Action::PageReload => {
                 let window = web_sys::window().ok_or("No window available")?;
                 window.location().reload().map_err(|e| format!("{:?}", e))?;
                 Ok(WasmAsyncResponse {
@@ -309,17 +316,19 @@ impl WebSession {
                     error: None,
                 })
             }
-            "page_snapshot" | "dom_snapshot" => {
-                let params = cmd.parse_params::<DomSnapshotParams>()
+            Action::DomSnapshot | Action::PageSnapshot => {
+                let params = cmd
+                    .parse_params::<DomSnapshotParams>()
                     .map_err(|e| format!("Invalid snapshot params: {}", e))?;
                 Ok(execute_dom_snapshot(params))
             }
-            "dom_format" => {
-                let params = cmd.parse_params::<DomFormatParams>()
+            Action::DomFormat => {
+                let params = cmd
+                    .parse_params::<DomFormatParams>()
                     .map_err(|e| format!("Invalid dom_format params: {}", e))?;
                 Ok(execute_dom_format(params))
             }
-            "page_screenshot" => Ok(WasmAsyncResponse {
+            Action::PageScreenshot => Ok(WasmAsyncResponse {
                 ok: false,
                 value: None,
                 error: Some(WasmAsyncError {
@@ -327,132 +336,143 @@ impl WebSession {
                     code: "E_NOT_IMPLEMENTED".into(),
                 }),
             }),
-            "page_type" => {
-                let params = cmd.parse_params::<PageTypeParams>()
+            Action::PageType => {
+                let params = cmd
+                    .parse_params::<PageTypeParams>()
                     .map_err(|e| format!("Invalid page_type params: {}", e))?;
                 Ok(execute_page_type(params).await)
             }
-            "page_press" => {
-                let params = cmd.parse_params::<PagePressParams>()
+            Action::PagePress => {
+                let params = cmd
+                    .parse_params::<PagePressParams>()
                     .map_err(|e| format!("Invalid page_press params: {}", e))?;
                 Ok(execute_page_press(params).await)
             }
-            "page_select" => {
-                let params = cmd.parse_params::<PageSelectParams>()
+            Action::PageSelect => {
+                let params = cmd
+                    .parse_params::<PageSelectParams>()
                     .map_err(|e| format!("Invalid page_select params: {}", e))?;
                 Ok(execute_page_select(params).await)
             }
-            "page_check" => {
-                let params = cmd.parse_params::<PageCheckParams>()
+            Action::PageCheck => {
+                let params = cmd
+                    .parse_params::<PageCheckParams>()
                     .map_err(|e| format!("Invalid page_check params: {}", e))?;
                 Ok(execute_page_check(params).await)
             }
-            "page_hover" => {
-                let params = cmd.parse_params::<PageHoverParams>()
+            Action::PageHover => {
+                let params = cmd
+                    .parse_params::<PageHoverParams>()
                     .map_err(|e| format!("Invalid page_hover params: {}", e))?;
                 Ok(execute_page_hover(params).await)
             }
-            "page_unhover" => Ok(execute_page_unhover().await),
-            "page_scroll" => {
-                let params = cmd.parse_params::<PageScrollParams>()
+            Action::PageUnhover => Ok(execute_page_unhover().await),
+            Action::PageScroll => {
+                let params = cmd
+                    .parse_params::<PageScrollParams>()
                     .map_err(|e| format!("Invalid page_scroll params: {}", e))?;
                 Ok(execute_page_scroll(params).await)
             }
-            "page_scroll_to" => {
-                let params = cmd.parse_params::<PageScrollToParams>()
+            Action::PageScrollTo => {
+                let params = cmd
+                    .parse_params::<PageScrollToParams>()
                     .map_err(|e| format!("Invalid page_scroll_to params: {}", e))?;
                 Ok(execute_page_scroll_to(params).await)
             }
-            "page_dblclick" => {
-                let params = cmd.parse_params::<PageDblClickParams>()
+            Action::PageDblclick => {
+                let params = cmd
+                    .parse_params::<PageDblClickParams>()
                     .map_err(|e| format!("Invalid page_dblclick params: {}", e))?;
                 Ok(execute_page_dblclick(params).await)
             }
             // Extension-only APIs: return error in web context
-            "tab_query"
-            | "tab_create"
-            | "tab_activate"
-            | "tab_close"
-            | "tab_execute_script"
-            | "tab_click"
-            | "tab_fill"
-            | "tab_snapshot"
-            | "tab_scroll_to"
-            | "tab_evaluate"
-            | "tab_back"
-            | "tab_wait_for_load"
-            | "tab_fetch"
-            | "cookies_get"
-            | "cookies_set"
-            | "cookies_delete"
-            | "cookies_list"
-            | "history_search"
-            | "history_delete"
-            | "bookmarks_search"
-            | "bookmarks_create"
-            | "bookmarks_delete"
-            | "notifications_create"
-            | "notifications_clear"
-            | "clipboard_read"
-            | "clipboard_write"
-            | "chrome_runtime_sendMessage"
-            | "chrome_tabs_query"
-            | "chrome_tabs_create"
-            | "chrome_tabs_update"
-            | "chrome_tabs_remove"
-            | "chrome_tabs_get"
-            | "chrome_tabs_reload"
-            | "chrome_tabs_sendMessage"
-            | "chrome_alarms_create"
-            | "chrome_alarms_clear"
-            | "chrome_action_setBadgeText"
-            | "chrome_action_setBadgeBackgroundColor"
-            | "chrome_action_setTitle"
-            | "chrome_action_setIcon"
-            | "chrome_contextMenus_create"
-            | "chrome_contextMenus_remove"
-            | "chrome_windows_getAll"
-            | "chrome_windows_create"
-            | "chrome_windows_update"
-            | "chrome_windows_remove"
-            | "chrome_sidePanel_setOptions"
-            | "chrome_cookies_get"
-            | "chrome_cookies_set"
-            | "chrome_cookies_remove"
-            | "chrome_cookies_getAll"
-            | "chrome_bookmarks_search"
-            | "chrome_bookmarks_create"
-            | "chrome_bookmarks_remove"
-            | "chrome_history_search"
-            | "chrome_history_deleteUrl"
-            | "chrome_notifications_create"
-            | "chrome_notifications_clear"
-            | "chrome_scripting_executeScript"
-            | "page_close"
-            | "page_active_tab"
-            | "page_tabs"
-            | "page_switch"
-            | "page_new_tab" => Err(format!(
+            Action::TabQuery
+            | Action::TabCreate
+            | Action::TabActivate
+            | Action::TabClose
+            | Action::TabExecuteScript
+            | Action::TabClick
+            | Action::TabFill
+            | Action::TabSnapshot
+            | Action::TabScrollTo
+            | Action::TabEvaluate
+            | Action::TabBack
+            | Action::TabWaitForLoad
+            | Action::TabFetch
+            | Action::CookiesGet
+            | Action::CookiesSet
+            | Action::CookiesDelete
+            | Action::CookiesList
+            | Action::HistorySearch
+            | Action::HistoryDelete
+            | Action::BookmarksSearch
+            | Action::BookmarksCreate
+            | Action::BookmarksDelete
+            | Action::NotificationsCreate
+            | Action::NotificationsClear
+            | Action::ClipboardRead
+            | Action::ClipboardWrite
+            | Action::ChromeRuntimeSendMessage
+            | Action::ChromeTabsQuery
+            | Action::ChromeTabsCreate
+            | Action::ChromeTabsUpdate
+            | Action::ChromeTabsRemove
+            | Action::ChromeTabsGet
+            | Action::ChromeTabsReload
+            | Action::ChromeTabsSendMessage
+            | Action::ChromeAlarmsCreate
+            | Action::ChromeAlarmsClear
+            | Action::ChromeActionSetBadgeText
+            | Action::ChromeActionSetBadgeBackgroundColor
+            | Action::ChromeActionSetTitle
+            | Action::ChromeActionSetIcon
+            | Action::ChromeContextMenusCreate
+            | Action::ChromeContextMenusRemove
+            | Action::ChromeWindowsGetAll
+            | Action::ChromeWindowsCreate
+            | Action::ChromeWindowsUpdate
+            | Action::ChromeWindowsRemove
+            | Action::ChromeSidePanelSetOptions
+            | Action::ChromeCookiesGet
+            | Action::ChromeCookiesSet
+            | Action::ChromeCookiesRemove
+            | Action::ChromeCookiesGetAll
+            | Action::ChromeBookmarksSearch
+            | Action::ChromeBookmarksCreate
+            | Action::ChromeBookmarksRemove
+            | Action::ChromeHistorySearch
+            | Action::ChromeHistoryDeleteUrl
+            | Action::ChromeNotificationsCreate
+            | Action::ChromeNotificationsClear
+            | Action::ChromeScriptingExecuteScript
+            | Action::PageClose
+            | Action::PageActiveTab
+            | Action::PageTabs
+            | Action::PageSwitch
+            | Action::PageNewTab => Err(format!(
                 "{} is not available in web-lua context",
                 cmd.action
             )),
-            "storage_get" => {
-                let params = cmd.parse_params::<StorageGetParams>()
+            Action::StorageGet => {
+                let params = cmd
+                    .parse_params::<StorageGetParams>()
                     .map_err(|e| format!("Invalid storage_get params: {}", e))?;
                 Ok(execute_storage_get(params).await)
             }
-            "storage_set" => {
-                let params = cmd.parse_params::<StorageSetParams>()
+            Action::StorageSet => {
+                let params = cmd
+                    .parse_params::<StorageSetParams>()
                     .map_err(|e| format!("Invalid storage_set params: {}", e))?;
                 Ok(execute_storage_set(params).await)
             }
-            "storage_delete" => {
-                let params = cmd.parse_params::<StorageDeleteParams>()
+            Action::StorageDelete => {
+                let params = cmd
+                    .parse_params::<StorageDeleteParams>()
                     .map_err(|e| format!("Invalid storage_delete params: {}", e))?;
                 Ok(execute_storage_delete(params).await)
             }
-            "storage_list" => Ok(execute_storage_list().await),
-            "mock_async" => {
+            Action::StorageList => Ok(execute_storage_list().await),
+            Action::MockAsync => {
                 // Test-only: just return empty success
                 Ok(WasmAsyncResponse {
                     ok: true,
@@ -460,11 +480,26 @@ impl WebSession {
                     error: None,
                 })
             }
-            action if action.starts_with("host_") => {
-                let host_action = &action[5..];
-                Ok(execute_host_call(host_action, cmd.params.clone()).await)
+            Action::Host(host_action) => {
+                Ok(execute_host_call(host_action.as_str(), cmd.params.clone()).await)
             }
-            _ => Err(format!("Unknown action: {}", cmd.action)),
+            Action::Other(action) => Err(format!("Unknown action: {}", action)),
+            Action::RuntimeInspect => Err(format!(
+                "{} is not available in web-lua context",
+                cmd.action
+            )),
+            Action::UrlParse => Err(format!(
+                "{} is not available in web-lua context",
+                cmd.action
+            )),
+            Action::UrlEncode => Err(format!(
+                "{} is not available in web-lua context",
+                cmd.action
+            )),
+            Action::WebLog => Err(format!(
+                "{} is not available in web-lua context",
+                cmd.action
+            )),
         }
     }
 }

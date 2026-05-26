@@ -42,7 +42,11 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
                 .dyn_into::<js_sys::Function>()
                 .unwrap();
             let abort_fn = js_sys::Reflect::get(&ac, &"abort".into()).unwrap();
-            let _ = set_timeout.call2(&window, &abort_fn, &JsValue::from_f64(params.timeout as f64));
+            let _ = set_timeout.call2(
+                &window,
+                &abort_fn,
+                &JsValue::from_f64(params.timeout as f64),
+            );
 
             Some(ac)
         }
@@ -133,7 +137,11 @@ pub async fn execute_sleep(params: SleepParams) -> WasmAsyncResponse {
                 .unwrap()
                 .dyn_into::<js_sys::Function>()
                 .unwrap();
-            let _ = set_timeout.call2(&window, &resolve, &JsValue::from_f64(params.duration as f64));
+            let _ = set_timeout.call2(
+                &window,
+                &resolve,
+                &JsValue::from_f64(params.duration as f64),
+            );
         },
     );
 
@@ -147,7 +155,10 @@ pub async fn execute_sleep(params: SleepParams) -> WasmAsyncResponse {
 }
 
 pub async fn execute_page_wait(params: PageWaitParams) -> WasmAsyncResponse {
-    let _ = execute_sleep(SleepParams { duration: params.ms }).await;
+    let _ = execute_sleep(SleepParams {
+        duration: params.ms,
+    })
+    .await;
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::Bool(true)),
@@ -460,19 +471,20 @@ pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
 
 pub fn execute_dom_format(params: DomFormatParams) -> WasmAsyncResponse {
     let snapshot = &params.snapshot;
-    let snap: dom_semantic_tree::model::TreeSnapshot = match serde_json::from_value(snapshot.clone()) {
-        Ok(s) => s,
-        Err(_) => {
-            return WasmAsyncResponse {
-                ok: false,
-                value: None,
-                error: Some(WasmAsyncError {
-                    message: "Failed to parse snapshot for formatting".into(),
-                    code: "E_FORMAT".into(),
-                }),
+    let snap: dom_semantic_tree::model::TreeSnapshot =
+        match serde_json::from_value(snapshot.clone()) {
+            Ok(s) => s,
+            Err(_) => {
+                return WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Failed to parse snapshot for formatting".into(),
+                        code: "E_FORMAT".into(),
+                    }),
+                }
             }
-        }
-    };
+        };
     let text = dom_semantic_tree::format::format_snapshot(&snap, &params.format);
     WasmAsyncResponse {
         ok: true,

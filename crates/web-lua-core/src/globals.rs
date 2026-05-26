@@ -3,10 +3,7 @@ use crate::state::HostState;
 use crate::types::CellError;
 use crate::utils::format_value;
 use crate::web::register_web_module;
-use piccolo::{
-    Callback, CallbackReturn, Context, IntoValue,
-    String as LuaString, Table, Value,
-};
+use piccolo::{Callback, CallbackReturn, Context, IntoValue, String as LuaString, Table, Value};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;

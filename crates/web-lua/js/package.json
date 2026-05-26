@@ -1,6 +1,6 @@
 {
   "name": "@pi-oxide/web-lua",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Web-based Lua runtime with DOM and fetch APIs",
   "type": "module",
   "main": "index.ts",
