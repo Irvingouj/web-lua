@@ -450,6 +450,12 @@
         "lua_type": "number",
         "required": true,
         "description": "Target tab ID"
+      },
+      {
+        "name": "timeout",
+        "lua_type": "number",
+        "required": false,
+        "description": "Timeout in milliseconds (default 30000)"
       }
     ],
     "returns": {

@@ -993,6 +993,7 @@ Wait for a tab to finish loading.
 **Parameters**
 
 - `tab_id` (`number`, required): Target tab ID
+- `timeout` (`number`, optional): Timeout in milliseconds (default 30000)
 
 **Returns** `boolean`: Whether the tab loaded
 

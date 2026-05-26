@@ -68,4 +68,4 @@ export type TabFillParams = { tabId: bigint, refId: string, value: string, };
 
 export type TabScrollToParams = { tabId: bigint, x: number, y: number, refId: string | null, };
 
-export type TabWaitForLoadParams = { tabId: bigint, };
+export type TabWaitForLoadParams = { tabId: bigint, timeout: bigint, };
