@@ -1,6 +1,5 @@
 use crate::utils::format_value;
 use piccolo::{Callback, CallbackReturn, Context, IntoValue, String as LuaString, Table, Value};
-use serde_json;
 
 // ─── JSON Module ──────────────────────────────────────────────────
 

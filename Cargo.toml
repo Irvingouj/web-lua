@@ -22,4 +22,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 url = "2"
-dom-semantic-tree = { path = "crates/dom-semantic-tree", features = ["wasm"] }
+dom-semantic-tree = { path = "crates/dom-semantic-tree" }

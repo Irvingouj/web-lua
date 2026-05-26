@@ -1,14 +1,14 @@
 pub mod action;
 pub mod api_docs;
 pub mod command_params;
-pub mod globals;
-pub mod json;
+pub(crate) mod globals;
+pub(crate) mod json;
 pub mod plugin;
 pub mod session;
-pub mod state;
+pub(crate) mod state;
 pub mod types;
-pub mod utils;
-pub mod web;
+pub(crate) mod utils;
+pub(crate) mod web;
 
 #[cfg(test)]
 pub mod tests;
