@@ -257,8 +257,8 @@ export class ExtensionSession {
     // Wait for the runner to settle (catches rejection if any)
     try {
       await runner;
-    } catch {
-      // runner may reject; ignore
+    } catch (e) {
+      logger.warn("ExtensionSession runner rejected during stop:", e);
     }
   }
 

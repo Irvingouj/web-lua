@@ -12,10 +12,6 @@ fn default_timeout() -> u64 {
     30_000
 }
 
-fn default_sleep_duration() -> u64 {
-    1000
-}
-
 fn default_wait_ms() -> u64 {
     1000
 }

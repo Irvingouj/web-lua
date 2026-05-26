@@ -14,14 +14,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 
-const rustBinDir = path.join(
-  process.env.HOME,
-  ".rustup/toolchains/stable-aarch64-apple-darwin/bin",
-);
+// Dynamically discover Rust toolchain via rustup, with fallback to PATH.
+let rustBinDir = "";
+try {
+  const rustcPath = execSync("rustup which rustc", {
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "ignore"],
+  }).trim();
+  rustBinDir = path.dirname(rustcPath);
+} catch {
+  // rustup not available — rely on cargo/rustc already in PATH
+}
 const env = {
   ...process.env,
-  PATH: `${rustBinDir}:${process.env.PATH}`,
-  RUSTC: path.join(rustBinDir, "rustc"),
+  PATH: rustBinDir ? `${rustBinDir}:${process.env.PATH}` : process.env.PATH,
+  ...(rustBinDir ? { RUSTC: path.join(rustBinDir, "rustc") } : {}),
 };
 
 function run(cmd, cwd = rootDir) {
@@ -39,21 +46,21 @@ const targets = [
     crate: "web-lua",
     wasm: "web_lua.wasm",
     outDir: "crates/web-lua/pkg",
-    bundleScript: "crates/web-lua/scripts/bundle-wasm.js",
+    cratePrefix: "web_lua",
   },
   {
     name: "extension-lua",
     crate: "extension-lua",
     wasm: "extension_lua.wasm",
     outDir: "crates/extension-lua/pkg",
-    bundleScript: "crates/extension-lua/scripts/bundle-wasm.js",
+    cratePrefix: "extension_lua",
   },
   {
     name: "dom-semantic-tree",
     crate: "dom-semantic-tree",
     wasm: "dom_semantic_tree.wasm",
     outDir: "crates/dom-semantic-tree/pkg",
-    bundleScript: "crates/dom-semantic-tree/scripts/bundle-wasm.js",
+    cratePrefix: "dom_semantic_tree",
   },
 ];
 
@@ -77,9 +84,9 @@ async function buildTarget(target) {
     rootDir,
   );
 
-  const bundleScript = path.join(rootDir, target.bundleScript);
+  const bundleScript = path.join(rootDir, "scripts/bundle-wasm.js");
   if (fs.existsSync(bundleScript)) {
-    run(`node ${bundleScript} ${target.outDir}`, rootDir);
+    run(`node ${bundleScript} ${target.outDir} ${target.cratePrefix}`, rootDir);
   }
 
   // Generate API docs by loading the self-contained WASM module in Node.js

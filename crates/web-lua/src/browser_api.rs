@@ -5,15 +5,41 @@ use web_lua_base::types::WasmAsyncError;
 use web_lua_base::types::WasmAsyncResponse;
 use web_lua_core::command_params::*;
 
+fn no_window_response() -> WasmAsyncResponse {
+    WasmAsyncResponse {
+        ok: false,
+        value: None,
+        error: Some(WasmAsyncError {
+            message: "DOM APIs not available in this context".into(),
+            code: "E_NO_WINDOW".into(),
+        }),
+    }
+}
+
 pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
-    let window = web_sys::window().unwrap();
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return no_window_response(),
+    };
 
     let request_init = web_sys::RequestInit::new();
     request_init.set_method(&params.method);
 
     // Headers
     if !params.headers.is_empty() {
-        let headers = web_sys::Headers::new().unwrap();
+        let headers = match web_sys::Headers::new() {
+            Ok(h) => h,
+            Err(_) => {
+                return WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: "Failed to create Headers object".into(),
+                        code: "E_HEADERS".into(),
+                    }),
+                }
+            }
+        };
         for (key, val) in &params.headers {
             headers.append(key, val).ok();
         }
@@ -130,7 +156,10 @@ pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
 }
 
 pub async fn execute_sleep(params: SleepParams) -> WasmAsyncResponse {
-    let window = web_sys::window().unwrap();
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return no_window_response(),
+    };
     let promise = js_sys::Promise::new(
         &mut |resolve: js_sys::Function, _reject: js_sys::Function| {
             let set_timeout = js_sys::Reflect::get(&window, &"setTimeout".into())
@@ -509,11 +538,23 @@ fn get_element_by_ref_id(ref_id: &str) -> Result<web_sys::Element, String> {
 pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
     match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
-            let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
+            let event = match web_sys::MouseEvent::new_with_mouse_event_init_dict(
                 "mouseenter",
                 &web_sys::MouseEventInit::new(),
-            );
-            let _ = element.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
+            ) {
+                Ok(e) => e,
+                Err(e) => {
+                    return WasmAsyncResponse {
+                        ok: false,
+                        value: None,
+                        error: Some(WasmAsyncError {
+                            message: format!("{:?}", e),
+                            code: "E_AGENT".into(),
+                        }),
+                    }
+                }
+            };
+            let _ = element.dispatch_event(&event);
             WasmAsyncResponse {
                 ok: true,
                 value: Some(serde_json::Value::Bool(true)),
@@ -547,11 +588,12 @@ pub async fn execute_page_unhover() -> WasmAsyncResponse {
     };
     // Dispatch mouseleave on body to clear any hover
     if let Some(body) = document.body() {
-        let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
+        if let Ok(event) = web_sys::MouseEvent::new_with_mouse_event_init_dict(
             "mouseleave",
             &web_sys::MouseEventInit::new(),
-        );
-        let _ = body.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
+        ) {
+            let _ = body.dispatch_event(&event);
+        }
     }
     WasmAsyncResponse {
         ok: true,
@@ -613,11 +655,23 @@ pub async fn execute_page_scroll_to(params: PageScrollToParams) -> WasmAsyncResp
 pub async fn execute_page_dblclick(params: PageDblClickParams) -> WasmAsyncResponse {
     match get_element_by_ref_id(&params.ref_id) {
         Ok(element) => {
-            let event = web_sys::MouseEvent::new_with_mouse_event_init_dict(
+            let event = match web_sys::MouseEvent::new_with_mouse_event_init_dict(
                 "dblclick",
                 &web_sys::MouseEventInit::new(),
-            );
-            let _ = element.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
+            ) {
+                Ok(e) => e,
+                Err(e) => {
+                    return WasmAsyncResponse {
+                        ok: false,
+                        value: None,
+                        error: Some(WasmAsyncError {
+                            message: format!("{:?}", e),
+                            code: "E_AGENT".into(),
+                        }),
+                    }
+                }
+            };
+            let _ = element.dispatch_event(&event);
             WasmAsyncResponse {
                 ok: true,
                 value: Some(serde_json::Value::Bool(true)),
@@ -687,8 +741,20 @@ pub async fn execute_page_press(params: PagePressParams) -> WasmAsyncResponse {
     };
     let init = web_sys::KeyboardEventInit::new();
     init.set_key(&params.key);
-    let event = web_sys::KeyboardEvent::new_with_keyboard_event_init_dict("keydown", &init);
-    let _ = document.dispatch_event(&event.map_err(|e| format!("{:?}", e)).unwrap());
+    let event = match web_sys::KeyboardEvent::new_with_keyboard_event_init_dict("keydown", &init) {
+        Ok(e) => e,
+        Err(e) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("{:?}", e),
+                    code: "E_AGENT".into(),
+                }),
+            }
+        }
+    };
+    let _ = document.dispatch_event(&event);
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::Bool(true)),

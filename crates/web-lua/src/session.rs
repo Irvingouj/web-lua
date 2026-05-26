@@ -94,7 +94,7 @@ sleep = web.sleep
 
     /// Load a Lua library by executing its source code.
     pub fn load_library(&mut self, source: &str) -> WasmRunResult {
-        self.base.load_library(source).into()
+        self.base.load_library(source)
     }
 
     /// Inspect all global variables in the current Lua state.
@@ -168,7 +168,7 @@ sleep = web.sleep
             self.aborted.set(false);
         }
 
-        result.into()
+        result
     }
 }
 

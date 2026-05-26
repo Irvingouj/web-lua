@@ -22,7 +22,7 @@ if (window.__luaNotebookContentScriptInjected) {
 window.__luaNotebookContentScriptInjected = true;
 
 function getElementByRefId(refId) {
-  return document.querySelector(`[data-ref-id='${refId}']`);
+  return document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
 }
 
 function asRecord(obj) {

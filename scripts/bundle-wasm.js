@@ -3,15 +3,21 @@
  * Post-process wasm-bindgen output to create a self-contained JS module.
  * Base64-embeds the .wasm binary and auto-calls initSync() so consumers
  * don't need to handle a separate file or initialization.
+ *
+ * Usage: node scripts/bundle-wasm.js <pkgDir> <cratePrefix>
+ *   pkgDir      — wasm-bindgen output directory (e.g. crates/web-lua/pkg)
+ *   cratePrefix — snake_case crate name used in file names (e.g. web_lua)
  */
 
 import fs from 'fs';
 import path from 'path';
 
-const pkgDir = process.argv[2] || 'crates/extension-lua/pkg';
-const wasmPath = path.join(pkgDir, 'extension_lua_bg.wasm');
-const jsPath = path.join(pkgDir, 'extension_lua.js');
-const dtsPath = path.join(pkgDir, 'extension_lua.d.ts');
+const pkgDir = process.argv[2] || 'crates/web-lua/pkg';
+const cratePrefix = process.argv[3] || path.basename(path.dirname(pkgDir)).replace(/-/g, '_');
+
+const wasmPath = path.join(pkgDir, `${cratePrefix}_bg.wasm`);
+const jsPath = path.join(pkgDir, `${cratePrefix}.js`);
+const dtsPath = path.join(pkgDir, `${cratePrefix}.d.ts`);
 
 if (!fs.existsSync(wasmPath)) {
     console.error('WASM file not found:', wasmPath);
@@ -32,7 +38,9 @@ let js = fs.readFileSync(jsPath, 'utf-8');
 
 // Remove the default URL fallback that tries to fetch the separate .wasm file.
 js = js.replace(
-    /if \(module_or_path === undefined\) \{\s*module_or_path = new URL\('extension_lua_bg\.wasm', import\.meta\.url\);\s*\}/,
+    new RegExp(
+        `if \\(module_or_path === undefined\\) \\{\\s*module_or_path = new URL\\('${cratePrefix}_bg\\.wasm', import\\.meta\\.url\\);\\s*\\}`
+    ),
     `// Self-contained: WASM is base64-embedded below`
 );
 
@@ -60,9 +68,9 @@ if (fs.existsSync(wasmPath + '.d.ts')) {
 // Copy bundled JS and .d.ts into js/ directory for self-contained packaging
 const jsDir = path.resolve(pkgDir, '../js');
 if (fs.existsSync(jsDir)) {
-    fs.copyFileSync(jsPath, path.join(jsDir, 'extension_lua.js'));
+    fs.copyFileSync(jsPath, path.join(jsDir, `${cratePrefix}.js`));
     if (fs.existsSync(dtsPath)) {
-        fs.copyFileSync(dtsPath, path.join(jsDir, 'extension_lua.d.ts'));
+        fs.copyFileSync(dtsPath, path.join(jsDir, `${cratePrefix}.d.ts`));
     }
     console.log(`Copied bundled files to ${jsDir}`);
 }

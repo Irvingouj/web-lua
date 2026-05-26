@@ -27,8 +27,8 @@ export class WebSession {
     this.raw.stopWith();
     try {
       await runner;
-    } catch {
-      // runner may reject; ignore
+    } catch (e) {
+      console.warn("WebSession runner rejected during stop:", e);
     }
   }
 

@@ -134,6 +134,11 @@ export function registerHostHandlers(handlers: Record<string, HostHandler>) {
 // ─── Typed params helper ───────────────────────────────────────
 
 function expectParams<T>(params: unknown): T {
+  if (typeof params !== "object" || params === null || Array.isArray(params)) {
+    throw new Error(
+      `Expected params object, got ${params === null ? "null" : Array.isArray(params) ? "array" : typeof params}`
+    );
+  }
   return params as T;
 }
 
@@ -483,7 +488,7 @@ export async function executeMainThreadCommand(
           const controller = new AbortController();
           const timeoutId = setTimeout(
             () => controller.abort(),
-            timeoutNum || 30_000,
+            timeoutNum,
           );
           const fetchOpts: RequestInit = {
             method: methodStr || "GET",
@@ -677,7 +682,7 @@ async function handleFetch(params: FetchParams): Promise<AsyncResponse<FetchValu
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), Number(timeout) || 30_000);
+    const timeoutId = setTimeout(() => controller.abort(), Number(timeout) ?? 30_000);
     const fetchOpts: RequestInit = {
       method: method || "GET",
       headers:
@@ -968,7 +973,7 @@ async function sendMessageToTab(
 // APIs which relay commands to the content script via sendMessageToTab.
 
 function getElementByRefId(refId: string): Element | null {
-  return document.querySelector(`[data-ref-id='${refId}']`);
+  return document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
 }
 
 function extractRefId(params: unknown): string | undefined {
