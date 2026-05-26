@@ -142,6 +142,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     doc: "Wait for a tab to finish loading.",
     params: [
     tab_id: "number", required, "Target tab ID",
+    timeout: "number", optional, "Timeout in milliseconds (default 30000)",
     ],
     returns: "boolean" => "Whether the tab loaded",
     );

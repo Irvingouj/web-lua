@@ -254,6 +254,8 @@ pub struct TabBackParams {
 pub struct TabWaitForLoadParams {
     #[serde(rename = "tabId")]
     pub tab_id: u64,
+    #[serde(default = "default_timeout", rename = "timeout")]
+    pub timeout: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

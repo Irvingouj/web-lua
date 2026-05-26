@@ -458,7 +458,10 @@ export async function executeMainThreadCommand(
     }
     case "tab_wait_for_load": {
       const tabId = extractTabId(params);
-      return waitForTabLoad(tabId);
+      const obj = asRecord(params);
+      const timeoutArg = extractArg(params, 1, obj.timeout);
+      const timeout = typeof timeoutArg === "number" ? timeoutArg : 30_000;
+      return waitForTabLoad(tabId, timeout);
     }
     case "tab_fetch": {
       const tabId = extractTabId(params);
@@ -783,7 +786,10 @@ async function executeInTab(
   }
 }
 
-async function waitForTabLoad(tabId: number | null): Promise<AsyncResponse<boolean>> {
+async function waitForTabLoad(
+  tabId: number | null,
+  timeoutMs: number = 30_000,
+): Promise<AsyncResponse<boolean>> {
   throwIfAborted();
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
@@ -825,7 +831,7 @@ async function waitForTabLoad(tabId: number | null): Promise<AsyncResponse<boole
       setTimeout(() => {
         chrome.tabs.onUpdated.removeListener(listener);
         reject(new Error("Timeout waiting for tab load"));
-      }, 30_000);
+      }, timeoutMs);
     });
     return { ok: true, value: true };
   } catch (err: unknown) {
