@@ -32,7 +32,7 @@ pub struct SessionBuilder {
 impl Default for SessionBuilder {
     fn default() -> Self {
         Self {
-            fuel_limit: 8192,
+            fuel_limit: 1_000_000,
             plugins: Vec::new(),
             lua_libraries: Vec::new(),
         }
