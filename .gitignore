@@ -18,6 +18,7 @@ crates/web-lua/js/web_lua.js
 crates/web-lua/js/web_lua.d.ts
 crates/extension-lua/js/extension_lua.js
 crates/extension-lua/js/extension_lua.d.ts
+crates/*/js/dist/
 web/public/dom_snapshot_wasm.js
 web/public/dom_snapshot_wasm_bg.wasm
 .claude/

@@ -5,14 +5,15 @@
 
 import type { CellResult, WasmGlobalsSnapshot } from "./extension_lua.js";
 import { generateApiDocs } from "./extension_lua.js";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 import {
   executeMainThreadCommand,
   registerHostHandler,
   registerHostHandlers,
   removeExtensionListeners,
   setRunnerAbortController,
-} from "./runner";
+} from "./runner.js";
+import type { Command } from "./runner.js";
 
 export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
 export { registerHostHandler, registerHostHandlers, generateApiDocs };
@@ -22,6 +23,7 @@ interface WorkerMessage {
   id?: string;
   code?: string;
   stdin?: string;
+  source?: string;
   command?: unknown;
   data?: unknown;
   result?: unknown;
@@ -72,7 +74,7 @@ export class ExtensionSession {
       readyReject = reject;
     });
 
-    let cleanupDone: () => void;
+    let cleanupDone: () => void = () => {};
     const runnerPromise = new Promise<void>((resolve) => {
       cleanupDone = resolve;
     });
@@ -137,7 +139,7 @@ export class ExtensionSession {
         if (!msg.id || !msg.command) break;
         const action = (msg.command as Record<string, unknown>)?.action;
         logger.debug("[ExtensionSession] asyncRelay action:", action, "id:", msg.id);
-        executeMainThreadCommand(msg.command)
+        executeMainThreadCommand(msg.command as Command)
           .then((result) => {
             logger.debug("[ExtensionSession] asyncRelayResult action:", action, "resultType:", typeof result);
             this.worker?.postMessage({

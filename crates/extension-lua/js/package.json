@@ -1,26 +1,17 @@
 {
   "name": "@pi-oxide/extension-lua",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Chrome Extension Lua runtime with tab, chrome, and runtime APIs",
   "type": "module",
-  "main": "index.ts",
-  "types": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "index.ts",
-    "runner.ts",
-    "worker.ts",
-    "logger.ts",
-    "extension_lua.js",
-    "extension_lua.d.ts",
-    "content-script.js",
-    "manifest.json",
-    "background.js",
-    "README.md",
-    "API.md",
-    "api.json"
+    "dist",
+    "README.md"
   ],
   "scripts": {
-    "prepublishOnly": "cd ../../../ && node scripts/build.js extension"
+    "build": "node ../../../scripts/build-npm.js extension",
+    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js extension"
   },
   "dependencies": {
     "@pi-oxide/dom-semantic-tree": "^0.1.0"

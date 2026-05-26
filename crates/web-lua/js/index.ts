@@ -7,7 +7,7 @@ import type { CellResult, WasmGlobalsSnapshot } from "./web_lua.js";
 import wasmInit, { WebSession as RawWebSession, generateApiDocs } from "./web_lua.js";
 
 export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
-export { registerHostHandler, registerHostHandlers } from "./registry";
+export { registerHostHandler, registerHostHandlers } from "./registry.js";
 export { generateApiDocs };
 
 export class WebSession {
@@ -41,7 +41,7 @@ export class WebSession {
   }
 
   inspectGlobals(): WasmGlobalsSnapshot {
-    return this.raw.inspectGlobals();
+    return this.raw.inspect_globals();
   }
 
   setFuelLimit(limit: number): void {

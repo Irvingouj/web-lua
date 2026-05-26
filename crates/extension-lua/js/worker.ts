@@ -1,7 +1,7 @@
 // Web Worker for extension-lua
 // Loads extension-lua WASM, defines __extension_lua_relay, and communicates with main thread.
 
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 import init, { ExtensionSession, setLogLevel as setWasmLogLevel } from "./extension_lua.js";
 
 let session: ExtensionSession | null = null;
@@ -116,7 +116,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "inspectGlobals": {
       try {
-        const snap = session.inspectGlobals();
+        const snap = session.inspect_globals();
         self.postMessage({ type: "result", id: msg.id, data: snap });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -126,7 +126,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "loadLibrary": {
       try {
-        const result = session.loadLibrary(msg.source);
+        const result = session.load_library(msg.source);
         self.postMessage({ type: "result", id: msg.id, data: result });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);

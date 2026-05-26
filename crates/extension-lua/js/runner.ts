@@ -2,7 +2,7 @@
 // Main-thread command executor for extension-lua runner
 // Handles all commands relayed from the extension Worker.
 
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 import {
   init as initDomSnapshot,
   collectDocument,
@@ -65,7 +65,7 @@ import type {
   TabBackParams,
   TabWaitForLoadParams,
   TabScrollToParams,
-} from "../../../web/src/types/generated";
+} from "./generated.js";
 
 declare global {
   interface Window {
@@ -77,7 +77,7 @@ declare global {
 
 type HostHandler = (params: unknown) => Promise<unknown>;
 
-interface Command {
+export interface Command {
   action: string;
   params: unknown;
 }

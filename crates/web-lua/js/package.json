@@ -1,21 +1,17 @@
 {
   "name": "@pi-oxide/web-lua",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Web-based Lua runtime with DOM and fetch APIs",
   "type": "module",
-  "main": "index.ts",
-  "types": "index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "index.ts",
-    "registry.ts",
-    "web_lua.js",
-    "web_lua.d.ts",
-    "README.md",
-    "API.md",
-    "api.json"
+    "dist",
+    "README.md"
   ],
   "scripts": {
-    "prepublishOnly": "cd ../../../ && node scripts/build.js web"
+    "build": "node ../../../scripts/build-npm.js web",
+    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js web"
   },
   "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
 }
