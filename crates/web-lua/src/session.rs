@@ -7,6 +7,7 @@ use crate::browser_api::{
 };
 use std::cell::Cell;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 use web_lua_base::types::*;
 use web_lua_base::BaseSession;
 use web_lua_core::command_params::*;
@@ -42,12 +43,24 @@ impl WebSession {
         // Inject Lua aliases for consistent API surface
         let _ = session.base.load_library(
             r#"
+page.go = page.goto
 page.fetch = web.fetch
 sleep = web.sleep
 "#,
         );
 
         // Register injected alias metadata
+        web_lua_core::lua_api_doc!(
+            namespace: "page",
+            name: "go",
+            action: "",
+            doc: "Navigate to a URL (alias for page.goto).",
+            source: "injected_lua",
+            params: [
+                url: "string", required, "URL to navigate to",
+            ],
+            returns: "nil" => "None",
+        );
         web_lua_core::lua_api_doc!(
             namespace: "page",
             name: "fetch",
@@ -142,6 +155,38 @@ sleep = web.sleep
     }
 }
 
+fn find_element_by_label(document: &web_sys::Document, query: &str) -> Option<web_sys::Element> {
+    let lower_query = query.to_lowercase().trim().to_string();
+    if lower_query.is_empty() {
+        return None;
+    }
+    let elements = document
+        .query_selector_all("input, textarea, select, button, a, [role='button'], [role='link']")
+        .ok()?;
+    for i in 0..elements.length() {
+        if let Some(node) = elements.item(i) {
+            if let Ok(el) = node.dyn_into::<web_sys::Element>() {
+                if let Some(aria_label) = el.get_attribute("aria-label") {
+                    if aria_label.to_lowercase().trim() == lower_query {
+                        return Some(el);
+                    }
+                }
+                if let Some(input) = el.dyn_ref::<web_sys::HtmlInputElement>() {
+                    if input.placeholder().to_lowercase().trim() == lower_query {
+                        return Some(el);
+                    }
+                }
+                if let Some(text) = el.text_content() {
+                    if text.to_lowercase().trim() == lower_query {
+                        return Some(el);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 impl WebSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
         use web_lua_core::action::Action;
@@ -197,6 +242,7 @@ impl WebSession {
                 let element = document
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
                     .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
                 element
                     .dyn_ref::<web_sys::HtmlElement>()
@@ -219,6 +265,7 @@ impl WebSession {
                 let element = document
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
                     .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
                     input.set_value(&params.value);
@@ -310,7 +357,15 @@ impl WebSession {
                 let params = cmd
                     .parse_params::<DomSnapshotParams>()
                     .map_err(|e| format!("Invalid snapshot params: {}", e))?;
-                Ok(execute_dom_snapshot(params))
+                let mut resp = execute_dom_snapshot(params);
+                if let Some(ref mut value) = resp.value {
+                    if let Some(serde_json::Value::Object(ref mut map)) = value.get_mut("data") {
+                        if let Some(nodes) = map.get("nodes").cloned() {
+                            map.insert("elements".to_string(), nodes);
+                        }
+                    }
+                }
+                Ok(resp)
             }
             Action::DomFormat => {
                 let params = cmd
@@ -330,7 +385,54 @@ impl WebSession {
                 let params = cmd
                     .parse_params::<PageTypeParams>()
                     .map_err(|e| format!("Invalid page_type params: {}", e))?;
-                Ok(execute_page_type(params).await)
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let element = document
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+                    .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+                    input.set_value(&params.text);
+                } else {
+                    return Err("Element is not an input".into());
+                }
+                let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+                let _ = element.dispatch_event(&event);
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Null),
+                    error: None,
+                })
+            }
+            Action::PageAppend => {
+                let params = cmd
+                    .parse_params::<PageAppendParams>()
+                    .map_err(|e| format!("Invalid page_append params: {}", e))?;
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let element = document
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+                    .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+                    let current = input.value();
+                    input.set_value(&format!("{}{}", current, params.text));
+                } else {
+                    return Err("Element is not an input".into());
+                }
+                let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+                let _ = element.dispatch_event(&event);
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Null),
+                    error: None,
+                })
             }
             Action::PagePress => {
                 let params = cmd
@@ -374,6 +476,354 @@ impl WebSession {
                     .parse_params::<PageDblClickParams>()
                     .map_err(|e| format!("Invalid page_dblclick params: {}", e))?;
                 Ok(execute_page_dblclick(params).await)
+            }
+            Action::PageFind => {
+                let params = cmd
+                    .parse_params::<PageFindParams>()
+                    .map_err(|e| format!("Invalid page_find params: {}", e))?;
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let elements = document
+                    .query_selector_all(&params.selector)
+                    .map_err(|e| format!("{:?}", e))?;
+                let mut results = Vec::new();
+                for i in 0..elements.length() {
+                    if let Some(el) = elements.item(i) {
+                        if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                            let tag = el.tag_name();
+                            let ref_id = el.get_attribute("data-ref-id").unwrap_or_default();
+                            let text = el
+                                .text_content()
+                                .unwrap_or_default()
+                                .chars()
+                                .take(100)
+                                .collect::<String>();
+                            results.push(serde_json::json!({
+                                "tag": tag,
+                                "refId": ref_id,
+                                "text": text,
+                            }));
+                        }
+                    }
+                }
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Array(results)),
+                    error: None,
+                })
+            }
+            Action::PageWaitFor => {
+                let params = cmd
+                    .parse_params::<PageWaitForParams>()
+                    .map_err(|e| format!("Invalid page_wait_for params: {}", e))?;
+                let window = web_sys::window().ok_or("No window available")?;
+                let document = window.document().ok_or("No document available")?;
+                let start = js_sys::Date::now();
+                let timeout = params.timeout as f64;
+                let interval_ms = 100.0;
+
+                loop {
+                    if let Ok(Some(_)) = document.query_selector(&params.selector) {
+                        return Ok(WasmAsyncResponse {
+                            ok: true,
+                            value: Some(serde_json::Value::Bool(true)),
+                            error: None,
+                        });
+                    }
+                    let elapsed = js_sys::Date::now() - start;
+                    if elapsed >= timeout {
+                        return Ok(WasmAsyncResponse {
+                            ok: false,
+                            value: None,
+                            error: Some(WasmAsyncError {
+                                message: format!(
+                                    "Timeout waiting for selector: {}",
+                                    params.selector
+                                ),
+                                code: "E_TIMEOUT".into(),
+                            }),
+                        });
+                    }
+                    // Sleep for interval_ms using setTimeout
+                    let promise = js_sys::Promise::new(
+                        &mut |resolve: js_sys::Function, _reject: js_sys::Function| {
+                            let set_timeout = js_sys::Reflect::get(&window, &"setTimeout".into())
+                                .unwrap()
+                                .dyn_into::<js_sys::Function>()
+                                .unwrap();
+                            let _ = set_timeout.call2(
+                                &window,
+                                &resolve,
+                                &JsValue::from_f64(interval_ms),
+                            );
+                        },
+                    );
+                    let _ = JsFuture::from(promise).await;
+                }
+            }
+            Action::PageExtract => {
+                let params = cmd
+                    .parse_params::<PageExtractParams>()
+                    .map_err(|e| format!("Invalid page_extract params: {}", e))?;
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let mut result = serde_json::Map::new();
+                for field in &params.fields {
+                    match field.as_str() {
+                        "title" => {
+                            result.insert(
+                                "title".to_string(),
+                                serde_json::Value::String(document.title()),
+                            );
+                        }
+                        "url" => {
+                            let href = web_sys::window()
+                                .ok_or("No window available")?
+                                .location()
+                                .href()
+                                .map_err(|e| format!("{:?}", e))?;
+                            result.insert("url".to_string(), serde_json::Value::String(href));
+                        }
+                        "headings" => {
+                            let headings = document
+                                .query_selector_all("h1, h2, h3, h4, h5, h6")
+                                .map_err(|e| format!("{:?}", e))?;
+                            let mut list = Vec::new();
+                            for i in 0..headings.length() {
+                                if let Some(el) = headings.item(i) {
+                                    if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                                        list.push(serde_json::json!({
+                                            "tag": el.tag_name(),
+                                            "text": el.text_content().unwrap_or_default().trim().to_string(),
+                                        }));
+                                    }
+                                }
+                            }
+                            result.insert("headings".to_string(), serde_json::Value::Array(list));
+                        }
+                        "links" => {
+                            let links = document
+                                .query_selector_all("a[href]")
+                                .map_err(|e| format!("{:?}", e))?;
+                            let mut list = Vec::new();
+                            for i in 0..links.length() {
+                                if let Some(el) = links.item(i) {
+                                    if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                                        list.push(serde_json::json!({
+                                            "href": el.get_attribute("href").unwrap_or_default(),
+                                            "text": el.text_content().unwrap_or_default().trim().to_string(),
+                                        }));
+                                    }
+                                }
+                            }
+                            result.insert("links".to_string(), serde_json::Value::Array(list));
+                        }
+                        "text" => {
+                            let body_text = document
+                                .body()
+                                .and_then(|b| b.text_content())
+                                .unwrap_or_default()
+                                .trim()
+                                .chars()
+                                .take(500)
+                                .collect::<String>();
+                            result.insert("text".to_string(), serde_json::Value::String(body_text));
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Object(result)),
+                    error: None,
+                })
+            }
+            // sidepanel.* synonyms in web-lua (same visible page)
+            Action::SidepanelSnapshotText => {
+                let params = cmd
+                    .parse_params::<DomSnapshotParams>()
+                    .map_err(|e| format!("Invalid sidepanel_snapshot params: {}", e))?;
+                let resp = execute_dom_snapshot(params);
+                if let Some(ref value) = resp.value {
+                    if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
+                        return Ok(WasmAsyncResponse {
+                            ok: true,
+                            value: Some(serde_json::Value::String(text.to_string())),
+                            error: None,
+                        });
+                    }
+                }
+                Ok(resp)
+            }
+            Action::SidepanelSnapshotData => {
+                let params = cmd
+                    .parse_params::<DomSnapshotParams>()
+                    .map_err(|e| format!("Invalid sidepanel_snapshot_data params: {}", e))?;
+                let mut resp = execute_dom_snapshot(params);
+                if let Some(ref mut value) = resp.value {
+                    if let Some(serde_json::Value::Object(ref mut map)) = value.get_mut("data") {
+                        if let Some(nodes) = map.get("nodes").cloned() {
+                            map.insert("elements".to_string(), nodes);
+                        }
+                    }
+                }
+                Ok(resp)
+            }
+            Action::SidepanelClick => {
+                let params = cmd
+                    .parse_params::<PageClickParams>()
+                    .map_err(|e| format!("Invalid sidepanel_click params: {}", e))?;
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let element = document
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+                    .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                element
+                    .dyn_ref::<web_sys::HtmlElement>()
+                    .ok_or("Element is not clickable")?
+                    .click();
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Null),
+                    error: None,
+                })
+            }
+            Action::SidepanelDblclick => {
+                let params = cmd
+                    .parse_params::<PageDblClickParams>()
+                    .map_err(|e| format!("Invalid sidepanel_dblclick params: {}", e))?;
+                Ok(execute_page_dblclick(params).await)
+            }
+            Action::SidepanelFill => {
+                let params = cmd
+                    .parse_params::<PageFillParams>()
+                    .map_err(|e| format!("Invalid sidepanel_fill params: {}", e))?;
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let element = document
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+                    .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+                    input.set_value(&params.value);
+                } else {
+                    return Err("Element is not an input".into());
+                }
+                let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+                let _ = element.dispatch_event(&event);
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Null),
+                    error: None,
+                })
+            }
+            Action::SidepanelType => {
+                let params = cmd
+                    .parse_params::<PageTypeParams>()
+                    .map_err(|e| format!("Invalid sidepanel_type params: {}", e))?;
+                Ok(execute_page_type(params).await)
+            }
+            Action::SidepanelAppend => {
+                let params = cmd
+                    .parse_params::<PageAppendParams>()
+                    .map_err(|e| format!("Invalid sidepanel_append params: {}", e))?;
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let element = document
+                    .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+                    .map_err(|e| format!("{:?}", e))?
+                    .or_else(|| find_element_by_label(&document, &params.label))
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+                    let current = input.value();
+                    input.set_value(&format!("{}{}", current, params.text));
+                } else {
+                    return Err("Element is not an input".into());
+                }
+                let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+                let _ = element.dispatch_event(&event);
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::Null),
+                    error: None,
+                })
+            }
+            Action::SidepanelPress => {
+                let params = cmd
+                    .parse_params::<PagePressParams>()
+                    .map_err(|e| format!("Invalid sidepanel_press params: {}", e))?;
+                Ok(execute_page_press(params).await)
+            }
+            Action::SidepanelSelect => {
+                let params = cmd
+                    .parse_params::<PageSelectParams>()
+                    .map_err(|e| format!("Invalid sidepanel_select params: {}", e))?;
+                Ok(execute_page_select(params).await)
+            }
+            Action::SidepanelCheck => {
+                let params = cmd
+                    .parse_params::<PageCheckParams>()
+                    .map_err(|e| format!("Invalid sidepanel_check params: {}", e))?;
+                Ok(execute_page_check(params).await)
+            }
+            Action::SidepanelHover => {
+                let params = cmd
+                    .parse_params::<PageHoverParams>()
+                    .map_err(|e| format!("Invalid sidepanel_hover params: {}", e))?;
+                Ok(execute_page_hover(params).await)
+            }
+            Action::SidepanelUnhover => Ok(execute_page_unhover().await),
+            Action::SidepanelScroll => {
+                let params = cmd
+                    .parse_params::<PageScrollParams>()
+                    .map_err(|e| format!("Invalid sidepanel_scroll params: {}", e))?;
+                Ok(execute_page_scroll(params).await)
+            }
+            Action::SidepanelScrollTo => {
+                let params = cmd
+                    .parse_params::<PageScrollToParams>()
+                    .map_err(|e| format!("Invalid sidepanel_scroll_to params: {}", e))?;
+                Ok(execute_page_scroll_to(params).await)
+            }
+            Action::SidepanelUrl => {
+                let window = web_sys::window().ok_or("No window available")?;
+                let href = window.location().href().map_err(|e| format!("{:?}", e))?;
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::String(href)),
+                    error: None,
+                })
+            }
+            Action::SidepanelTitle => {
+                let document = web_sys::window()
+                    .ok_or("No window available")?
+                    .document()
+                    .ok_or("No document available")?;
+                let title = document.title();
+                Ok(WasmAsyncResponse {
+                    ok: true,
+                    value: Some(serde_json::Value::String(title)),
+                    error: None,
+                })
+            }
+            Action::SidepanelWait => {
+                let params = cmd
+                    .parse_params::<PageWaitParams>()
+                    .map_err(|e| format!("Invalid sidepanel_wait params: {}", e))?;
+                Ok(execute_page_wait(params).await)
             }
             // Extension-only APIs: return error in web context
             Action::TabQuery

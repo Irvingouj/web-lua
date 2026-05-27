@@ -47,8 +47,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
             if type_name == "table" {
                 if let Value::Table(t) = val {
                     let keys_table = Table::new(&ctx);
-                    let mut ki = 1;
-                    for entry in t.iter() {
+                    for (ki, entry) in (1..).zip(t.iter()) {
                         let (k, _) = entry;
                         let key_str = match k {
                             Value::Integer(i) => i.to_string(),
@@ -58,7 +57,6 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
                         keys_table
                             .set(ctx, ki, LuaString::from_slice(&ctx, key_str.as_bytes()))
                             .unwrap();
-                        ki += 1;
                     }
                     entry_table.set_field(ctx, "keys", keys_table);
                 }

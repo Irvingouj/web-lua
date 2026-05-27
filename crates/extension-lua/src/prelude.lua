@@ -62,6 +62,15 @@ runtime = {
   clipboard = web.clipboard,
   notifications = web.notifications,
 }
+page.go = page.goto
+page.open = page.new_tab
+page.type = page.fill
+page.see = page.snapshot
+page.enter = function() return page.press("Enter") end
+page.wait_for_load = function(timeout)
+  return tab.wait_for_load(tab.current(), timeout)
+end
 page.fetch = function(url, opts)
   return tab.fetch(tab.current(), url, opts)
 end
+tab.sleep = runtime.sleep

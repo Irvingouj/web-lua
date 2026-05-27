@@ -94,7 +94,11 @@ where
 {
     let mut result = base.run_cell(code, stdin);
 
-    while let WasmRunResult::Pending { ref pending_command, .. } = result {
+    while let WasmRunResult::Pending {
+        ref pending_command,
+        ..
+    } = result
+    {
         if let Some(flag) = aborted {
             if flag.get() {
                 let err_json = serde_json::to_string(&WasmAsyncResponse {

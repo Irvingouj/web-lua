@@ -1,0 +1,875 @@
+use crate::json::lua_value_to_json;
+use crate::state::HostState;
+use crate::types::AsyncCommand;
+use crate::utils::format_value;
+use piccolo::{Callback, CallbackReturn, Context, IntoValue, Table, Value};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>) {
+    let sidepanel_table = Table::new(&ctx);
+
+    // sidepanel.snapshot(opts?) — async, yields "sidepanel_snapshot_text"
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = if stack.is_empty() {
+                serde_json::json!({})
+            } else {
+                lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+            };
+            let _validated: crate::command_params::DomSnapshotParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg =
+                            format!("Invalid sidepanel_snapshot params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelSnapshotText,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "snapshot", cb);
+
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "snapshot",
+            action: "sidepanel_snapshot_text",
+            doc: "Take a DOM snapshot of the sidepanel and return readable text.",
+            params: [
+                opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            ],
+            returns: "string" => "Readable accessibility tree with refIds",
+        );
+    }
+
+    // sidepanel.snapshot_data(opts?) — async, yields "sidepanel_snapshot_data"
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = if stack.is_empty() {
+                serde_json::json!({})
+            } else {
+                lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+            };
+            let _validated: crate::command_params::DomSnapshotParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!(
+                            "Invalid sidepanel_snapshot_data params built from Lua: {}",
+                            e
+                        );
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelSnapshotData,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "snapshot_data", cb);
+
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "snapshot_data",
+            action: "sidepanel_snapshot_data",
+            doc: "Take a DOM snapshot of the sidepanel and return structured data.",
+            params: [
+                opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            ],
+            returns: "table" => "Structured snapshot with nodes, url, title, viewport",
+        );
+    }
+
+    // sidepanel.click(ref_id) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.click requires a ref_id argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageClickParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_click params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelClick,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "click", cb);
+
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "click",
+            action: "sidepanel_click",
+            doc: "Click an element by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.dblclick(ref_id) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.dblclick requires a ref_id argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageDblClickParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg =
+                            format!("Invalid sidepanel_dblclick params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelDblclick,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "dblclick", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "dblclick",
+            action: "sidepanel_dblclick",
+            doc: "Double-click an element by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.fill(ref_id, value) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.fill requires ref_id and value arguments"
+                    .into_value(ctx)
+                    .into());
+            };
+            let value = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.fill requires a value argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id, "value": value });
+            let _validated: crate::command_params::PageFillParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_fill params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelFill,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "fill", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "fill",
+            action: "sidepanel_fill",
+            doc: "Fill an input element by refId with a value in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+                value: "string", required, "Text to fill",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.type(ref_id, text) — async (append text)
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.type requires ref_id and text arguments"
+                    .into_value(ctx)
+                    .into());
+            };
+            let text = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.type requires a text argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id, "text": text });
+            let _validated: crate::command_params::PageTypeParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_type params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelType,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "type", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "type",
+            action: "sidepanel_type",
+            doc: "Append text to an input element by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+                text: "string", required, "Text to append",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.press(key) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let key = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.press requires a key argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "key": key });
+            let _validated: crate::command_params::PagePressParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_press params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelPress,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "press", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "press",
+            action: "sidepanel_press",
+            doc: "Press a keyboard key in the sidepanel.",
+            params: [
+                key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.select(ref_id, value) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.select requires ref_id and value arguments"
+                    .into_value(ctx)
+                    .into());
+            };
+            let value = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.select requires a value argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id, "value": value });
+            let _validated: crate::command_params::PageSelectParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_select params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelSelect,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "select", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "select",
+            action: "sidepanel_select",
+            doc: "Select an option in a dropdown by refId and value in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+                value: "string", required, "Option value to select",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.check(ref_id, checked?) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.check requires a ref_id argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let checked = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::Boolean(b) => b,
+                    Value::Nil => true,
+                    _ => true,
+                }
+            } else {
+                true
+            };
+            let params = serde_json::json!({ "refId": ref_id, "checked": checked });
+            let _validated: crate::command_params::PageCheckParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_check params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelCheck,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "check", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "check",
+            action: "sidepanel_check",
+            doc: "Check or uncheck a checkbox by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+                checked: "boolean", optional, "Checked state (default true)",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.hover(ref_id) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.hover requires a ref_id argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageHoverParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_hover params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelHover,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "hover", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "hover",
+            action: "sidepanel_hover",
+            doc: "Hover over an element by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.unhover() — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelUnhover,
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "unhover", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "unhover",
+            action: "sidepanel_unhover",
+            doc: "Move mouse away from any hovered element in the sidepanel.",
+            params: [
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.scroll(direction, amount) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let direction = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                "down".to_string()
+            };
+            let amount = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::Integer(i) => i as f64,
+                    Value::Number(f) => f,
+                    _ => 300.0,
+                }
+            } else {
+                300.0
+            };
+            let params = serde_json::json!({ "direction": direction, "amount": amount });
+            let _validated: crate::command_params::PageScrollParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_scroll params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelScroll,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "scroll", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "scroll",
+            action: "sidepanel_scroll",
+            doc: "Scroll the sidepanel by direction and amount.",
+            params: [
+                direction: "string", optional, "up, down, left, right (default down)",
+                amount: "number", optional, "Pixels to scroll (default 300)",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.scroll_to(ref_id) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.scroll_to requires a ref_id argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id });
+            let _validated: crate::command_params::PageScrollToParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg =
+                            format!("Invalid sidepanel_scroll_to params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelScrollTo,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "scroll_to", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "scroll_to",
+            action: "sidepanel_scroll_to",
+            doc: "Scroll to an element by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.url() — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelUrl,
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "url", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "url",
+            action: "sidepanel_url",
+            doc: "Get the sidepanel URL.",
+            params: [
+            ],
+            returns: "string" => "Current sidepanel URL",
+        );
+    }
+
+    // sidepanel.title() — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelTitle,
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "title", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "title",
+            action: "sidepanel_title",
+            doc: "Get the sidepanel document title.",
+            params: [
+            ],
+            returns: "string" => "Current sidepanel title",
+        );
+    }
+
+    // sidepanel.wait(ms) — async
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ms = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::Integer(i) => i as u64,
+                    Value::Number(f) => f as u64,
+                    _ => 1000,
+                }
+            } else {
+                1000
+            };
+            let params = serde_json::json!({ "duration": ms });
+            let _validated: crate::command_params::PageWaitParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_wait params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelWait,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "wait", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "wait",
+            action: "sidepanel_wait",
+            doc: "Wait for a duration.",
+            params: [
+                ms: "number", optional, "Milliseconds to wait (default 1000)",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    // sidepanel.append(ref_id, text) — async (append text)
+    {
+        let hs = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.append requires ref_id and text arguments"
+                    .into_value(ctx)
+                    .into());
+            };
+            let text = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("sidepanel.append requires a text argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id, "text": text });
+            let _validated: crate::command_params::PageAppendParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid sidepanel_append params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::SidepanelAppend,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        sidepanel_table.set_field(ctx, "append", cb);
+        crate::lua_api_doc!(
+            namespace: "sidepanel",
+            name: "append",
+            action: "sidepanel_append",
+            doc: "Append text to an input element by refId in the sidepanel.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+                text: "string", required, "Text to append",
+            ],
+            returns: "nil" => "None",
+        );
+    }
+
+    ctx.set_global("sidepanel", sidepanel_table);
+}

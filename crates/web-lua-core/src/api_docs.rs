@@ -35,7 +35,7 @@ pub enum ApiDocFormat {
     Markdown,
 }
 
-static REGISTRY: Mutex<Vec<LuaApiDoc>> = Mutex::new(Vec::new());
+pub(crate) static REGISTRY: Mutex<Vec<LuaApiDoc>> = Mutex::new(Vec::new());
 
 pub fn register(doc: LuaApiDoc) {
     let mut registry = REGISTRY.lock().unwrap();
@@ -100,4 +100,17 @@ pub fn generate(format: ApiDocFormat) -> String {
         ApiDocFormat::Json => generate_json(),
         ApiDocFormat::Markdown => generate_markdown(),
     }
+}
+
+/// Deduplicated boilerplate macro: injects a `generate_api_docs` WASM export
+/// that first creates a temporary session to populate the API registry.
+#[macro_export]
+macro_rules! export_generate_api_docs {
+    ($session_type:ty) => {
+        #[::wasm_bindgen::prelude::wasm_bindgen(js_name = generateApiDocs)]
+        pub fn generate_api_docs(format: $crate::api_docs::ApiDocFormat) -> String {
+            let _session = <$session_type>::new();
+            $crate::api_docs::generate(format)
+        }
+    };
 }

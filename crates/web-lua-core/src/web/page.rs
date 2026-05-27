@@ -71,7 +71,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_snapshot_data params built from Lua: {}", e);
+                        let msg =
+                            format!("Invalid page_snapshot_data params built from Lua: {}", e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -104,6 +105,53 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
+    // page.snapshot_text(opts?) — alias for page.snapshot
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = if stack.is_empty() {
+                serde_json::json!({})
+            } else {
+                lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+            };
+            let _validated: crate::command_params::DomSnapshotParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg =
+                            format!("Invalid page_snapshot_text params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::PageSnapshotText,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        page_table.set_field(ctx, "snapshot_text", cb);
+
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "snapshot_text",
+        action: "page_snapshot_text",
+        doc: "Alias for page.snapshot — returns readable text.",
+        params: [
+        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+        ],
+        returns: "string" => "Readable accessibility tree with refIds",
+        );
+    }
+
     // page.click(ref_id) — async
     {
         let hs_page = host_state.clone();
@@ -118,7 +166,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                     .into_value(ctx)
                     .into());
             };
-            let params = serde_json::json!({ "refId": ref_id });
+            let params = serde_json::json!({ "refId": ref_id, "label": ref_id });
             let _validated: crate::command_params::PageClickParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
@@ -229,7 +277,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             } else {
                 return Err("page.fill requires a value argument".into_value(ctx).into());
             };
-            let params = serde_json::json!({ "refId": ref_id, "value": value });
+            let params = serde_json::json!({ "refId": ref_id, "label": ref_id, "value": value });
             let _validated: crate::command_params::PageFillParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
@@ -289,7 +337,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             } else {
                 return Err("page.type requires a text argument".into_value(ctx).into());
             };
-            let params = serde_json::json!({ "refId": ref_id, "text": text });
+            let params = serde_json::json!({ "refId": ref_id, "label": ref_id, "text": text });
             let _validated: crate::command_params::PageTypeParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
@@ -932,7 +980,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             } else {
                 1000
             };
-            let params = serde_json::json!({ "ms": ms });
+            let params = serde_json::json!({ "duration": ms });
             let _validated: crate::command_params::PageWaitParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
@@ -1162,6 +1210,237 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         params: [
         ],
         returns: "number | nil" => "Active tab ID or nil",
+        );
+    }
+
+    // page.find(selector) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let selector = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.find requires a selector argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "selector": selector });
+            let _validated: crate::command_params::PageFindParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid page_find params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::PageFind,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        page_table.set_field(ctx, "find", cb);
+        crate::lua_api_doc!(
+            namespace: "page",
+            name: "find",
+            action: "page_find",
+            doc: "Find elements matching a CSS selector.",
+            params: [
+                selector: "string", required, "CSS selector",
+            ],
+            returns: "table" => "Array of element objects { tag, refId, text }",
+        );
+    }
+
+    // page.wait_for(selector, timeout?) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let selector = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.wait_for requires a selector argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let timeout = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::Integer(i) => i as u64,
+                    Value::Number(f) => f as u64,
+                    _ => 30_000,
+                }
+            } else {
+                30_000
+            };
+            let params = serde_json::json!({ "selector": selector, "timeout": timeout });
+            let _validated: crate::command_params::PageWaitForParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid page_wait_for params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::PageWaitFor,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        page_table.set_field(ctx, "wait_for", cb);
+        crate::lua_api_doc!(
+            namespace: "page",
+            name: "wait_for",
+            action: "page_wait_for",
+            doc: "Wait for an element matching a CSS selector to appear.",
+            params: [
+                selector: "string", required, "CSS selector",
+                timeout: "number", optional, "Timeout in milliseconds (default 30000)",
+            ],
+            returns: "boolean" => "True if element found, false if timeout",
+        );
+    }
+
+    // page.extract(fields) — async
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let fields = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::Table(t) => {
+                        let mut fields = Vec::new();
+                        for i in 1..=t.length() {
+                            if let Ok(Value::String(s)) = t.get(ctx, i) {
+                                fields.push(String::from_utf8_lossy(s.as_bytes()).to_string());
+                            }
+                        }
+                        fields
+                    }
+                    _ => Vec::new(),
+                }
+            } else {
+                Vec::new()
+            };
+            let params = serde_json::json!({ "fields": fields });
+            let _validated: crate::command_params::PageExtractParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid page_extract params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::PageExtract,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        page_table.set_field(ctx, "extract", cb);
+        crate::lua_api_doc!(
+            namespace: "page",
+            name: "extract",
+            action: "page_extract",
+            doc: "Extract structured data from the page.",
+            params: [
+                fields: "table", required, "Array of field names: title, url, headings, links, etc.",
+            ],
+            returns: "table" => "Extracted data object",
+        );
+    }
+
+    // page.append(ref_id, text) — async (append text)
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let ref_id = if !stack.is_empty() {
+                match stack.get(0) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.append requires ref_id and text arguments"
+                    .into_value(ctx)
+                    .into());
+            };
+            let text = if stack.len() > 1 {
+                match stack.get(1) {
+                    Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    other => format_value(ctx, other),
+                }
+            } else {
+                return Err("page.append requires a text argument"
+                    .into_value(ctx)
+                    .into());
+            };
+            let params = serde_json::json!({ "refId": ref_id, "text": text });
+            let _validated: crate::command_params::PageAppendParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid page_append params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::PageAppend,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        page_table.set_field(ctx, "append", cb);
+        crate::lua_api_doc!(
+            namespace: "page",
+            name: "append",
+            action: "page_append",
+            doc: "Append text to an input element by refId.",
+            params: [
+                ref_id: "string", required, "Element refId from snapshot",
+                text: "string", required, "Text to append",
+            ],
+            returns: "nil" => "None",
         );
     }
 

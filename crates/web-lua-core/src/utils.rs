@@ -1,3 +1,4 @@
+use crate::api_docs::REGISTRY;
 use crate::types::CellError;
 use piccolo::{Context, Value};
 
@@ -76,6 +77,89 @@ pub(crate) fn clean_error_message(msg: &str) -> String {
     msg.to_string()
 }
 
+// ─── API Suggestion Helpers ──────────────────────────────────────
+
+/// Compute simple Levenshtein edit distance between two strings.
+#[allow(dead_code, clippy::needless_range_loop)]
+pub(crate) fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a_len = a.chars().count();
+    let b_len = b.chars().count();
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
+    let mut prev = vec![0usize; b_len + 1];
+    let mut curr = vec![0usize; b_len + 1];
+    for j in 0..=b_len {
+        prev[j] = j;
+    }
+    for (i, ac) in a.chars().enumerate() {
+        curr[0] = i + 1;
+        for (j, bc) in b.chars().enumerate() {
+            let cost = if ac == bc { 0 } else { 1 };
+            curr[j + 1] = (curr[j] + 1).min(prev[j + 1] + 1).min(prev[j] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b_len]
+}
+
+/// Given a namespace and a misspelled name, return up to 3 closest API names
+/// from `api_docs::REGISTRY`.
+#[allow(dead_code)]
+pub(crate) fn suggest_api_names(namespace: &str, name: &str) -> Vec<String> {
+    let registry = REGISTRY.lock().unwrap();
+    let mut candidates: Vec<(usize, String)> = registry
+        .iter()
+        .filter(|d| d.namespace == namespace)
+        .map(|d| {
+            let dist = levenshtein_distance(name, &d.name);
+            (dist, d.name.clone())
+        })
+        .collect();
+    candidates.sort_by_key(|(dist, _)| *dist);
+    candidates.into_iter().take(3).map(|(_, n)| n).collect()
+}
+
+/// Build a human-friendly parameter error message using `LuaApiDoc` metadata.
+#[allow(dead_code)]
+pub(crate) fn format_param_error(
+    namespace: &str,
+    name: &str,
+    serde_err: &serde_json::Error,
+) -> String {
+    let registry = REGISTRY.lock().unwrap();
+    let doc = registry
+        .iter()
+        .find(|d| d.namespace == namespace && d.name == name);
+
+    let signature = doc.map(|d| {
+        let params = d
+            .params
+            .iter()
+            .map(|p| {
+                let req = if p.required { "required" } else { "optional" };
+                format!(
+                    "  {:<12} ({:<8}, {:<8}): {}",
+                    p.name, p.lua_type, req, p.description
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("{}.{}({{\n{}\n}})", namespace, name, params)
+    });
+
+    let mut msg = format!("{}.{}: invalid parameters.\n", namespace, name);
+    msg.push_str(&format!("  {}\n", serde_err));
+    if let Some(sig) = signature {
+        msg.push_str("\nExpected signature:\n");
+        msg.push_str(&sig);
+    }
+    msg
+}
+
 // ─── URL Encoding Helper ─────────────────────────────────────────
 
 /// Simple percent-encoding for URL query parameters.
@@ -129,12 +213,18 @@ mod tests {
     #[test]
     fn test_extract_line_number_builtin_prefix() {
         assert_eq!(extract_line_number("lua error: [line 5]: boom"), Some(5));
-        assert_eq!(extract_line_number("runtime error: [line 12]: oops"), Some(12));
+        assert_eq!(
+            extract_line_number("runtime error: [line 12]: oops"),
+            Some(12)
+        );
     }
 
     #[test]
     fn test_extract_line_number_compile_pattern() {
-        assert_eq!(extract_line_number("parse error at line 3: unexpected token"), Some(3));
+        assert_eq!(
+            extract_line_number("parse error at line 3: unexpected token"),
+            Some(3)
+        );
     }
 
     #[test]
@@ -148,14 +238,8 @@ mod tests {
 
     #[test]
     fn test_clean_error_message_strips_all_prefixes() {
-        assert_eq!(
-            clean_error_message("lua error: [line 2]: boom"),
-            "boom"
-        );
-        assert_eq!(
-            clean_error_message("runtime error: [line 1]: oops"),
-            "oops"
-        );
+        assert_eq!(clean_error_message("lua error: [line 2]: boom"), "boom");
+        assert_eq!(clean_error_message("runtime error: [line 1]: oops"), "oops");
     }
 
     #[test]

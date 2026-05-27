@@ -419,6 +419,16 @@ Take a DOM snapshot and return structured data.
 
 **Returns** `table`: Structured snapshot with nodes, url, title, viewport
 
+### `page.snapshot_text _(action: `page_snapshot_text`)_`
+
+Alias for page.snapshot — returns readable text.
+
+**Parameters**
+
+- `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
+
+**Returns** `string`: Readable accessibility tree with refIds
+
 ### `page.click _(action: `page_click`)_`
 
 Click an element by refId in the current page.
@@ -628,6 +638,68 @@ Get the currently active tab ID.
 
 **Returns** `number | nil`: Active tab ID or nil
 
+### `page.find _(action: `page_find`)_`
+
+Find elements matching a CSS selector.
+
+**Parameters**
+
+- `selector` (`string`, required): CSS selector
+
+**Returns** `table`: Array of element objects { tag, refId, text }
+
+### `page.wait_for _(action: `page_wait_for`)_`
+
+Wait for an element matching a CSS selector to appear.
+
+**Parameters**
+
+- `selector` (`string`, required): CSS selector
+- `timeout` (`number`, optional): Timeout in milliseconds (default 30000)
+
+**Returns** `boolean`: True if element found, false if timeout
+
+### `page.extract _(action: `page_extract`)_`
+
+Extract structured data from the page.
+
+**Parameters**
+
+- `fields` (`table`, required): Array of field names: title, url, headings, links, etc.
+
+**Returns** `table`: Extracted data object
+
+### `page.append _(action: `page_append`)_`
+
+Append text to an input element by refId.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+- `text` (`string`, required): Text to append
+
+**Returns** `nil`: None
+
+### `page.go`
+
+Navigate to a URL (alias for page.goto).
+
+**Parameters**
+
+- `url` (`string`, required): URL to navigate to
+
+**Returns** `nil`: None
+
+### `page.open`
+
+Open a new tab (alias for page.new_tab).
+
+**Parameters**
+
+- `url` (`string | nil`, optional): URL to open in the new tab
+
+**Returns** `table`: Created tab object
+
 ### `page.fetch`
 
 Fetch a URL using the active tab origin (wrapper for tab.fetch).
@@ -685,6 +757,172 @@ Alias for web.clipboard.
 Alias for web.notifications.
 
 **Returns** `table`: Notifications API table
+
+## `sidepanel` module
+
+### `sidepanel.snapshot _(action: `sidepanel_snapshot_text`)_`
+
+Take a DOM snapshot of the sidepanel and return readable text.
+
+**Parameters**
+
+- `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
+
+**Returns** `string`: Readable accessibility tree with refIds
+
+### `sidepanel.snapshot_data _(action: `sidepanel_snapshot_data`)_`
+
+Take a DOM snapshot of the sidepanel and return structured data.
+
+**Parameters**
+
+- `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
+
+**Returns** `table`: Structured snapshot with nodes, url, title, viewport
+
+### `sidepanel.click _(action: `sidepanel_click`)_`
+
+Click an element by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+
+**Returns** `nil`: None
+
+### `sidepanel.dblclick _(action: `sidepanel_dblclick`)_`
+
+Double-click an element by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+
+**Returns** `nil`: None
+
+### `sidepanel.fill _(action: `sidepanel_fill`)_`
+
+Fill an input element by refId with a value in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+- `value` (`string`, required): Text to fill
+
+**Returns** `nil`: None
+
+### `sidepanel.type _(action: `sidepanel_type`)_`
+
+Append text to an input element by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+- `text` (`string`, required): Text to append
+
+**Returns** `nil`: None
+
+### `sidepanel.press _(action: `sidepanel_press`)_`
+
+Press a keyboard key in the sidepanel.
+
+**Parameters**
+
+- `key` (`string`, required): Key name: Enter, Escape, ArrowDown, etc.
+
+**Returns** `nil`: None
+
+### `sidepanel.select _(action: `sidepanel_select`)_`
+
+Select an option in a dropdown by refId and value in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+- `value` (`string`, required): Option value to select
+
+**Returns** `nil`: None
+
+### `sidepanel.check _(action: `sidepanel_check`)_`
+
+Check or uncheck a checkbox by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+- `checked` (`boolean`, optional): Checked state (default true)
+
+**Returns** `nil`: None
+
+### `sidepanel.hover _(action: `sidepanel_hover`)_`
+
+Hover over an element by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+
+**Returns** `nil`: None
+
+### `sidepanel.unhover _(action: `sidepanel_unhover`)_`
+
+Move mouse away from any hovered element in the sidepanel.
+
+**Returns** `nil`: None
+
+### `sidepanel.scroll _(action: `sidepanel_scroll`)_`
+
+Scroll the sidepanel by direction and amount.
+
+**Parameters**
+
+- `direction` (`string`, optional): up, down, left, right (default down)
+- `amount` (`number`, optional): Pixels to scroll (default 300)
+
+**Returns** `nil`: None
+
+### `sidepanel.scroll_to _(action: `sidepanel_scroll_to`)_`
+
+Scroll to an element by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+
+**Returns** `nil`: None
+
+### `sidepanel.url _(action: `sidepanel_url`)_`
+
+Get the sidepanel URL.
+
+**Returns** `string`: Current sidepanel URL
+
+### `sidepanel.title _(action: `sidepanel_title`)_`
+
+Get the sidepanel document title.
+
+**Returns** `string`: Current sidepanel title
+
+### `sidepanel.wait _(action: `sidepanel_wait`)_`
+
+Wait for a duration.
+
+**Parameters**
+
+- `ms` (`number`, optional): Milliseconds to wait (default 1000)
+
+**Returns** `nil`: None
+
+### `sidepanel.append _(action: `sidepanel_append`)_`
+
+Append text to an input element by refId in the sidepanel.
+
+**Parameters**
+
+- `ref_id` (`string`, required): Element refId from snapshot
+- `text` (`string`, required): Text to append
+
+**Returns** `nil`: None
 
 ## `tab` module
 
@@ -1269,6 +1507,97 @@ Wait for a tab to finish loading.
 - `timeout` (`number`, optional): Timeout in milliseconds (default 30000)
 
 **Returns** `boolean`: Whether the tab loaded
+
+### `web.tab.type _(action: `tab_type`)_`
+
+Type text into an input element by refId in the target tab (appends).
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `ref_id` (`number`, required): Element refId from snapshot
+- `text` (`string`, required): Text to type
+
+**Returns** `boolean`: Whether type succeeded
+
+### `web.tab.press _(action: `tab_press`)_`
+
+Dispatch a keyboard key press in the target tab.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `key` (`string`, required): Key to press (e.g. 'Enter', 'Escape')
+
+**Returns** `boolean`: Whether press succeeded
+
+### `web.tab.select _(action: `tab_select`)_`
+
+Select an option in a dropdown by refId in the target tab.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `ref_id` (`number`, required): Element refId from snapshot
+- `value` (`string`, required): Option value to select
+
+**Returns** `boolean`: Whether select succeeded
+
+### `web.tab.check _(action: `tab_check`)_`
+
+Toggle a checkbox by refId in the target tab.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `ref_id` (`number`, required): Element refId from snapshot
+- `checked` (`boolean`, optional): Desired checked state (default true)
+
+**Returns** `boolean`: Whether check succeeded
+
+### `web.tab.hover _(action: `tab_hover`)_`
+
+Hover over an element by refId in the target tab.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `ref_id` (`number`, required): Element refId from snapshot
+
+**Returns** `boolean`: Whether hover succeeded
+
+### `web.tab.unhover _(action: `tab_unhover`)_`
+
+Unhover (mouseleave) an element by refId in the target tab.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+
+**Returns** `boolean`: Whether unhover succeeded
+
+### `web.tab.scroll _(action: `tab_scroll`)_`
+
+Scroll the target tab page.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `direction` (`string`, optional): Scroll direction: up or down (default down)
+- `amount` (`number`, optional): Scroll amount in pixels (default 300)
+
+**Returns** `boolean`: Whether scroll succeeded
+
+### `web.tab.dblclick _(action: `tab_dblclick`)_`
+
+Double-click an element by refId in the target tab.
+
+**Parameters**
+
+- `tab_id` (`number`, required): Target tab ID
+- `ref_id` (`number`, required): Element refId from snapshot
+
+**Returns** `boolean`: Whether dblclick succeeded
 
 ### `web.tab.fetch _(action: `tab_fetch`)_`
 

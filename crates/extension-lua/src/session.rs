@@ -129,6 +129,29 @@ impl ExtensionSession {
         web_lua_core::lua_api_doc!(namespace: "runtime", name: "storage", action: "", doc: "Alias for web.storage.", source: "injected_lua", params: [], returns: "table" => "Storage API table");
         web_lua_core::lua_api_doc!(namespace: "runtime", name: "clipboard", action: "", doc: "Alias for web.clipboard.", source: "injected_lua", params: [], returns: "table" => "Clipboard API table");
         web_lua_core::lua_api_doc!(namespace: "runtime", name: "notifications", action: "", doc: "Alias for web.notifications.", source: "injected_lua", params: [], returns: "table" => "Notifications API table");
+        // page aliases
+        web_lua_core::lua_api_doc!(
+            namespace: "page",
+            name: "go",
+            action: "",
+            doc: "Navigate to a URL (alias for page.goto).",
+            source: "injected_lua",
+            params: [
+                url: "string", required, "URL to navigate to",
+            ],
+            returns: "nil" => "None",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "page",
+            name: "open",
+            action: "",
+            doc: "Open a new tab (alias for page.new_tab).",
+            source: "injected_lua",
+            params: [
+                url: "string | nil", optional, "URL to open in the new tab",
+            ],
+            returns: "table" => "Created tab object",
+        );
         // page.fetch wrapper
         web_lua_core::lua_api_doc!(
             namespace: "page",

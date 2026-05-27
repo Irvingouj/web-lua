@@ -504,6 +504,224 @@
   },
   {
     "namespace": "web.tab",
+    "name": "type",
+    "action": "tab_type",
+    "description": "Type text into an input element by refId in the target tab (appends).",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to type"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether type succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "press",
+    "action": "tab_press",
+    "description": "Dispatch a keyboard key press in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "key",
+        "lua_type": "string",
+        "required": true,
+        "description": "Key to press (e.g. 'Enter', 'Escape')"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether press succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "select",
+    "action": "tab_select",
+    "description": "Select an option in a dropdown by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Option value to select"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether select succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "check",
+    "action": "tab_check",
+    "description": "Toggle a checkbox by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "checked",
+        "lua_type": "boolean",
+        "required": false,
+        "description": "Desired checked state (default true)"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether check succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "hover",
+    "action": "tab_hover",
+    "description": "Hover over an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether hover succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "unhover",
+    "action": "tab_unhover",
+    "description": "Unhover (mouseleave) an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether unhover succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "scroll",
+    "action": "tab_scroll",
+    "description": "Scroll the target tab page.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "direction",
+        "lua_type": "string",
+        "required": false,
+        "description": "Scroll direction: up or down (default down)"
+      },
+      {
+        "name": "amount",
+        "lua_type": "number",
+        "required": false,
+        "description": "Scroll amount in pixels (default 300)"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether scroll succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "dblclick",
+    "action": "tab_dblclick",
+    "description": "Double-click an element by refId in the target tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Target tab ID"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "number",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "Whether dblclick succeeded"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
     "name": "fetch",
     "action": "tab_fetch",
     "description": "Perform an HTTP fetch inside a target tab origin.",
@@ -1544,6 +1762,25 @@
   },
   {
     "namespace": "page",
+    "name": "snapshot_text",
+    "action": "page_snapshot_text",
+    "description": "Alias for page.snapshot — returns readable text.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
     "name": "click",
     "action": "page_click",
     "description": "Click an element by refId in the current page.",
@@ -1962,6 +2199,432 @@
     "returns": {
       "lua_type": "number | nil",
       "description": "Active tab ID or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "find",
+    "action": "page_find",
+    "description": "Find elements matching a CSS selector.",
+    "params": [
+      {
+        "name": "selector",
+        "lua_type": "string",
+        "required": true,
+        "description": "CSS selector"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of element objects { tag, refId, text }"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "wait_for",
+    "action": "page_wait_for",
+    "description": "Wait for an element matching a CSS selector to appear.",
+    "params": [
+      {
+        "name": "selector",
+        "lua_type": "string",
+        "required": true,
+        "description": "CSS selector"
+      },
+      {
+        "name": "timeout",
+        "lua_type": "number",
+        "required": false,
+        "description": "Timeout in milliseconds (default 30000)"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "True if element found, false if timeout"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "extract",
+    "action": "page_extract",
+    "description": "Extract structured data from the page.",
+    "params": [
+      {
+        "name": "fields",
+        "lua_type": "table",
+        "required": true,
+        "description": "Array of field names: title, url, headings, links, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Extracted data object"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "append",
+    "action": "page_append",
+    "description": "Append text to an input element by refId.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "snapshot",
+    "action": "sidepanel_snapshot_text",
+    "description": "Take a DOM snapshot of the sidepanel and return readable text.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "snapshot_data",
+    "action": "sidepanel_snapshot_data",
+    "description": "Take a DOM snapshot of the sidepanel and return structured data.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Structured snapshot with nodes, url, title, viewport"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "click",
+    "action": "sidepanel_click",
+    "description": "Click an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "dblclick",
+    "action": "sidepanel_dblclick",
+    "description": "Double-click an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "fill",
+    "action": "sidepanel_fill",
+    "description": "Fill an input element by refId with a value in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to fill"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "type",
+    "action": "sidepanel_type",
+    "description": "Append text to an input element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "press",
+    "action": "sidepanel_press",
+    "description": "Press a keyboard key in the sidepanel.",
+    "params": [
+      {
+        "name": "key",
+        "lua_type": "string",
+        "required": true,
+        "description": "Key name: Enter, Escape, ArrowDown, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "select",
+    "action": "sidepanel_select",
+    "description": "Select an option in a dropdown by refId and value in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "value",
+        "lua_type": "string",
+        "required": true,
+        "description": "Option value to select"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "check",
+    "action": "sidepanel_check",
+    "description": "Check or uncheck a checkbox by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "checked",
+        "lua_type": "boolean",
+        "required": false,
+        "description": "Checked state (default true)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "hover",
+    "action": "sidepanel_hover",
+    "description": "Hover over an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "unhover",
+    "action": "sidepanel_unhover",
+    "description": "Move mouse away from any hovered element in the sidepanel.",
+    "params": [],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "scroll",
+    "action": "sidepanel_scroll",
+    "description": "Scroll the sidepanel by direction and amount.",
+    "params": [
+      {
+        "name": "direction",
+        "lua_type": "string",
+        "required": false,
+        "description": "up, down, left, right (default down)"
+      },
+      {
+        "name": "amount",
+        "lua_type": "number",
+        "required": false,
+        "description": "Pixels to scroll (default 300)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "scroll_to",
+    "action": "sidepanel_scroll_to",
+    "description": "Scroll to an element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "url",
+    "action": "sidepanel_url",
+    "description": "Get the sidepanel URL.",
+    "params": [],
+    "returns": {
+      "lua_type": "string",
+      "description": "Current sidepanel URL"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "title",
+    "action": "sidepanel_title",
+    "description": "Get the sidepanel document title.",
+    "params": [],
+    "returns": {
+      "lua_type": "string",
+      "description": "Current sidepanel title"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "wait",
+    "action": "sidepanel_wait",
+    "description": "Wait for a duration.",
+    "params": [
+      {
+        "name": "ms",
+        "lua_type": "number",
+        "required": false,
+        "description": "Milliseconds to wait (default 1000)"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "sidepanel",
+    "name": "append",
+    "action": "sidepanel_append",
+    "description": "Append text to an input element by refId in the sidepanel.",
+    "params": [
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": true,
+        "description": "Element refId from snapshot"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
     },
     "source": "rust_core"
   },
@@ -2519,6 +3182,44 @@
     "returns": {
       "lua_type": "table",
       "description": "Notifications API table"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "page",
+    "name": "go",
+    "action": "",
+    "description": "Navigate to a URL (alias for page.goto).",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to navigate to"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "page",
+    "name": "open",
+    "action": "",
+    "description": "Open a new tab (alias for page.new_tab).",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "URL to open in the new tab"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Created tab object"
     },
     "source": "injected_lua"
   },

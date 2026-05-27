@@ -220,6 +220,96 @@ const handlers = {
         }
         throw new Error("Element is not an input");
     },
+    type: (params) => {
+        const refId = getStringParam(params, "refId");
+        const text = getStringParam(params, "text");
+        const el = refId ? getElementByRefId(refId) : null;
+        if (!el)
+            throw new Error(`Element ${refId} not found`);
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+            el.value += text;
+            const ev = new InputEvent("input", { bubbles: true });
+            el.dispatchEvent(ev);
+            return null;
+        }
+        throw new Error("Element is not an input");
+    },
+    press: (params) => {
+        const key = getStringParam(params, "key");
+        const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
+        document.dispatchEvent(evDown);
+        const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
+        document.dispatchEvent(evUp);
+        return null;
+    },
+    select: (params) => {
+        const refId = getStringParam(params, "refId");
+        const value = getStringParam(params, "value");
+        const el = refId ? getElementByRefId(refId) : null;
+        if (!el)
+            throw new Error(`Element ${refId} not found`);
+        if (el instanceof HTMLSelectElement) {
+            el.value = value;
+            return null;
+        }
+        throw new Error("Element is not a select");
+    },
+    check: (params) => {
+        const refId = getStringParam(params, "refId");
+        const checked = (() => {
+            const obj = asRecord(params);
+            return typeof obj.checked === "boolean" ? obj.checked : true;
+        })();
+        const el = refId ? getElementByRefId(refId) : null;
+        if (!el)
+            throw new Error(`Element ${refId} not found`);
+        if (el instanceof HTMLInputElement && el.type === "checkbox") {
+            el.checked = checked;
+            return null;
+        }
+        throw new Error("Element is not a checkbox");
+    },
+    hover: (params) => {
+        const refId = getStringParam(params, "refId");
+        const el = refId ? getElementByRefId(refId) : null;
+        if (!el)
+            throw new Error(`Element ${refId} not found`);
+        const ev = new MouseEvent("mouseenter", { bubbles: true });
+        el.dispatchEvent(ev);
+        return null;
+    },
+    unhover: () => {
+        const ev = new MouseEvent("mouseleave", { bubbles: true });
+        document.body.dispatchEvent(ev);
+        return null;
+    },
+    scroll: (params) => {
+        const obj = asRecord(params);
+        const direction = obj.direction ?? "down";
+        const amount = typeof obj.amount === "number" ? obj.amount : 300;
+        window.scrollBy({
+            top: direction === "down" ? amount : -amount,
+            behavior: "smooth",
+        });
+        return true;
+    },
+    dblclick: (params) => {
+        const refId = getStringParam(params, "refId");
+        const el = refId ? getElementByRefId(refId) : null;
+        if (!el)
+            throw new Error(`Element ${refId} not found`);
+        const ev = new MouseEvent("dblclick", { bubbles: true });
+        el.dispatchEvent(ev);
+        return null;
+    },
+    forward: () => {
+        window.history.forward();
+        return true;
+    },
+    reload: () => {
+        window.location.reload();
+        return true;
+    },
     scrollTo: (params) => {
         const refId = getStringParam(params, "refId");
         const x = getNumberParam(params, "x", 0);

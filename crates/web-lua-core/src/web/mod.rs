@@ -84,6 +84,7 @@ mod log;
 mod notifications;
 mod page;
 mod runtime;
+mod sidepanel;
 mod storage;
 mod tab;
 mod url;
@@ -122,6 +123,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     chrome::register(ctx, host_state.clone());
     dom::register(ctx, host_state.clone());
     page::register(ctx, host_state.clone());
+    sidepanel::register(ctx, host_state.clone());
     host::register(ctx, host_state.clone());
     runtime::register(ctx, host_state.clone());
 

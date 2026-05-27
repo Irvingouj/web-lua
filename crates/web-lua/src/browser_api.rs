@@ -426,7 +426,10 @@ pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
 
     let snapshot = dom_semantic_tree::collect::collect_document(opts);
 
-    let text = dom_semantic_tree::format::format_snapshot(&snapshot, dom_semantic_tree::format::SnapshotFormat::CompactText);
+    let text = dom_semantic_tree::format::format_snapshot(
+        &snapshot,
+        dom_semantic_tree::format::SnapshotFormat::CompactText,
+    );
 
     let data = match serde_json::to_value(&snapshot) {
         Ok(v) => v,

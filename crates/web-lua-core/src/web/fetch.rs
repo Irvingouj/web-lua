@@ -210,13 +210,11 @@ pub(crate) fn register<'a>(
 
         // query string as table
         let query_table = Table::new(&ctx);
-        let mut idx = 1i64;
-        for (key, value) in parsed.query_pairs() {
+        for (idx, (key, value)) in (1i64..).zip(parsed.query_pairs()) {
             let pair = Table::new(&ctx);
             pair.set_field(ctx, "key", ctx.intern(key.as_bytes()));
             pair.set_field(ctx, "value", ctx.intern(value.as_bytes()));
             query_table.set(ctx, idx, pair).unwrap();
-            idx += 1;
         }
         result.set_field(ctx, "query", query_table);
 

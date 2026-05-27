@@ -73,6 +73,9 @@ import type {
   TabBackParams,
   TabWaitForLoadParams,
   TabScrollToParams,
+  PageFindParams,
+  PageWaitForParams,
+  PageExtractParams,
 } from "./generated.js";
 
 declare global {
@@ -115,9 +118,10 @@ type DomSnapshotValue = {
 };
 
 type TabMessage =
-  | { action: "click"; params: { refId: string } }
-  | { action: "fill"; params: { refId: string; value: string } }
-  | { action: "type"; params: { refId: string; text: string } }
+  | { action: "click"; params: { refId?: string; label?: string } }
+  | { action: "fill"; params: { refId?: string; value: string; label?: string } }
+  | { action: "type"; params: { refId?: string; text: string; label?: string } }
+  | { action: "append"; params: { refId?: string; text: string; label?: string } }
   | { action: "press"; params: { key: string } }
   | { action: "select"; params: { refId: string; value: string } }
   | { action: "check"; params: { refId: string; checked: boolean } }
@@ -365,7 +369,7 @@ export async function executeMainThreadCommand(
       if (activeTab === null) {
         return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
       }
-      return executeInTab(activeTab, () => { window.location.reload(); return true; }, []);
+      return handleChromeApi({ action: "chrome_tabs_reload", params: { tabId: activeTab } });
     }
     case "page_wait": {
       const { duration } = expectParams<PageWaitParams>(params);
@@ -374,31 +378,46 @@ export async function executeMainThreadCommand(
     }
     case "page_click": {
       const activeTab = getActiveTabId();
+      const obj = asRecord(params);
       const refId = extractRefId(params);
-      if (!refId) {
-        return { ok: false, error: { message: "page_click requires refId", code: "E_MISSING_PARAM" } };
+      const label = obj.label ?? "";
+      if (!refId && !label) {
+        return { ok: false, error: { message: "page_click requires refId or label", code: "E_MISSING_PARAM" } };
       }
-      return sendMessageToTab(activeTab, { action: "click", params: { refId } });
+      return sendMessageToTab(activeTab, { action: "click", params: { refId, label: String(label) } });
     }
     case "page_fill": {
       const activeTab = getActiveTabId();
       const obj = asRecord(params);
       const refId = extractRefId(params);
       const value = obj.value ?? "";
-      if (!refId) {
-        return { ok: false, error: { message: "page_fill requires refId", code: "E_MISSING_PARAM" } };
+      const label = obj.label ?? "";
+      if (!refId && !label) {
+        return { ok: false, error: { message: "page_fill requires refId or label", code: "E_MISSING_PARAM" } };
       }
-      return sendMessageToTab(activeTab, { action: "fill", params: { refId, value: String(value) } });
+      return sendMessageToTab(activeTab, { action: "fill", params: { refId, label: String(label), value: String(value) } });
     }
     case "page_type": {
       const activeTab = getActiveTabId();
       const obj = asRecord(params);
       const refId = extractRefId(params);
       const text = obj.text ?? "";
-      if (!refId) {
-        return { ok: false, error: { message: "page_type requires refId", code: "E_MISSING_PARAM" } };
+      const label = obj.label ?? "";
+      if (!refId && !label) {
+        return { ok: false, error: { message: "page_type requires refId or label", code: "E_MISSING_PARAM" } };
       }
-      return sendMessageToTab(activeTab, { action: "type", params: { refId, text: String(text) } });
+      return sendMessageToTab(activeTab, { action: "type", params: { refId, label: String(label), text: String(text) } });
+    }
+    case "page_append": {
+      const activeTab = getActiveTabId();
+      const obj = asRecord(params);
+      const refId = extractRefId(params);
+      const text = obj.text ?? "";
+      const label = obj.label ?? "";
+      if (!refId && !label) {
+        return { ok: false, error: { message: "page_append requires refId or label", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "append", params: { refId, label: String(label), text: String(text) } });
     }
     case "page_press": {
       const activeTab = getActiveTabId();
@@ -458,7 +477,148 @@ export async function executeMainThreadCommand(
       }
       return sendMessageToTab(activeTab, { action: "dblclick", params: { refId } });
     }
-    case "page_snapshot": {
+    case "page_find": {
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      const { selector } = expectParams<PageFindParams>(params);
+      return executeInTab(
+        activeTab,
+        (sel: unknown) => {
+          const elements = Array.from(document.querySelectorAll(String(sel)));
+          return elements.map((el) => ({
+            tag: el.tagName,
+            refId: el.getAttribute("data-ref-id"),
+            text: el.textContent?.slice(0, 100) || "",
+          }));
+        },
+        [selector],
+      );
+    }
+    case "page_wait_for": {
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      const { selector, timeout } = expectParams<PageWaitForParams>(params);
+      const start = Date.now();
+      const timeoutMs = Number(timeout) || 30_000;
+      while (true) {
+        throwIfAborted();
+        const result = await executeInTab(
+          activeTab,
+          (sel: unknown) => !!document.querySelector(String(sel)),
+          [selector],
+        );
+        if (result.ok && result.value === true) {
+          return { ok: true, value: true };
+        }
+        if (Date.now() - start >= timeoutMs) {
+          return {
+            ok: false,
+            error: {
+              message: `Timeout waiting for selector: ${selector}`,
+              code: "E_TIMEOUT",
+              category: "timeout",
+            },
+          };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    case "page_extract": {
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      const { fields } = expectParams<PageExtractParams>(params);
+      return executeInTab(
+        activeTab,
+        (fieldsArg: unknown) => {
+          const fieldList = Array.isArray(fieldsArg) ? fieldsArg : [];
+          const result: Record<string, unknown> = {};
+          for (const field of fieldList) {
+            switch (field) {
+              case "title":
+                result.title = document.title;
+                break;
+              case "url":
+                result.url = window.location.href;
+                break;
+              case "headings": {
+                const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+                result.headings = headings.map((el) => ({
+                  tag: el.tagName,
+                  text: el.textContent?.trim().slice(0, 200) || "",
+                }));
+                break;
+              }
+              case "links": {
+                const links = Array.from(document.querySelectorAll("a[href]"));
+                result.links = links.map((el) => ({
+                  href: el.getAttribute("href"),
+                  text: el.textContent?.trim().slice(0, 100) || "",
+                }));
+                break;
+              }
+              case "text":
+                result.text = document.body?.textContent?.trim().slice(0, 500) || "";
+                break;
+            }
+          }
+          return result;
+        },
+        [fields],
+      );
+    }
+    case "sidepanel_click":
+      return handleSidepanelAction("sidepanel_click", params);
+    case "sidepanel_dblclick":
+      return handleSidepanelAction("sidepanel_dblclick", params);
+    case "sidepanel_fill":
+      return handleSidepanelAction("sidepanel_fill", params);
+    case "sidepanel_type":
+      return handleSidepanelAction("sidepanel_type", params);
+    case "sidepanel_press":
+      return handleSidepanelAction("sidepanel_press", params);
+    case "sidepanel_select":
+      return handleSidepanelAction("sidepanel_select", params);
+    case "sidepanel_check":
+      return handleSidepanelAction("sidepanel_check", params);
+    case "sidepanel_hover":
+      return handleSidepanelAction("sidepanel_hover", params);
+    case "sidepanel_unhover":
+      return handleSidepanelAction("sidepanel_unhover", params);
+    case "sidepanel_scroll":
+      return handleSidepanelAction("sidepanel_scroll", params);
+    case "sidepanel_scroll_to":
+      return handleSidepanelAction("sidepanel_scroll_to", params);
+    case "sidepanel_append":
+      return handleSidepanelAction("sidepanel_append", params);
+    case "sidepanel_url":
+      return { ok: true, value: window.location.href };
+    case "sidepanel_title":
+      return { ok: true, value: document.title };
+    case "sidepanel_wait": {
+      const { duration } = expectParams<PageWaitParams>(params);
+      await new Promise((resolve) => setTimeout(resolve, Number(duration)));
+      return { ok: true, value: true };
+    }
+    case "sidepanel_snapshot":
+    case "sidepanel_snapshot_text": {
+      const result = await handleDomSnapshot(expectParams<DomSnapshotParams>(params));
+      if (result.ok && result.value && typeof result.value === "object") {
+        const val = result.value as Record<string, unknown>;
+        return { ok: true, value: val.text };
+      }
+      return { ok: false, error: { message: "Failed to get sidepanel snapshot", code: "E_SNAPSHOT" } };
+    }
+    case "sidepanel_snapshot_data": {
+      return handleDomSnapshot(expectParams<DomSnapshotParams>(params));
+    }
+    case "page_snapshot":
+    case "page_snapshot_text": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
         return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
@@ -687,7 +847,7 @@ export async function executeMainThreadCommand(
           if (document.body) traverse(document.body, 0);
           const header = [`URL: ${window.location.href}`, `Title: ${document.title}`, ""];
           const text = header.concat(lines).join("\n");
-          return { data: { nodes, url: window.location.href, title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight }, version: "1.0" }, text };
+          return { data: { nodes, elements: nodes, url: window.location.href, title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight }, version: "1.0" }, text };
         },
         [maxNodes],
       );
@@ -1503,6 +1663,7 @@ export async function executeMainThreadCommand(
             return {
               text: header.concat(lines).join("\n"),
               nodes,
+              elements: nodes,
               url: window.location.href,
               title: document.title,
               viewport: {
@@ -1897,7 +2058,7 @@ function extractRefId(params: unknown): string | undefined {
   return typeof obj.refId === "string" ? obj.refId : undefined;
 }
 
-async function handlePageAction(
+async function handleSidepanelAction(
   action: string,
   params: unknown,
 ): Promise<AsyncResponse<null>> {
@@ -1906,7 +2067,7 @@ async function handlePageAction(
   const element = refId ? getElementByRefId(refId) : null;
 
   switch (action) {
-    case "page_click": {
+    case "sidepanel_click": {
       if (!element)
         return {
           ok: false,
@@ -1915,7 +2076,7 @@ async function handlePageAction(
       (element as HTMLElement).click();
       return { ok: true, value: null };
     }
-    case "page_dblclick": {
+    case "sidepanel_dblclick": {
       if (!element)
         return {
           ok: false,
@@ -1925,7 +2086,7 @@ async function handlePageAction(
       element.dispatchEvent(ev);
       return { ok: true, value: null };
     }
-    case "page_fill": {
+    case "sidepanel_fill": {
       if (!element)
         return {
           ok: false,
@@ -1947,7 +2108,7 @@ async function handlePageAction(
       element.dispatchEvent(ev);
       return { ok: true, value: null };
     }
-    case "page_type": {
+    case "sidepanel_type": {
       if (!element)
         return {
           ok: false,
@@ -1964,7 +2125,29 @@ async function handlePageAction(
       element.dispatchEvent(ev);
       return { ok: true, value: null };
     }
-    case "page_press": {
+    case "sidepanel_append": {
+      if (!element)
+        return {
+          ok: false,
+          error: { message: `Element ${refId} not found`, code: "ENOTFOUND" },
+        };
+      const { text } = expectParams<PageTypeParams>(params);
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        element.value += text;
+      } else {
+        return {
+          ok: false,
+          error: { message: "Element is not an input", code: "EINPUT" },
+        };
+      }
+      const ev = new InputEvent("input", { bubbles: true });
+      element.dispatchEvent(ev);
+      return { ok: true, value: null };
+    }
+    case "sidepanel_press": {
       const { key } = expectParams<PagePressParams>(params);
       const ev = new KeyboardEvent("keydown", { key, bubbles: true });
       document.dispatchEvent(ev);
@@ -1972,7 +2155,7 @@ async function handlePageAction(
       document.dispatchEvent(evUp);
       return { ok: true, value: null };
     }
-    case "page_select": {
+    case "sidepanel_select": {
       if (!element)
         return {
           ok: false,
@@ -1989,7 +2172,7 @@ async function handlePageAction(
       }
       return { ok: true, value: null };
     }
-    case "page_check": {
+    case "sidepanel_check": {
       if (!element)
         return {
           ok: false,
@@ -2006,7 +2189,7 @@ async function handlePageAction(
       }
       return { ok: true, value: null };
     }
-    case "page_hover": {
+    case "sidepanel_hover": {
       if (!element)
         return {
           ok: false,
@@ -2016,7 +2199,7 @@ async function handlePageAction(
       element.dispatchEvent(ev);
       return { ok: true, value: null };
     }
-    case "page_unhover": {
+    case "sidepanel_unhover": {
       if (!element)
         return {
           ok: false,
@@ -2026,7 +2209,7 @@ async function handlePageAction(
       element.dispatchEvent(ev);
       return { ok: true, value: null };
     }
-    case "page_scroll": {
+    case "sidepanel_scroll": {
       const { direction, amount } = expectParams<PageScrollParams>(params);
       window.scrollBy({
         top: direction === "down" ? amount : -amount,
@@ -2034,7 +2217,7 @@ async function handlePageAction(
       });
       return { ok: true, value: null };
     }
-    case "page_scroll_to": {
+    case "sidepanel_scroll_to": {
       if (!element)
         return {
           ok: false,
@@ -2046,7 +2229,7 @@ async function handlePageAction(
     default:
       return {
         ok: false,
-        error: { message: `Unknown page action: ${action}`, code: "EUNKNOWN" },
+        error: { message: `Unknown sidepanel action: ${action}`, code: "EUNKNOWN" },
       };
   }
 }

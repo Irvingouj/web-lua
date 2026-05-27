@@ -32,6 +32,43 @@ function getElementByRefId(refId: string | number): Element | null {
   return document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
 }
 
+function findElementByLabel(query: string): Element | null {
+  const lowerQuery = query.toLowerCase().trim();
+  if (!lowerQuery) return null;
+  const all = Array.from(document.querySelectorAll('input, textarea, select, button, a, [role="button"], [role="link"]'));
+  for (const el of all) {
+    const ariaLabel = el.getAttribute("aria-label");
+    if (ariaLabel && ariaLabel.toLowerCase().trim() === lowerQuery) return el;
+    const placeholder = (el as HTMLInputElement).placeholder;
+    if (placeholder && placeholder.toLowerCase().trim() === lowerQuery) return el;
+    const id = el.id;
+    if (id) {
+      const label = document.querySelector(`label[for='${CSS.escape(id)}']`);
+      if (label && label.textContent?.trim().toLowerCase() === lowerQuery) return el;
+    }
+    const parentLabel = el.closest("label");
+    if (parentLabel && parentLabel.textContent?.trim().toLowerCase() === lowerQuery) return el;
+    const text = el.textContent?.trim().toLowerCase() || "";
+    if (text === lowerQuery) return el;
+  }
+  return null;
+}
+
+function findCandidateLabels(query: string): string[] {
+  const lowerQuery = query.toLowerCase().trim();
+  const candidates = new Set<string>();
+  const all = Array.from(document.querySelectorAll('input, textarea, select, button, a, [role="button"], [role="link"]'));
+  for (const el of all) {
+    const ariaLabel = el.getAttribute("aria-label");
+    if (ariaLabel) candidates.add(ariaLabel.trim());
+    const placeholder = (el as HTMLInputElement).placeholder;
+    if (placeholder) candidates.add(placeholder.trim());
+    const text = el.textContent?.trim() || "";
+    if (text) candidates.add(text);
+  }
+  return Array.from(candidates).filter((c) => c.toLowerCase().includes(lowerQuery)).slice(0, 5);
+}
+
 function asRecord(obj: unknown): Record<string, unknown> {
   return typeof obj === "object" && obj !== null && !Array.isArray(obj)
     ? (obj as Record<string, unknown>)
@@ -223,17 +260,33 @@ type Handler<T = unknown, R = unknown> = (params: T) => R | Promise<R>;
 const handlers: Record<string, Handler> = {
   click: (params) => {
     const refId = getStringParam(params, "refId");
-    const el = refId ? getElementByRefId(refId) : null;
-    if (!el) throw new Error(`Element ${refId} not found`);
+    const label = getStringParam(params, "label");
+    let el = refId ? getElementByRefId(refId) : null;
+    if (!el && label) {
+      el = findElementByLabel(label);
+    }
+    if (!el) {
+      const query = label || refId;
+      const candidates = query ? findCandidateLabels(query) : [];
+      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+    }
     (el as HTMLElement).click();
     return null;
   },
 
   fill: (params) => {
     const refId = getStringParam(params, "refId");
+    const label = getStringParam(params, "label");
     const value = getStringParam(params, "value");
-    const el = refId ? getElementByRefId(refId) : null;
-    if (!el) throw new Error(`Element ${refId} not found`);
+    let el = refId ? getElementByRefId(refId) : null;
+    if (!el && label) {
+      el = findElementByLabel(label);
+    }
+    if (!el) {
+      const query = label || refId;
+      const candidates = query ? findCandidateLabels(query) : [];
+      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+    }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       el.value = value;
       const ev = new InputEvent("input", { bubbles: true });
@@ -245,9 +298,39 @@ const handlers: Record<string, Handler> = {
 
   type: (params) => {
     const refId = getStringParam(params, "refId");
+    const label = getStringParam(params, "label");
     const text = getStringParam(params, "text");
-    const el = refId ? getElementByRefId(refId) : null;
-    if (!el) throw new Error(`Element ${refId} not found`);
+    let el = refId ? getElementByRefId(refId) : null;
+    if (!el && label) {
+      el = findElementByLabel(label);
+    }
+    if (!el) {
+      const query = label || refId;
+      const candidates = query ? findCandidateLabels(query) : [];
+      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+    }
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      el.value = text;
+      const ev = new InputEvent("input", { bubbles: true });
+      el.dispatchEvent(ev);
+      return null;
+    }
+    throw new Error("Element is not an input");
+  },
+
+  append: (params) => {
+    const refId = getStringParam(params, "refId");
+    const label = getStringParam(params, "label");
+    const text = getStringParam(params, "text");
+    let el = refId ? getElementByRefId(refId) : null;
+    if (!el && label) {
+      el = findElementByLabel(label);
+    }
+    if (!el) {
+      const query = label || refId;
+      const candidates = query ? findCandidateLabels(query) : [];
+      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+    }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       el.value += text;
       const ev = new InputEvent("input", { bubbles: true });

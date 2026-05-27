@@ -83,6 +83,8 @@ pub struct SleepParams {
 pub struct PageClickParams {
     #[serde(rename = "refId")]
     pub ref_id: String,
+    #[serde(default)]
+    pub label: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -90,6 +92,8 @@ pub struct PageClickParams {
 pub struct PageDblClickParams {
     #[serde(rename = "refId")]
     pub ref_id: String,
+    #[serde(default)]
+    pub label: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -97,6 +101,8 @@ pub struct PageDblClickParams {
 pub struct PageFillParams {
     #[serde(rename = "refId")]
     pub ref_id: String,
+    #[serde(default)]
+    pub label: String,
     pub value: String,
 }
 
@@ -105,6 +111,8 @@ pub struct PageFillParams {
 pub struct PageTypeParams {
     #[serde(rename = "refId")]
     pub ref_id: String,
+    #[serde(default)]
+    pub label: String,
     pub text: String,
 }
 
@@ -158,6 +166,36 @@ pub struct PageScrollToParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct PageGotoParams {
     pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct PageFindParams {
+    pub selector: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct PageWaitForParams {
+    pub selector: String,
+    #[serde(default = "default_timeout")]
+    pub timeout: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct PageExtractParams {
+    pub fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct PageAppendParams {
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+    #[serde(default)]
+    pub label: String,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

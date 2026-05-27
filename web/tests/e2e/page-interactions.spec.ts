@@ -108,7 +108,7 @@ end
     await expectCellOutputContains(page, 0, "filled");
   });
 
-  test("4: page.type on input appends text", async ({ page }) => {
+  test("4: page.type on input sets value", async ({ page }) => {
     await setCellCode(
       page,
       0,
@@ -275,5 +275,32 @@ print("went forward")
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
     await expectCellOutputContains(page, 0, "went forward");
+  });
+
+  test("11: page.append on input appends text", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local snap = page.snapshot_data()
+local input_ref = nil
+for _, node in ipairs(snap.data.nodes) do
+  if node.tag == "input" and node.role == "textbox" then
+    input_ref = node.refId
+    break
+  end
+end
+if input_ref then
+  page.fill(input_ref, "hello")
+  page.append(input_ref, " world")
+  print("appended")
+else
+  print("no input")
+end
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "appended");
   });
 });

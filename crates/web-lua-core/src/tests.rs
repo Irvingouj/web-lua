@@ -68,6 +68,10 @@ mod tests {
         crate::command_params::TabBackParams::export_all(&cfg).unwrap();
         crate::command_params::TabWaitForLoadParams::export_all(&cfg).unwrap();
         crate::command_params::TabScrollToParams::export_all(&cfg).unwrap();
+        crate::command_params::PageFindParams::export_all(&cfg).unwrap();
+        crate::command_params::PageWaitForParams::export_all(&cfg).unwrap();
+        crate::command_params::PageExtractParams::export_all(&cfg).unwrap();
+        crate::command_params::PageAppendParams::export_all(&cfg).unwrap();
     }
 
     #[test]
