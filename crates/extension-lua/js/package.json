@@ -1,6 +1,6 @@
 {
   "name": "@pi-oxide/extension-lua",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Chrome Extension Lua runtime with tab, chrome, and runtime APIs",
   "type": "module",
   "main": "dist/index.js",

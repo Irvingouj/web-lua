@@ -142,6 +142,18 @@ function copyExtensionAssets() {
     try {
       execSync("tsc", { cwd: srcDir, stdio: "pipe" });
       console.log("  Compiled TypeScript sources");
+      // Strip ESM marker from content-script.js so it works as a classic MV3 script
+      // tsc may emit into dist/ (when outDir is set), so strip both locations
+      function stripEsmMarker(filePath) {
+        if (fs.existsSync(filePath)) {
+          let cs = fs.readFileSync(filePath, "utf-8");
+          cs = cs.replace(/export\s*\{\s*\};?\s*$/, "");
+          fs.writeFileSync(filePath, cs);
+          console.log(`  Stripped ESM marker from ${path.basename(filePath)}`);
+        }
+      }
+      stripEsmMarker(path.join(srcDir, "content-script.js"));
+      stripEsmMarker(path.join(distDir, "content-script.js"));
     } catch (e) {
       console.error("  TypeScript compilation failed:", e.message);
       process.exit(1);

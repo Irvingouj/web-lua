@@ -526,4 +526,3 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         return false;
     }
 });
-export {};

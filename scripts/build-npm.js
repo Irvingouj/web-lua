@@ -69,6 +69,17 @@ if (pkg.generated) {
 
 // Run tsc
 execSync("tsc", { cwd: absDir, stdio: "inherit" });
+// Strip ESM marker from content-script.js so it works as a classic MV3 script
+function stripEsmMarker(filePath) {
+  if (fs.existsSync(filePath)) {
+    let cs = fs.readFileSync(filePath, "utf-8");
+    cs = cs.replace(/export\s*\{\s*\};?\s*$/, "");
+    fs.writeFileSync(filePath, cs);
+    console.log(`  Stripped ESM marker from ${path.basename(filePath)}`);
+  }
+}
+stripEsmMarker(path.join(absDir, "content-script.js"));
+stripEsmMarker(path.join(distDir, "content-script.js"));
 
 // Copy WASM bundles and static assets into dist/
 for (const file of [...pkg.wasm, ...pkg.extra]) {
