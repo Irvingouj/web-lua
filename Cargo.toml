@@ -8,6 +8,7 @@ members = [
     "crates/extension-lua",
     "crates/web-lua-plugin-crypto",
     "crates/dom-semantic-tree",
+    "crates/web-fs",
 ]
 
 [workspace.package]
@@ -23,3 +24,4 @@ serde_json = "1"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 url = "2"
 dom-semantic-tree = { path = "crates/dom-semantic-tree" }
+web-fs = { path = "crates/web-fs" }

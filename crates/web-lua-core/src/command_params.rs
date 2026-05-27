@@ -378,3 +378,48 @@ pub struct TabDblClickParams {
     #[serde(rename = "refId")]
     pub ref_id: String,
 }
+
+// ─── fs.* ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FsWriteParams {
+    pub path: String,
+    pub data: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FsPathParams {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FsCopyParams {
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FsUpdateParams {
+    pub path: String,
+    pub offset: u64,
+    pub data: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FsHashParams {
+    pub path: String,
+    pub algo: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FsReadRangeParams {
+    pub path: String,
+    pub offset: u64,
+    pub len: usize,
+}

@@ -42,6 +42,7 @@ impl ExtensionSession {
         };
         // Inject Lua aliases so the Lua API surface matches the design
         let _ = session.base.load_library(include_str!("prelude.lua"));
+        let _ = session.base.load_library(web_lua_core::PATH_PRELUDE);
         // Register injected alias metadata
         web_lua_core::lua_api_doc!(
             namespace: "tab",
@@ -165,6 +166,72 @@ impl ExtensionSession {
             ],
             returns: "table" => "{ status, ok, body, headers }",
         );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "join",
+            action: "",
+            doc: "Join path segments into an absolute VFS path.",
+            source: "injected_lua",
+            params: [
+                parts: "string", required, "Path segments to join",
+            ],
+            returns: "string" => "Joined absolute path",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "basename",
+            action: "",
+            doc: "Get the last component of a path.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "File or directory name",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "dirname",
+            action: "",
+            doc: "Get the directory portion of a path.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "Parent directory path",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "extname",
+            action: "",
+            doc: "Get the file extension including the leading dot.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "Extension or empty string",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "normalize",
+            action: "",
+            doc: "Resolve . and .. segments in a path.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "Normalized absolute path",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "is_absolute",
+            action: "",
+            doc: "Check whether a path is absolute (starts with /).",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Path to check",
+            ],
+            returns: "boolean" => "true if absolute",
+        );
 
         session
     }
@@ -173,6 +240,7 @@ impl ExtensionSession {
     pub fn reset(&mut self) {
         self.base.reset();
         let _ = self.base.load_library(include_str!("prelude.lua"));
+        let _ = self.base.load_library(web_lua_core::PATH_PRELUDE);
     }
 
     /// Set the fuel limit for execution.

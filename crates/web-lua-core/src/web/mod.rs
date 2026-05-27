@@ -78,6 +78,7 @@ mod clipboard;
 mod cookies;
 mod dom;
 mod fetch;
+mod fs;
 mod history;
 mod host;
 mod log;
@@ -119,6 +120,10 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
 
     let clipboard_table = clipboard::register(ctx, host_state.clone());
     web_table.set_field(ctx, "clipboard", clipboard_table);
+
+    let fs_table = fs::register(ctx, host_state.clone());
+    web_table.set_field(ctx, "fs", fs_table);
+    ctx.set_global("fs", fs_table);
 
     chrome::register(ctx, host_state.clone());
     dom::register(ctx, host_state.clone());

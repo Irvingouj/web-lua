@@ -384,6 +384,211 @@ Format a DOM snapshot into a text representation.
 
 **Returns** `string`: Formatted text representation
 
+## `fs` module
+
+### `fs.exists _(action: `fs_exists`)_`
+
+Check whether a path exists in the virtual filesystem.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path
+
+**Returns** `boolean`: true if the path exists
+
+### `fs.stat _(action: `fs_stat`)_`
+
+Get metadata for a path.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path
+
+**Returns** `table | nil`: Metadata object or nil if not found
+
+### `fs.list _(action: `fs_list`)_`
+
+List entries in a directory.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS directory path
+
+**Returns** `table`: Array of DirEntry tables
+
+### `fs.mkdir _(action: `fs_mkdir`)_`
+
+Create a directory (and parents if needed).
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS directory path
+
+**Returns** `boolean`: true on success
+
+### `fs.delete _(action: `fs_delete`)_`
+
+Delete a file or directory (recursive for directories).
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path to delete
+
+**Returns** `boolean`: true on success
+
+### `fs.copy _(action: `fs_copy`)_`
+
+Copy a file from one path to another.
+
+**Parameters**
+
+- `from` (`string`, required): Source absolute VFS path
+- `to` (`string`, required): Destination absolute VFS path
+
+**Returns** `boolean`: true on success
+
+### `fs.move _(action: `fs_move`)_`
+
+Move (rename) a file from one path to another.
+
+**Parameters**
+
+- `from` (`string`, required): Source absolute VFS path
+- `to` (`string`, required): Destination absolute VFS path
+
+**Returns** `boolean`: true on success
+
+### `fs.read _(action: `fs_read`)_`
+
+Read raw bytes from a file. Returns base64-encoded string over the async wire.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+
+**Returns** `string`: Base64-encoded file contents
+
+### `fs.read_text _(action: `fs_read_text`)_`
+
+Read a file as UTF-8 text.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+
+**Returns** `string | nil`: File contents or nil
+
+### `fs.read_base64 _(action: `fs_read_base64`)_`
+
+Read a file and return its contents as base64.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+
+**Returns** `string | nil`: Base64-encoded contents or nil
+
+### `fs.read_range _(action: `fs_read_range`)_`
+
+Read a byte range from a file.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `offset` (`number`, required): Byte offset to start reading
+- `len` (`number`, required): Number of bytes to read
+
+**Returns** `string`: Base64-encoded range contents
+
+### `fs.write _(action: `fs_write`)_`
+
+Write raw bytes to a file (overwrites existing). Data is base64-encoded over the wire.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `data` (`string`, required): Raw byte string to write
+
+**Returns** `boolean`: true on success
+
+### `fs.write_text _(action: `fs_write_text`)_`
+
+Write UTF-8 text to a file (overwrites existing).
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `text` (`string`, required): Text to write
+
+**Returns** `boolean`: true on success
+
+### `fs.write_base64 _(action: `fs_write_base64`)_`
+
+Write base64-decoded bytes to a file (overwrites existing).
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `b64` (`string`, required): Base64-encoded data
+
+**Returns** `boolean`: true on success
+
+### `fs.append _(action: `fs_append`)_`
+
+Append raw bytes to a file. Data is base64-encoded over the wire.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `data` (`string`, required): Raw byte string to append
+
+**Returns** `boolean`: true on success
+
+### `fs.append_text _(action: `fs_append_text`)_`
+
+Append UTF-8 text to a file.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `text` (`string`, required): Text to append
+
+**Returns** `boolean`: true on success
+
+### `fs.append_base64 _(action: `fs_append_base64`)_`
+
+Append base64-decoded bytes to a file.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `b64` (`string`, required): Base64-encoded data
+
+**Returns** `boolean`: true on success
+
+### `fs.update _(action: `fs_update`)_`
+
+Write raw bytes at a specific offset in a file. Data is base64-encoded over the wire.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `offset` (`number`, required): Byte offset
+- `data` (`string`, required): Raw byte string to write
+
+**Returns** `boolean`: true on success
+
+### `fs.hash _(action: `fs_hash`)_`
+
+Compute a hash of a file's contents.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS file path
+- `algo` (`string`, required): Hash algorithm (sha256 or sha1)
+
+**Returns** `string | nil`: Hex-encoded hash or nil
+
 ## `global` module
 
 ### `global.sleep`
@@ -712,6 +917,68 @@ Fetch a URL (alias for web.fetch).
 - `opts` (`table | nil`, optional): Options: method, body, headers, timeout
 
 **Returns** `table`: { status, ok, body, headers }
+
+## `path` module
+
+### `path.join`
+
+Join path segments into an absolute VFS path.
+
+**Parameters**
+
+- `parts` (`string`, required): Path segments to join
+
+**Returns** `string`: Joined absolute path
+
+### `path.basename`
+
+Get the last component of a path.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path
+
+**Returns** `string`: File or directory name
+
+### `path.dirname`
+
+Get the directory portion of a path.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path
+
+**Returns** `string`: Parent directory path
+
+### `path.extname`
+
+Get the file extension including the leading dot.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path
+
+**Returns** `string`: Extension or empty string
+
+### `path.normalize`
+
+Resolve . and .. segments in a path.
+
+**Parameters**
+
+- `path` (`string`, required): Absolute VFS path
+
+**Returns** `string`: Normalized absolute path
+
+### `path.is_absolute`
+
+Check whether a path is absolute (starts with /).
+
+**Parameters**
+
+- `path` (`string`, required): Path to check
+
+**Returns** `boolean`: true if absolute
 
 ## `runtime` module
 

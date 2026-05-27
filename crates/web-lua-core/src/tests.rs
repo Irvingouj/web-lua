@@ -72,6 +72,12 @@ mod tests {
         crate::command_params::PageWaitForParams::export_all(&cfg).unwrap();
         crate::command_params::PageExtractParams::export_all(&cfg).unwrap();
         crate::command_params::PageAppendParams::export_all(&cfg).unwrap();
+        crate::command_params::FsPathParams::export_all(&cfg).unwrap();
+        crate::command_params::FsWriteParams::export_all(&cfg).unwrap();
+        crate::command_params::FsCopyParams::export_all(&cfg).unwrap();
+        crate::command_params::FsUpdateParams::export_all(&cfg).unwrap();
+        crate::command_params::FsHashParams::export_all(&cfg).unwrap();
+        crate::command_params::FsReadRangeParams::export_all(&cfg).unwrap();
     }
 
     #[test]
@@ -1662,6 +1668,52 @@ mod tests {
         assert_eq!(result.status, CellStatus::AsyncPending);
         let cmd = result.pending_command.unwrap();
         assert_eq!(cmd.action.as_str(), "storage_list");
+    }
+
+    #[test]
+    fn test_fs_write_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            web.fs.write("/test.txt", "hello")
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "fs_write");
+        assert_eq!(cmd.params["path"], "/test.txt");
+        assert!(cmd.params["data"].as_str().unwrap().len() > 0);
+    }
+
+    #[test]
+    fn test_fs_read_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local data = web.fs.read("/test.txt")
+            print(data)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "fs_read");
+    }
+
+    #[test]
+    fn test_fs_stat_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local meta = web.fs.stat("/test.txt")
+            print(meta)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "fs_stat");
     }
 
     #[test]

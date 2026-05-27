@@ -4,6 +4,11 @@ use crate::browser_api::{
     execute_page_scroll_to, execute_page_select, execute_page_type, execute_page_unhover,
     execute_page_wait, execute_sleep, execute_storage_delete, execute_storage_get,
     execute_storage_list, execute_storage_set,
+    execute_fs_exists, execute_fs_stat, execute_fs_list, execute_fs_mkdir, execute_fs_delete,
+    execute_fs_copy, execute_fs_move, execute_fs_read, execute_fs_read_text, execute_fs_read_base64,
+    execute_fs_read_range, execute_fs_write, execute_fs_write_text, execute_fs_write_base64,
+    execute_fs_append, execute_fs_append_text, execute_fs_append_base64, execute_fs_update,
+    execute_fs_hash,
 };
 use std::cell::Cell;
 use wasm_bindgen::prelude::*;
@@ -48,6 +53,7 @@ page.fetch = web.fetch
 sleep = web.sleep
 "#,
         );
+        let _ = session.base.load_library(web_lua_core::PATH_PRELUDE);
 
         // Register injected alias metadata
         web_lua_core::lua_api_doc!(
@@ -84,6 +90,72 @@ sleep = web.sleep
             ],
             returns: "nil" => "None",
         );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "join",
+            action: "",
+            doc: "Join path segments into an absolute VFS path.",
+            source: "injected_lua",
+            params: [
+                parts: "string", required, "Path segments to join",
+            ],
+            returns: "string" => "Joined absolute path",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "basename",
+            action: "",
+            doc: "Get the last component of a path.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "File or directory name",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "dirname",
+            action: "",
+            doc: "Get the directory portion of a path.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "Parent directory path",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "extname",
+            action: "",
+            doc: "Get the file extension including the leading dot.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "Extension or empty string",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "normalize",
+            action: "",
+            doc: "Resolve . and .. segments in a path.",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Absolute VFS path",
+            ],
+            returns: "string" => "Normalized absolute path",
+        );
+        web_lua_core::lua_api_doc!(
+            namespace: "path",
+            name: "is_absolute",
+            action: "",
+            doc: "Check whether a path is absolute (starts with /).",
+            source: "injected_lua",
+            params: [
+                path: "string", required, "Path to check",
+            ],
+            returns: "boolean" => "true if absolute",
+        );
 
         session
     }
@@ -98,6 +170,7 @@ page.fetch = web.fetch
 sleep = web.sleep
 "#,
         );
+        let _ = self.base.load_library(web_lua_core::PATH_PRELUDE);
     }
 
     /// Set the fuel limit for execution.
@@ -920,6 +993,101 @@ impl WebSession {
                 Ok(execute_storage_delete(params).await)
             }
             Action::StorageList => Ok(execute_storage_list().await),
+            Action::FsExists => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_exists params: {}", e))?;
+                Ok(execute_fs_exists(params).await)
+            }
+            Action::FsStat => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_stat params: {}", e))?;
+                Ok(execute_fs_stat(params).await)
+            }
+            Action::FsList => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_list params: {}", e))?;
+                Ok(execute_fs_list(params).await)
+            }
+            Action::FsMkdir => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_mkdir params: {}", e))?;
+                Ok(execute_fs_mkdir(params).await)
+            }
+            Action::FsDelete => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_delete params: {}", e))?;
+                Ok(execute_fs_delete(params).await)
+            }
+            Action::FsCopy => {
+                let params = cmd.parse_params::<FsCopyParams>()
+                    .map_err(|e| format!("Invalid fs_copy params: {}", e))?;
+                Ok(execute_fs_copy(params).await)
+            }
+            Action::FsMove => {
+                let params = cmd.parse_params::<FsCopyParams>()
+                    .map_err(|e| format!("Invalid fs_move params: {}", e))?;
+                Ok(execute_fs_move(params).await)
+            }
+            Action::FsRead => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_read params: {}", e))?;
+                Ok(execute_fs_read(params).await)
+            }
+            Action::FsReadText => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_read_text params: {}", e))?;
+                Ok(execute_fs_read_text(params).await)
+            }
+            Action::FsReadBase64 => {
+                let params = cmd.parse_params::<FsPathParams>()
+                    .map_err(|e| format!("Invalid fs_read_base64 params: {}", e))?;
+                Ok(execute_fs_read_base64(params).await)
+            }
+            Action::FsReadRange => {
+                let params = cmd.parse_params::<FsReadRangeParams>()
+                    .map_err(|e| format!("Invalid fs_read_range params: {}", e))?;
+                Ok(execute_fs_read_range(params).await)
+            }
+            Action::FsWrite => {
+                let params = cmd.parse_params::<FsWriteParams>()
+                    .map_err(|e| format!("Invalid fs_write params: {}", e))?;
+                Ok(execute_fs_write(params).await)
+            }
+            Action::FsWriteText => {
+                let params = cmd.parse_params::<FsWriteParams>()
+                    .map_err(|e| format!("Invalid fs_write_text params: {}", e))?;
+                Ok(execute_fs_write_text(params).await)
+            }
+            Action::FsWriteBase64 => {
+                let params = cmd.parse_params::<FsWriteParams>()
+                    .map_err(|e| format!("Invalid fs_write_base64 params: {}", e))?;
+                Ok(execute_fs_write_base64(params).await)
+            }
+            Action::FsAppend => {
+                let params = cmd.parse_params::<FsWriteParams>()
+                    .map_err(|e| format!("Invalid fs_append params: {}", e))?;
+                Ok(execute_fs_append(params).await)
+            }
+            Action::FsAppendText => {
+                let params = cmd.parse_params::<FsWriteParams>()
+                    .map_err(|e| format!("Invalid fs_append_text params: {}", e))?;
+                Ok(execute_fs_append_text(params).await)
+            }
+            Action::FsAppendBase64 => {
+                let params = cmd.parse_params::<FsWriteParams>()
+                    .map_err(|e| format!("Invalid fs_append_base64 params: {}", e))?;
+                Ok(execute_fs_append_base64(params).await)
+            }
+            Action::FsUpdate => {
+                let params = cmd.parse_params::<FsUpdateParams>()
+                    .map_err(|e| format!("Invalid fs_update params: {}", e))?;
+                Ok(execute_fs_update(params).await)
+            }
+            Action::FsHash => {
+                let params = cmd.parse_params::<FsHashParams>()
+                    .map_err(|e| format!("Invalid fs_hash params: {}", e))?;
+                Ok(execute_fs_hash(params).await)
+            }
             Action::MockAsync => {
                 // Test-only: just return empty success
                 Ok(WasmAsyncResponse {
