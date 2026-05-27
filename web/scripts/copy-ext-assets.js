@@ -8,14 +8,18 @@ const rootDir = path.resolve(__dirname, "../..");
 const publicDir = path.join(rootDir, "web", "public");
 
 const assets = [
-  "crates/extension-lua/js/content-script.js",
-  "crates/extension-lua/js/manifest.json",
-  "crates/extension-lua/js/background.js",
+  { name: "content-script.js", srcDir: "crates/extension-lua/js" },
+  { name: "manifest.json", srcDir: "crates/extension-lua/js" },
+  { name: "background.js", srcDir: "crates/extension-lua/js" },
 ];
 
 for (const asset of assets) {
-  const src = path.join(rootDir, asset);
-  const dest = path.join(publicDir, path.basename(asset));
+  const srcDir = path.join(rootDir, asset.srcDir);
+  const distDir = path.join(srcDir, "dist");
+  const src = fs.existsSync(path.join(distDir, asset.name))
+    ? path.join(distDir, asset.name)
+    : path.join(srcDir, asset.name);
+  const dest = path.join(publicDir, asset.name);
   fs.copyFileSync(src, dest);
-  console.log(`Copied ${asset} → public/${path.basename(asset)}`);
+  console.log(`Copied ${src.replace(rootDir + "/", "")} → public/${asset.name}`);
 }

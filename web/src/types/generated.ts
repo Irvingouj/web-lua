@@ -19,8 +19,6 @@ export type DomSnapshotParams = { interactive_only: boolean, max_nodes: bigint, 
 
 export type FetchParams = { url: string, method: string, headers: { [key in string]: string }, body: string | null, timeout: bigint, };
 
-export type PageAppendParams = { refId: string, label: string, text: string, };
-
 export type FsCopyParams = { from: string, to: string, };
 
 export type FsHashParams = { path: string, algo: string, };
@@ -32,6 +30,8 @@ export type FsReadRangeParams = { path: string, offset: bigint, len: number, };
 export type FsUpdateParams = { path: string, offset: bigint, data: string, };
 
 export type FsWriteParams = { path: string, data: string, };
+
+export type PageAppendParams = { refId: string, label: string, text: string, };
 
 export type PageCheckParams = { refId: string, checked: boolean, };
 
