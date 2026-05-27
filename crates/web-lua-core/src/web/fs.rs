@@ -1,5 +1,6 @@
 use crate::state::HostState;
 use crate::types::AsyncCommand;
+use crate::web::protector::protect_api_table;
 use piccolo::{Callback, CallbackReturn, Context, IntoValue, Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -337,7 +338,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid fs.read_range params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("fs", "read_range", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -410,7 +411,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid fs.write params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("fs", "write", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -530,7 +531,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid fs.append params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("fs", "append", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -667,7 +668,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid fs.update params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("fs", "update", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -740,7 +741,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid fs.hash params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("fs", "hash", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -775,5 +776,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
-    fs_table
+    protect_api_table(ctx, fs_table, "fs")
 }
