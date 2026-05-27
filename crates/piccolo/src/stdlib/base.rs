@@ -94,18 +94,57 @@ pub fn load_base<'gc>(ctx: Context<'gc>) {
 
     ctx.set_global(
         "error",
-        Callback::from_fn(&ctx, |_, _, stack| Err(stack.get(0).into())),
+        Callback::from_fn(&ctx, |ctx, exec, stack| {
+            let mut msg = stack.get(0);
+            // If the error value is a string, prepend the current line number
+            // so that downstream consumers can report line-specific errors.
+            if let Value::String(s) = msg {
+                // Try to get the current line from the upper Lua frame.
+                // The upper frame is the Lua code that called this callback.
+                // current_line is a 0-based LineNumber, so add 1 for user display.
+                if let Some(ulf) = exec.upper_lua_frame() {
+                    let line = ulf.current_line.0 + 1;
+                    if line > 0 {
+                        let prefix = format!("[line {}]: ", line);
+                        let new_msg = format!("{}{}", prefix, s.display_lossy());
+                        msg = crate::String::from_slice(&ctx, &new_msg).into();
+                    }
+                }
+            }
+            Err(msg.into())
+        }),
     );
 
     ctx.set_global(
         "assert",
-        Callback::from_fn(&ctx, |ctx, _, stack| {
+        Callback::from_fn(&ctx, |ctx, exec, mut stack| {
             if stack.get(0).to_bool() {
                 Ok(CallbackReturn::Return)
             } else if stack.get(1).is_nil() {
-                Err("assertion failed!".into_value(ctx).into())
+                let mut msg = crate::String::from_slice(&ctx, b"assertion failed!");
+                if let Some(ulf) = exec.upper_lua_frame() {
+                    let line = ulf.current_line.0 + 1;
+                    if line > 0 {
+                        let prefix = format!("[line {}]: ", line);
+                        let new_msg = format!("{}{}", prefix, msg.display_lossy());
+                        msg = crate::String::from_slice(&ctx, &new_msg);
+                    }
+                }
+                stack.replace(ctx, msg);
+                Err(stack.get(0).into())
             } else {
-                Err(stack.get(1).into())
+                let mut msg = stack.get(1);
+                if let Value::String(s) = msg {
+                    if let Some(ulf) = exec.upper_lua_frame() {
+                        let line = ulf.current_line.0 + 1;
+                        if line > 0 {
+                            let prefix = format!("[line {}]: ", line);
+                            let new_msg = format!("{}{}", prefix, s.display_lossy());
+                            msg = crate::String::from_slice(&ctx, &new_msg).into();
+                        }
+                    }
+                }
+                Err(msg.into())
             }
         }),
     );

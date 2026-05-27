@@ -38,7 +38,7 @@ pub struct WasmAsyncResponse {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WasmCellError {
     Compile { message: String, line: Option<u32> },
-    Runtime { message: String },
+    Runtime { message: String, line: Option<u32> },
     StrictMode { variable: String },
     FuelExhausted,
     Internal { message: String },
@@ -138,7 +138,9 @@ impl From<web_lua_core::CellError> for WasmCellError {
             web_lua_core::CellError::Compile { message, line } => {
                 WasmCellError::Compile { message, line }
             }
-            web_lua_core::CellError::Runtime { message } => WasmCellError::Runtime { message },
+            web_lua_core::CellError::Runtime { message, line } => {
+                WasmCellError::Runtime { message, line }
+            }
             web_lua_core::CellError::StrictMode { variable } => {
                 WasmCellError::StrictMode { variable }
             }
@@ -207,7 +209,10 @@ impl From<web_lua_core::RunResult> for WasmRunResult {
                 commands: r.commands,
                 fuel_exhausted: r.fuel_exhausted,
                 execution_count: r.execution_count,
-                pending_command: r.pending_command.expect("AsyncPending without pending_command").into(),
+                pending_command: r
+                    .pending_command
+                    .expect("AsyncPending without pending_command")
+                    .into(),
             },
             web_lua_core::CellStatus::Done => {
                 if let Some(error) = r.error {
@@ -233,19 +238,34 @@ impl From<web_lua_core::RunResult> for WasmRunResult {
 impl From<WasmRunResult> for CellResult {
     fn from(r: WasmRunResult) -> Self {
         match r {
-            WasmRunResult::Ok { stdout, stderr, result, execution_count } => CellResult::Ok {
+            WasmRunResult::Ok {
+                stdout,
+                stderr,
+                result,
+                execution_count,
+            } => CellResult::Ok {
                 stdout,
                 stderr,
                 result,
                 execution_count,
             },
-            WasmRunResult::Err { stdout, stderr, error, execution_count } => CellResult::Err {
+            WasmRunResult::Err {
+                stdout,
+                stderr,
+                error,
+                execution_count,
+            } => CellResult::Err {
                 stdout,
                 stderr,
                 error,
                 execution_count,
             },
-            WasmRunResult::Pending { stdout, stderr, execution_count, .. } => CellResult::Err {
+            WasmRunResult::Pending {
+                stdout,
+                stderr,
+                execution_count,
+                ..
+            } => CellResult::Err {
                 stdout,
                 stderr,
                 error: WasmCellError::Internal {

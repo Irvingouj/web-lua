@@ -12,7 +12,7 @@ pub enum CellError {
     /// Syntax or parse error during compilation.
     Compile { message: String, line: Option<u32> },
     /// Lua runtime error (type mismatch, nil arithmetic, etc.)
-    Runtime { message: String },
+    Runtime { message: String, line: Option<u32> },
     /// Strict mode: access to an undeclared global variable.
     StrictMode { variable: String },
     /// Execution exceeded the fuel limit (likely an infinite loop).
@@ -31,7 +31,13 @@ impl fmt::Display for CellError {
                     write!(f, "Compile error: {}", message)
                 }
             }
-            CellError::Runtime { message } => write!(f, "Runtime error: {}", message),
+            CellError::Runtime { message, line } => {
+                if let Some(line) = line {
+                    write!(f, "Runtime error (line {}): {}", line, message)
+                } else {
+                    write!(f, "Runtime error: {}", message)
+                }
+            }
             CellError::StrictMode { variable } => {
                 write!(f, "Strict mode: undeclared variable '{}'", variable)
             }

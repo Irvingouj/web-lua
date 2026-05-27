@@ -95,6 +95,27 @@ mod tests {
     }
 
     #[test]
+    fn test_runtime_error_line_is_cell_relative() {
+        let mut session = NotebookSession::new();
+        // First cell: 3 lines, no error
+        let r1 = session.run_cell("local a = 1\nlocal b = 2\nlocal c = 3", "");
+        assert!(r1.error.is_none());
+        // Second cell: 2 lines, error on its line 2
+        // The line must be 2 (relative to this cell), not 5 (cumulative).
+        let r2 = session.run_cell("local d = 4\nerror('boom')", "");
+        if let Some(CellError::Runtime { line, .. }) = r2.error {
+            assert_eq!(
+                line,
+                Some(2),
+                "Expected cell-relative line 2, got {:?}",
+                line
+            );
+        } else {
+            panic!("Expected Runtime error, got {:?}", r2.error);
+        }
+    }
+
+    #[test]
     fn test_function_and_recursion() {
         let mut session = NotebookSession::new();
         let code = r#"
@@ -658,6 +679,57 @@ mod tests {
             "Unexpected error type: {:?}",
             result.error
         );
+    }
+
+    #[test]
+    fn test_runtime_error_has_line_number() {
+        let mut session = NotebookSession::new();
+        // error() on line 2 should report line 2
+        let result = session.run_cell("local x = 1\nerror('boom')", "");
+        if let Some(CellError::Runtime { line, .. }) = result.error {
+            assert_eq!(line, Some(2), "Expected line 2, got {:?}", line);
+        } else {
+            panic!("Expected Runtime error, got {:?}", result.error);
+        }
+    }
+
+    #[test]
+    fn test_assert_error_has_line_number() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("local x = 1\nassert(false, 'boom')", "");
+        if let Some(CellError::Runtime { line, .. }) = result.error {
+            assert_eq!(line, Some(2), "Expected line 2, got {:?}", line);
+        } else {
+            panic!("Expected Runtime error, got {:?}", result.error);
+        }
+    }
+
+    #[test]
+    fn test_error_line_1() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("error('boom')", "");
+        if let Some(CellError::Runtime { line, .. }) = result.error {
+            assert_eq!(line, Some(1), "Expected line 1, got {:?}", line);
+        } else {
+            panic!("Expected Runtime error, got {:?}", result.error);
+        }
+    }
+
+    #[test]
+    fn test_error_message_with_embedded_line_marker() {
+        let mut session = NotebookSession::new();
+        // A user message that itself contains "[line 5]:" should not confuse the extractor
+        let result = session.run_cell("error('see [line 5]: for info')", "");
+        if let Some(CellError::Runtime { line, message }) = result.error {
+            assert_eq!(line, Some(1), "Expected line 1, got {:?}", line);
+            assert!(
+                message.contains("[line 5]: for info"),
+                "Message should keep embedded marker, got: {}",
+                message
+            );
+        } else {
+            panic!("Expected Runtime error, got {:?}", result.error);
+        }
     }
 
     #[test]

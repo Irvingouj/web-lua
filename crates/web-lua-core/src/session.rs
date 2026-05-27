@@ -5,7 +5,7 @@ use crate::state::HostState;
 use crate::types::{
     AsyncCommand, AsyncResponse, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
 };
-use crate::utils::{classify_extern_error, format_value};
+use crate::utils::{classify_extern_error, clean_error_message, extract_line_number, format_value};
 use piccolo::{Closure, Executor, ExecutorMode, Fuel, IntoValue, Lua, StashedExecutor, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -398,10 +398,14 @@ impl NotebookSession {
             .unwrap_or((None, None));
 
         if let Some(err_msg) = lua_error {
+            let line = extract_line_number(&err_msg);
             self.host_state
                 .borrow_mut()
                 .cell_errors
-                .push(CellError::Runtime { message: err_msg });
+                .push(CellError::Runtime {
+                    message: clean_error_message(&err_msg),
+                    line,
+                });
         }
 
         // ── Phase 4: Build result ──────────────────────────────
@@ -583,10 +587,14 @@ impl NotebookSession {
             .unwrap_or((None, None));
 
         if let Some(err_msg) = lua_error {
+            let line = extract_line_number(&err_msg);
             self.host_state
                 .borrow_mut()
                 .cell_errors
-                .push(CellError::Runtime { message: err_msg });
+                .push(CellError::Runtime {
+                    message: clean_error_message(&err_msg),
+                    line,
+                });
         }
 
         let hs = self.host_state.borrow();
