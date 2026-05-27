@@ -771,6 +771,235 @@ mod tests {
         assert_eq!(result.stdout, vec!["true", "42"]);
     }
 
+    // ── Contextual API errors ───────────────────────────────────
+
+    #[test]
+    fn test_unknown_api_lists_available() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("page.notexist()", "");
+        assert!(
+            result.error.is_some(),
+            "Expected error for unknown API, got none"
+        );
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        assert!(
+            msg.contains("page.notexist"),
+            "Message should mention the invalid API, got: {}",
+            msg
+        );
+        // Should list all available APIs in the namespace like --help
+        assert!(
+            msg.contains("Available APIs in 'page'"),
+            "Message should list available APIs, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("page.snapshot") && msg.contains("page.click"),
+            "Message should include real API names, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_unknown_api_always_lists_available() {
+        // Even wildly different names get the full namespace listing
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("page.xxxxxxx()", "");
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        assert!(
+            msg.contains("page.xxxxxxx"),
+            "Message should mention the invalid API, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("Available APIs in 'page'"),
+            "Message should still list available APIs, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_param_error_enriched() {
+        let mut session = NotebookSession::new();
+        // page.snapshot expects max_nodes to be a number
+        let result = session.run_cell(r#"page.snapshot({max_nodes = "bad"})"#, "");
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        assert!(
+            msg.contains("page.snapshot"),
+            "Message should identify the API, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("invalid parameters"),
+            "Message should say invalid parameters, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("Expected signature"),
+            "Message should show expected signature, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_chrome_top_level_miss() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("chrome.nope()", "");
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        // Should list chrome.tabs, chrome.runtime, etc — NOT say "no APIs registered"
+        assert!(
+            msg.contains("chrome.tabs") || msg.contains("chrome.runtime"),
+            "Should list sub-namespaces under chrome, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_nil_comparison_no_crash() {
+        let mut session = NotebookSession::new();
+        // Reads of missing keys now return a sentinel function instead of crashing,
+        // so == nil is false (the sentinel is truthy). At least it doesn't throw.
+        let result = session.run_cell(
+            r#"if page.notexist == nil then print("safe") else print("broken") end"#,
+            "",
+        );
+        assert!(
+            result.error.is_none(),
+            "Feature-detection read should not crash, got: {:?}",
+            result.error
+        );
+        assert_eq!(result.stdout, vec!["broken"]);
+    }
+
+    #[test]
+    fn test_sentinel_call_still_errors() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("page.notexist()", "");
+        assert!(
+            result.error.is_some(),
+            "Calling a missing API should still error"
+        );
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        assert!(
+            msg.contains("page.notexist"),
+            "Error should name the invalid API, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("Available APIs in 'page'"),
+            "Error should list available APIs, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_web_notexist_shows_apis_and_children() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("web.notexist()", "");
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        // web has direct APIs (fetch, sleep, log, mock_async) AND sub-namespaces (tab, storage, url)
+        assert!(
+            msg.contains("Available APIs in 'web'"),
+            "Should list direct APIs, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("Sub-namespaces under 'web'"),
+            "Should list sub-namespaces, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("web.tab") || msg.contains("web.storage") || msg.contains("web.url"),
+            "Should mention child namespaces, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_web_tab_notexist() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("web.tab.notexist()", "");
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        assert!(
+            msg.contains("web.tab.notexist"),
+            "Error should name the invalid API, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("Available APIs in 'web.tab'"),
+            "Should list APIs under web.tab, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_rawget_bypasses_protector() {
+        let mut session = NotebookSession::new();
+        // rawget bypasses the __index metatable and returns true nil
+        let result = session.run_cell(
+            r#"local v = rawget(page, "notexist")
+            if v == nil then print("raw_nil") else print("raw_something") end"#,
+            "",
+        );
+        assert!(
+            result.error.is_none(),
+            "rawget should bypass protector without error, got: {:?}",
+            result.error
+        );
+        assert_eq!(result.stdout, vec!["raw_nil"]);
+    }
+
+    #[test]
+    fn test_type_of_sentinel() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"print(type(page.notexist))"#,
+            "",
+        );
+        assert!(
+            result.error.is_none(),
+            "type() of sentinel should not crash, got: {:?}",
+            result.error
+        );
+        assert_eq!(result.stdout, vec!["function"]);
+    }
+
+    #[test]
+    fn test_sentinel_call_with_args() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell("page.notexist(1, 2, 3)", "");
+        let msg = match &result.error {
+            Some(CellError::Runtime { message, .. }) => message.clone(),
+            other => panic!("Expected Runtime error, got {:?}", other),
+        };
+        assert!(
+            msg.contains("page.notexist"),
+            "Error should name the invalid API even with extra args, got: {}",
+            msg
+        );
+    }
+
     // ── Local variables and scoping ─────────────────────────────
 
     #[test]

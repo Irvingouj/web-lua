@@ -80,8 +80,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                         match serde_json::from_value(params.clone()) {
                             Ok(v) => v,
                             Err(e) => {
-                                let msg =
-                                    format!("Invalid storage_get params built from Lua: {}", e);
+                                let msg = crate::utils::format_param_error("web.storage", "get", &e);
                                 return Err(msg.into_value(ctx).into());
                             }
                         };
@@ -91,8 +90,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                         match serde_json::from_value(params.clone()) {
                             Ok(v) => v,
                             Err(e) => {
-                                let msg =
-                                    format!("Invalid storage_set params built from Lua: {}", e);
+                                let msg = crate::utils::format_param_error("web.storage", "set", &e);
                                 return Err(msg.into_value(ctx).into());
                             }
                         };
@@ -102,8 +100,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                         match serde_json::from_value(params.clone()) {
                             Ok(v) => v,
                             Err(e) => {
-                                let msg =
-                                    format!("Invalid storage_delete params built from Lua: {}", e);
+                                let msg = crate::utils::format_param_error("web.storage", "delete", &e);
                                 return Err(msg.into_value(ctx).into());
                             }
                         };

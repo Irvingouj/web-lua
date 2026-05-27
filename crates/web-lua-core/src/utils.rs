@@ -77,65 +77,83 @@ pub(crate) fn clean_error_message(msg: &str) -> String {
     msg.to_string()
 }
 
-// ─── API Suggestion Helpers ──────────────────────────────────────
+// ─── API Discovery Helpers ─────────────────────────────────────
 
-/// Compute simple Levenshtein edit distance between two strings.
-#[allow(dead_code, clippy::needless_range_loop)]
-pub(crate) fn levenshtein_distance(a: &str, b: &str) -> usize {
-    let a_len = a.chars().count();
-    let b_len = b.chars().count();
-    if a_len == 0 {
-        return b_len;
-    }
-    if b_len == 0 {
-        return a_len;
-    }
-    let mut prev = vec![0usize; b_len + 1];
-    let mut curr = vec![0usize; b_len + 1];
-    for j in 0..=b_len {
-        prev[j] = j;
-    }
-    for (i, ac) in a.chars().enumerate() {
-        curr[0] = i + 1;
-        for (j, bc) in b.chars().enumerate() {
-            let cost = if ac == bc { 0 } else { 1 };
-            curr[j + 1] = (curr[j] + 1).min(prev[j + 1] + 1).min(prev[j] + cost);
+/// Scan `api_docs::REGISTRY` once and return both the direct API names in
+/// `namespace` and the immediate child namespace names under it.
+///
+/// Uses a single mutex lock and a single pass over the registry.
+pub(crate) fn scan_namespace(namespace: &str) -> (Vec<String>, Vec<String>) {
+    let prefix = format!("{}.", namespace);
+    let registry = REGISTRY.lock().unwrap();
+
+    let mut apis: Vec<String> = Vec::new();
+    let mut children: Vec<String> = Vec::new();
+
+    for doc in registry.iter() {
+        if doc.namespace == namespace {
+            apis.push(doc.name.clone());
+        } else if doc.namespace.starts_with(&prefix) {
+            let rest = &doc.namespace[prefix.len()..];
+            let child = if let Some(dot) = rest.find('.') {
+                format!("{}{}", prefix, &rest[..dot])
+            } else {
+                doc.namespace.clone()
+            };
+            children.push(child);
         }
-        std::mem::swap(&mut prev, &mut curr);
     }
-    prev[b_len]
+
+    apis.sort();
+    apis.dedup();
+    children.sort();
+    children.dedup();
+
+    (apis, children)
 }
 
-/// Given a namespace and a misspelled name, return up to 3 closest API names
-/// from `api_docs::REGISTRY`.
-#[allow(dead_code)]
-pub(crate) fn suggest_api_names(namespace: &str, name: &str) -> Vec<String> {
-    let registry = REGISTRY.lock().unwrap();
-    let mut candidates: Vec<(usize, String)> = registry
-        .iter()
-        .filter(|d| d.namespace == namespace)
-        .map(|d| {
-            let dist = levenshtein_distance(name, &d.name);
-            (dist, d.name.clone())
-        })
-        .collect();
-    candidates.sort_by_key(|(dist, _)| *dist);
-    candidates.into_iter().take(3).map(|(_, n)| n).collect()
+/// Build the "unknown API" help message for a given namespace and name.
+/// Returns the full formatted string used by the protector sentinel.
+pub(crate) fn format_unknown_api_error(namespace: &str, name: &str) -> String {
+    let (apis, children) = scan_namespace(namespace);
+    let mut msg = format!("'{}.{}' is not a valid API.\n\n", namespace, name);
+
+    if !apis.is_empty() {
+        msg.push_str(&format!("Available APIs in '{}':\n", namespace));
+        for api in &apis {
+            msg.push_str(&format!("  {}.{}\n", namespace, api));
+        }
+    }
+
+    if !children.is_empty() {
+        if !apis.is_empty() {
+            msg.push_str(&format!("\nSub-namespaces under '{}':\n", namespace));
+        } else {
+            msg.push_str(&format!(
+                "Available namespaces under '{}':\n",
+                namespace
+            ));
+        }
+        for child in &children {
+            msg.push_str(&format!("  {}\n", child));
+        }
+    }
+
+    if apis.is_empty() && children.is_empty() {
+        msg.push_str("(no APIs registered in this namespace)");
+    }
+
+    msg
 }
 
 /// Build a human-friendly parameter error message using `LuaApiDoc` metadata.
-#[allow(dead_code)]
-pub(crate) fn format_param_error(
-    namespace: &str,
-    name: &str,
-    serde_err: &serde_json::Error,
-) -> String {
+pub(crate) fn format_param_error(namespace: &str, name: &str, serde_err: &serde_json::Error) -> String {
     let registry = REGISTRY.lock().unwrap();
     let doc = registry
         .iter()
         .find(|d| d.namespace == namespace && d.name == name);
 
-    let signature = doc.map(|d| {
+    let signature: Option<String> = doc.map(|d| {
         let params = d
             .params
             .iter()
@@ -148,7 +166,10 @@ pub(crate) fn format_param_error(
             })
             .collect::<Vec<_>>()
             .join("\n");
-        format!("{}.{}({{\n{}\n}})", namespace, name, params)
+        format!(
+            "{}.{}({{\n{}\n}})",
+            namespace, name, params
+        )
     });
 
     let mut msg = format!("{}.{}: invalid parameters.\n", namespace, name);
@@ -245,5 +266,36 @@ mod tests {
     #[test]
     fn test_clean_error_message_no_prefix() {
         assert_eq!(clean_error_message("plain message"), "plain message");
+    }
+
+    #[test]
+    fn test_format_unknown_api_error_lists_children() {
+        let msg = format_unknown_api_error("chrome", "nope");
+        assert!(
+            msg.contains("chrome.nope"),
+            "Message should name the invalid API, got: {}",
+            msg
+        );
+        assert!(
+            msg.contains("Available namespaces under 'chrome'"),
+            "Should show child namespaces for chrome, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_format_param_error_without_registry_entry() {
+        let serde_err = serde_json::from_str::<serde_json::Value>("not_json").unwrap_err();
+        let msg = format_param_error("nonexistent", "api", &serde_err);
+        assert!(
+            msg.contains("nonexistent.api: invalid parameters"),
+            "Should name the API, got: {}",
+            msg
+        );
+        assert!(
+            !msg.contains("Expected signature"),
+            "Should omit signature when doc is missing, got: {}",
+            msg
+        );
     }
 }

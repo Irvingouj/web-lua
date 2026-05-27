@@ -107,5 +107,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
     ],
     returns: "table" => "Array of global variable descriptors: name, type, keys, value",
     );
-    ctx.set_global("runtime", runtime_table);
+    set_protected_global!(ctx, "runtime", runtime_table, "runtime");
 }
