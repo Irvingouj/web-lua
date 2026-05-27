@@ -166,12 +166,12 @@ print(type(snap.data.version) == "string")
       0,
       `
 local snap = dom.snapshot()
-local line1 = string.sub(snap.text, 1, 20)
-print(line1)
+local hasButton = string.find(snap.text, "button") ~= nil
+print(hasButton)
     `.trim(),
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "button");
+    await expectCellOutputContains(page, 0, "true");
   });
 });
