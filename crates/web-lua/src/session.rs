@@ -386,6 +386,14 @@ impl WebSession {
             | Action::TabSnapshot
             | Action::TabScrollTo
             | Action::TabEvaluate
+            | Action::TabType
+            | Action::TabPress
+            | Action::TabSelect
+            | Action::TabCheck
+            | Action::TabHover
+            | Action::TabUnhover
+            | Action::TabScroll
+            | Action::TabDblclick
             | Action::TabBack
             | Action::TabWaitForLoad
             | Action::TabFetch

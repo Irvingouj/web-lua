@@ -56,6 +56,14 @@ mod tests {
         crate::command_params::DomSnapshotParams::export_all(&cfg).unwrap();
         crate::command_params::TabClickParams::export_all(&cfg).unwrap();
         crate::command_params::TabFillParams::export_all(&cfg).unwrap();
+        crate::command_params::TabTypeParams::export_all(&cfg).unwrap();
+        crate::command_params::TabPressParams::export_all(&cfg).unwrap();
+        crate::command_params::TabSelectParams::export_all(&cfg).unwrap();
+        crate::command_params::TabCheckParams::export_all(&cfg).unwrap();
+        crate::command_params::TabHoverParams::export_all(&cfg).unwrap();
+        crate::command_params::TabUnhoverParams::export_all(&cfg).unwrap();
+        crate::command_params::TabScrollParams::export_all(&cfg).unwrap();
+        crate::command_params::TabDblClickParams::export_all(&cfg).unwrap();
         crate::command_params::TabEvaluateParams::export_all(&cfg).unwrap();
         crate::command_params::TabBackParams::export_all(&cfg).unwrap();
         crate::command_params::TabWaitForLoadParams::export_all(&cfg).unwrap();

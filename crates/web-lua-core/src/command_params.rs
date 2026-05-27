@@ -265,3 +265,78 @@ pub struct TabScrollToParams {
     #[serde(rename = "refId")]
     pub ref_id: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabTypeParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabPressParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    pub key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabSelectParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabCheckParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+    #[serde(default = "default_true")]
+    pub checked: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabHoverParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabUnhoverParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabScrollParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    #[serde(default = "default_scroll_direction")]
+    pub direction: String,
+    #[serde(default = "default_scroll_amount")]
+    pub amount: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct TabDblClickParams {
+    #[serde(rename = "tabId")]
+    pub tab_id: u64,
+    #[serde(rename = "refId")]
+    pub ref_id: String,
+}

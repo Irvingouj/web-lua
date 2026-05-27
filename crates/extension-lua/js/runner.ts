@@ -61,6 +61,14 @@ import type {
   DomSnapshotParams,
   TabClickParams,
   TabFillParams,
+  TabTypeParams,
+  TabPressParams,
+  TabSelectParams,
+  TabCheckParams,
+  TabHoverParams,
+  TabUnhoverParams,
+  TabScrollParams,
+  TabDblClickParams,
   TabEvaluateParams,
   TabBackParams,
   TabWaitForLoadParams,
@@ -109,7 +117,15 @@ type DomSnapshotValue = {
 type TabMessage =
   | { action: "click"; params: { refId: string } }
   | { action: "fill"; params: { refId: string; value: string } }
+  | { action: "type"; params: { refId: string; text: string } }
+  | { action: "press"; params: { key: string } }
+  | { action: "select"; params: { refId: string; value: string } }
+  | { action: "check"; params: { refId: string; checked: boolean } }
+  | { action: "hover"; params: { refId: string } }
+  | { action: "unhover"; params: Record<string, never> }
+  | { action: "scroll"; params: { direction: string; amount: number } }
   | { action: "scrollTo"; params: { x: number; y: number; refId?: string } }
+  | { action: "dblclick"; params: { refId: string } }
   | { action: "back"; params: Record<string, never> };
 
 type DomNode = {
@@ -309,54 +325,373 @@ export async function executeMainThreadCommand(
       return { ok: true, value: null };
     }
     case "page_url": {
-      return { ok: true, value: window.location.href };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      return executeInTab(activeTab, () => window.location.href, []);
     }
     case "page_title": {
-      return { ok: true, value: document.title };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      return executeInTab(activeTab, () => document.title, []);
     }
     case "page_goto": {
       const { url } = expectParams<PageGotoParams>(params);
-      window.location.href = url;
-      return { ok: true, value: true };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      return handleChromeApi({ action: "chrome_tabs_update", params: { tabId: activeTab, update: { url } } });
     }
     case "page_back": {
-      window.history.back();
-      return { ok: true, value: true };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      return sendMessageToTab(activeTab, { action: "back", params: {} });
     }
     case "page_forward": {
-      window.history.forward();
-      return { ok: true, value: true };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      return executeInTab(activeTab, () => { window.history.forward(); return true; }, []);
     }
     case "page_reload": {
-      window.location.reload();
-      return { ok: true, value: true };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      return executeInTab(activeTab, () => { window.location.reload(); return true; }, []);
     }
     case "page_wait": {
       const { duration } = expectParams<PageWaitParams>(params);
       await new Promise((resolve) => setTimeout(resolve, Number(duration)));
       return { ok: true, value: true };
     }
-    case "page_click":
-    case "page_fill":
-    case "page_type":
-    case "page_press":
-    case "page_select":
-    case "page_check":
-    case "page_hover":
-    case "page_unhover":
-    case "page_scroll":
-    case "page_scroll_to":
+    case "page_click": {
+      const activeTab = getActiveTabId();
+      const refId = extractRefId(params);
+      if (!refId) {
+        return { ok: false, error: { message: "page_click requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "click", params: { refId } });
+    }
+    case "page_fill": {
+      const activeTab = getActiveTabId();
+      const obj = asRecord(params);
+      const refId = extractRefId(params);
+      const value = obj.value ?? "";
+      if (!refId) {
+        return { ok: false, error: { message: "page_fill requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "fill", params: { refId, value: String(value) } });
+    }
+    case "page_type": {
+      const activeTab = getActiveTabId();
+      const obj = asRecord(params);
+      const refId = extractRefId(params);
+      const text = obj.text ?? "";
+      if (!refId) {
+        return { ok: false, error: { message: "page_type requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "type", params: { refId, text: String(text) } });
+    }
+    case "page_press": {
+      const activeTab = getActiveTabId();
+      const { key } = expectParams<PagePressParams>(params);
+      return sendMessageToTab(activeTab, { action: "press", params: { key } });
+    }
+    case "page_select": {
+      const activeTab = getActiveTabId();
+      const obj = asRecord(params);
+      const refId = extractRefId(params);
+      const value = obj.value ?? "";
+      if (!refId) {
+        return { ok: false, error: { message: "page_select requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "select", params: { refId, value: String(value) } });
+    }
+    case "page_check": {
+      const activeTab = getActiveTabId();
+      const obj = asRecord(params);
+      const refId = extractRefId(params);
+      const checked = typeof obj.checked === "boolean" ? obj.checked : true;
+      if (!refId) {
+        return { ok: false, error: { message: "page_check requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "check", params: { refId, checked } });
+    }
+    case "page_hover": {
+      const activeTab = getActiveTabId();
+      const refId = extractRefId(params);
+      if (!refId) {
+        return { ok: false, error: { message: "page_hover requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "hover", params: { refId } });
+    }
+    case "page_unhover": {
+      const activeTab = getActiveTabId();
+      return sendMessageToTab(activeTab, { action: "unhover", params: {} });
+    }
+    case "page_scroll": {
+      const activeTab = getActiveTabId();
+      const { direction, amount } = expectParams<PageScrollParams>(params);
+      return sendMessageToTab(activeTab, { action: "scroll", params: { direction, amount } });
+    }
+    case "page_scroll_to": {
+      const activeTab = getActiveTabId();
+      const refId = extractRefId(params);
+      if (!refId) {
+        return { ok: false, error: { message: "page_scroll_to requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "scrollTo", params: { x: 0, y: 0, refId } });
+    }
     case "page_dblclick": {
-      return handlePageAction(command.action, params);
+      const activeTab = getActiveTabId();
+      const refId = extractRefId(params);
+      if (!refId) {
+        return { ok: false, error: { message: "page_dblclick requires refId", code: "E_MISSING_PARAM" } };
+      }
+      return sendMessageToTab(activeTab, { action: "dblclick", params: { refId } });
     }
     case "page_snapshot": {
-      const result = await handleDomSnapshot(expectParams<DomSnapshotParams>(params));
-      if (result.ok && result.value) {
-        return { ok: true, value: result.value.text };
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
       }
-      return result as AsyncResponse<string>;
+      const obj = asRecord(params);
+      const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
+      const result = await executeInTab(
+        activeTab,
+        (maxNodesArg: unknown) => {
+          const maxNodesNum = typeof maxNodesArg === "number" ? maxNodesArg : 500;
+          // inlineSnapshot is injected into content-script.ts
+          // but executeInTab runs in MAIN world where it may not exist.
+          // We inline a minimal snapshot here.
+          function getAccessibleRole(el: Element): string {
+            const tag = el.tagName.toLowerCase();
+            const ariaRole = el.getAttribute("role");
+            if (ariaRole) return ariaRole;
+            if (tag === "button" || (tag === "input" && (el as HTMLInputElement).type === "submit")) return "button";
+            if (tag === "a") return "link";
+            if (tag === "input") {
+              const type = (el as HTMLInputElement).type;
+              if (type === "text" || type === "email" || type === "password" || type === "search") return "textbox";
+              if (type === "checkbox") return "checkbox";
+              if (type === "radio") return "radio";
+              if (type === "submit" || type === "button") return "button";
+            }
+            if (tag === "textarea") return "textbox";
+            if (tag === "select") return "combobox";
+            if (tag === "img") return "img";
+            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6") return "heading";
+            if (tag === "li") return "listitem";
+            if (tag === "ul" || tag === "ol") return "list";
+            if (tag === "table") return "table";
+            if (tag === "tr") return "row";
+            if (tag === "td" || tag === "th") return "cell";
+            if (tag === "nav") return "navigation";
+            if (tag === "main") return "main";
+            if (tag === "article") return "article";
+            if (tag === "section") return "region";
+            if (tag === "aside") return "complementary";
+            if (tag === "form") return "form";
+            if (tag === "dialog" || tag === "modal") return "dialog";
+            if (tag === "figure") return "figure";
+            if (tag === "figcaption") return "caption";
+            if (el.getAttribute("onclick") || (el as HTMLElement).onclick) return "button";
+            return "generic";
+          }
+          function getAccessibleName(el: Element): string {
+            const ariaLabel = el.getAttribute("aria-label");
+            if (ariaLabel) return ariaLabel;
+            const labelledBy = el.getAttribute("aria-labelledby");
+            if (labelledBy) {
+              const labelEl = document.getElementById(labelledBy);
+              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
+            }
+            const tag = el.tagName.toLowerCase();
+            if (tag === "img") {
+              const alt = el.getAttribute("alt");
+              if (alt) return alt;
+            }
+            const title = (el as HTMLElement).title;
+            if (title) return title;
+            const role = getAccessibleRole(el);
+            if (role !== "generic" && role !== "list" && role !== "table" && role !== "row" && role !== "region" && role !== "navigation" && role !== "main") {
+              const text = el.textContent?.trim().slice(0, 60) || "";
+              return text;
+            }
+            return "";
+          }
+          function shouldInclude(el: Element): boolean {
+            const role = getAccessibleRole(el);
+            if (role === "generic") return false;
+            if (role === "presentation" || role === "none") return false;
+            if ((el as HTMLElement).hidden) return false;
+            const style = window.getComputedStyle(el);
+            if (style.display === "none" || style.visibility === "hidden") return false;
+            return true;
+          }
+          type DomNode = { refId: number; role: string; tag: string; name?: string };
+          const nodes: DomNode[] = [];
+          const lines: string[] = [];
+          let nextRefId = 1;
+          function traverse(el: Element, depth: number) {
+            if (nodes.length >= maxNodesNum) return;
+            const tag = el.tagName.toLowerCase();
+            if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template") return;
+            const included = shouldInclude(el);
+            let currentDepth = depth;
+            if (included) {
+              const refId = nextRefId++;
+              el.setAttribute("data-ref-id", String(refId));
+              const role = getAccessibleRole(el);
+              const name = getAccessibleName(el);
+              const node: DomNode = { refId, role, tag };
+              if (name) node.name = name;
+              nodes.push(node);
+              const indent = "  ".repeat(depth);
+              const parts: string[] = [`${indent}- ${role}`];
+              if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
+              parts.push(`[ref=${refId}]`);
+              lines.push(parts.join(" "));
+              currentDepth = depth + 1;
+            }
+            for (const child of el.children) {
+              traverse(child, currentDepth);
+            }
+          }
+          if (document.body) traverse(document.body, 0);
+          const header = [`URL: ${window.location.href}`, `Title: ${document.title}`, ""];
+          const text = header.concat(lines).join("\n");
+          return { text, nodes, url: window.location.href, title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight } };
+        },
+        [maxNodes],
+      );
+      if (result.ok && result.value && typeof result.value === "object") {
+        const val = result.value as Record<string, unknown>;
+        return { ok: true, value: val.text };
+      }
+      return { ok: false, error: { message: "Failed to get page snapshot", code: "E_SNAPSHOT" } };
     }
-    case "page_snapshot_data":
+    case "page_snapshot_data": {
+      const activeTab = getActiveTabId();
+      if (activeTab === null) {
+        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+      }
+      const obj = asRecord(params);
+      const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
+      return executeInTab(
+        activeTab,
+        (maxNodesArg: unknown) => {
+          const maxNodesNum = typeof maxNodesArg === "number" ? maxNodesArg : 500;
+          function getAccessibleRole(el: Element): string {
+            const tag = el.tagName.toLowerCase();
+            const ariaRole = el.getAttribute("role");
+            if (ariaRole) return ariaRole;
+            if (tag === "button" || (tag === "input" && (el as HTMLInputElement).type === "submit")) return "button";
+            if (tag === "a") return "link";
+            if (tag === "input") {
+              const type = (el as HTMLInputElement).type;
+              if (type === "text" || type === "email" || type === "password" || type === "search") return "textbox";
+              if (type === "checkbox") return "checkbox";
+              if (type === "radio") return "radio";
+              if (type === "submit" || type === "button") return "button";
+            }
+            if (tag === "textarea") return "textbox";
+            if (tag === "select") return "combobox";
+            if (tag === "img") return "img";
+            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6") return "heading";
+            if (tag === "li") return "listitem";
+            if (tag === "ul" || tag === "ol") return "list";
+            if (tag === "table") return "table";
+            if (tag === "tr") return "row";
+            if (tag === "td" || tag === "th") return "cell";
+            if (tag === "nav") return "navigation";
+            if (tag === "main") return "main";
+            if (tag === "article") return "article";
+            if (tag === "section") return "region";
+            if (tag === "aside") return "complementary";
+            if (tag === "form") return "form";
+            if (tag === "dialog" || tag === "modal") return "dialog";
+            if (tag === "figure") return "figure";
+            if (tag === "figcaption") return "caption";
+            if (el.getAttribute("onclick") || (el as HTMLElement).onclick) return "button";
+            return "generic";
+          }
+          function getAccessibleName(el: Element): string {
+            const ariaLabel = el.getAttribute("aria-label");
+            if (ariaLabel) return ariaLabel;
+            const labelledBy = el.getAttribute("aria-labelledby");
+            if (labelledBy) {
+              const labelEl = document.getElementById(labelledBy);
+              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
+            }
+            const tag = el.tagName.toLowerCase();
+            if (tag === "img") {
+              const alt = el.getAttribute("alt");
+              if (alt) return alt;
+            }
+            const title = (el as HTMLElement).title;
+            if (title) return title;
+            const role = getAccessibleRole(el);
+            if (role !== "generic" && role !== "list" && role !== "table" && role !== "row" && role !== "region" && role !== "navigation" && role !== "main") {
+              const text = el.textContent?.trim().slice(0, 60) || "";
+              return text;
+            }
+            return "";
+          }
+          function shouldInclude(el: Element): boolean {
+            const role = getAccessibleRole(el);
+            if (role === "generic") return false;
+            if (role === "presentation" || role === "none") return false;
+            if ((el as HTMLElement).hidden) return false;
+            const style = window.getComputedStyle(el);
+            if (style.display === "none" || style.visibility === "hidden") return false;
+            return true;
+          }
+          type DomNode = { refId: number; role: string; tag: string; name?: string };
+          const nodes: DomNode[] = [];
+          const lines: string[] = [];
+          let nextRefId = 1;
+          function traverse(el: Element, depth: number) {
+            if (nodes.length >= maxNodesNum) return;
+            const tag = el.tagName.toLowerCase();
+            if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template") return;
+            const included = shouldInclude(el);
+            let currentDepth = depth;
+            if (included) {
+              const refId = nextRefId++;
+              el.setAttribute("data-ref-id", String(refId));
+              const role = getAccessibleRole(el);
+              const name = getAccessibleName(el);
+              const node: DomNode = { refId, role, tag };
+              if (name) node.name = name;
+              nodes.push(node);
+              const indent = "  ".repeat(depth);
+              const parts: string[] = [`${indent}- ${role}`];
+              if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
+              parts.push(`[ref=${refId}]`);
+              lines.push(parts.join(" "));
+              currentDepth = depth + 1;
+            }
+            for (const child of el.children) {
+              traverse(child, currentDepth);
+            }
+          }
+          if (document.body) traverse(document.body, 0);
+          const header = [`URL: ${window.location.href}`, `Title: ${document.title}`, ""];
+          const text = header.concat(lines).join("\n");
+          return { data: { nodes, url: window.location.href, title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight }, version: "1.0" }, text };
+        },
+        [maxNodes],
+      );
+    }
     case "dom_snapshot": {
       return handleDomSnapshot(expectParams<DomSnapshotParams>(params));
     }
@@ -443,6 +778,123 @@ export async function executeMainThreadCommand(
       return sendMessageToTab(tabId, {
         action: "scrollTo",
         params: { x, y, refId: refId ? String(refId) : undefined },
+      });
+    }
+    case "tab_type": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const refId = extractArg(params, 1, obj.refId ?? obj.ref_id);
+      const text = extractArg(params, 2, obj.text ?? "");
+      if (!refId)
+        return {
+          ok: false,
+          error: {
+            message: "tab_type requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
+      return sendMessageToTab(tabId, {
+        action: "type",
+        params: { refId: String(refId), text: String(text) },
+      });
+    }
+    case "tab_press": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const key = extractArg(params, 1, obj.key ?? "");
+      return sendMessageToTab(tabId, {
+        action: "press",
+        params: { key: String(key) },
+      });
+    }
+    case "tab_select": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const refId = extractArg(params, 1, obj.refId ?? obj.ref_id);
+      const value = extractArg(params, 2, obj.value ?? "");
+      if (!refId)
+        return {
+          ok: false,
+          error: {
+            message: "tab_select requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
+      return sendMessageToTab(tabId, {
+        action: "select",
+        params: { refId: String(refId), value: String(value) },
+      });
+    }
+    case "tab_check": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const refId = extractArg(params, 1, obj.refId ?? obj.ref_id);
+      const checked = typeof obj.checked === "boolean" ? obj.checked : true;
+      if (!refId)
+        return {
+          ok: false,
+          error: {
+            message: "tab_check requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
+      return sendMessageToTab(tabId, {
+        action: "check",
+        params: { refId: String(refId), checked },
+      });
+    }
+    case "tab_hover": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const refId = extractArg(params, 1, obj.refId ?? obj.ref_id);
+      if (!refId)
+        return {
+          ok: false,
+          error: {
+            message: "tab_hover requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
+      return sendMessageToTab(tabId, {
+        action: "hover",
+        params: { refId: String(refId) },
+      });
+    }
+    case "tab_unhover": {
+      const tabId = extractTabId(params);
+      return sendMessageToTab(tabId, {
+        action: "unhover",
+        params: {},
+      });
+    }
+    case "tab_scroll": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const direction = extractArg(params, 1, obj.direction ?? "down");
+      const amount = extractArg(params, 2, obj.amount ?? 300);
+      return sendMessageToTab(tabId, {
+        action: "scroll",
+        params: {
+          direction: String(direction),
+          amount: typeof amount === "number" ? amount : 300,
+        },
+      });
+    }
+    case "tab_dblclick": {
+      const tabId = extractTabId(params);
+      const obj = asRecord(params);
+      const refId = extractArg(params, 1, obj.refId ?? obj.ref_id);
+      if (!refId)
+        return {
+          ok: false,
+          error: {
+            message: "tab_dblclick requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
+      return sendMessageToTab(tabId, {
+        action: "dblclick",
+        params: { refId: String(refId) },
       });
     }
     case "tab_evaluate": {
@@ -1429,11 +1881,11 @@ async function sendMessageToTab(
   };
 }
 
-// ─── Page actions (side panel / main document) ─────────────────
+// ─── Sidepanel actions (side panel / main document) ─────────────
 //
-// IMPORTANT: page.* actions operate on the extension popup/sidepanel DOM,
-// NOT the active browser tab. To interact with the active tab, use tab.*
-// APIs which relay commands to the content script via sendMessageToTab.
+// IMPORTANT: sidepanel.* actions operate on the extension popup/sidepanel
+// DOM, NOT the active browser tab. To interact with the active tab, use
+// page.* APIs which relay commands to the content script via sendMessageToTab.
 
 function getElementByRefId(refId: string): Element | null {
   return document.querySelector(`[data-ref-id='${CSS.escape(refId)}']`);
