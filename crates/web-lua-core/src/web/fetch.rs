@@ -119,7 +119,7 @@ pub(crate) fn register<'a>(
             match serde_json::from_value(params.clone()) {
                 Ok(v) => v,
                 Err(e) => {
-                    let msg = format!("Invalid fetch params built from Lua: {}", e);
+                    let msg = crate::utils::format_param_error("web", "fetch", &e);
                     return Err(msg.into_value(ctx).into());
                 }
             };
@@ -354,7 +354,7 @@ pub(crate) fn register<'a>(
             match serde_json::from_value(params.clone()) {
                 Ok(v) => v,
                 Err(e) => {
-                    let msg = format!("Invalid sleep params built from Lua: {}", e);
+                    let msg = crate::utils::format_param_error("web", "sleep", &e);
                     return Err(msg.into_value(ctx).into());
                 }
             };

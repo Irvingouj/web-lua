@@ -25,7 +25,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid dom_snapshot params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("dom", "snapshot", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -87,7 +87,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid dom_format params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("dom", "format", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -122,5 +122,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
-    ctx.set_global("dom", dom_table);
+    set_protected_global!(ctx, "dom", dom_table, "dom");
 }

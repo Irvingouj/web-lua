@@ -72,6 +72,43 @@ macro_rules! lua_api {
     };
 }
 
+/// Wrap `$table` with the API protector and attach it to `$parent` under `$name`.
+///
+/// **Note:** The macro shadows `$table` — the original unprotected table is
+/// replaced by the protected one, so the caller can only access the wrapped
+/// version after this call.
+///
+/// Usage:
+/// ```ignore
+/// let tab_table = tab::register(ctx, host_state.clone());
+/// set_protected!(ctx, web_table, "tab", tab_table, "web.tab");
+/// ```
+macro_rules! set_protected {
+    ($ctx:expr, $parent:expr, $name:expr, $table:ident, $ns:expr) => {
+        let $table = crate::web::protector::protect_api_table($ctx, $table, $ns);
+        $parent.set_field($ctx, $name, $table);
+    };
+}
+
+/// Wrap `$table` with the API protector and register it as a global.
+///
+/// **Note:** The macro shadows `$table` — the original unprotected table is
+/// replaced by the protected one, so the caller can only access the wrapped
+/// version after this call.
+///
+/// Usage:
+/// ```ignore
+/// let page_table = Table::new(&ctx);
+/// // ... populate page_table ...
+/// set_protected_global!(ctx, "page", page_table, "page");
+/// ```
+macro_rules! set_protected_global {
+    ($ctx:expr, $name:expr, $table:ident, $ns:expr) => {
+        let $table = crate::web::protector::protect_api_table($ctx, $table, $ns);
+        $ctx.set_global($name, $table);
+    };
+}
+
 mod bookmarks;
 mod chrome;
 mod clipboard;
@@ -83,6 +120,7 @@ mod host;
 mod log;
 mod notifications;
 mod page;
+mod protector;
 mod runtime;
 mod sidepanel;
 mod storage;
@@ -95,30 +133,30 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     fetch::register(ctx, &web_table, host_state.clone());
 
     let url_table = url::register(ctx);
-    web_table.set_field(ctx, "url", url_table);
+    set_protected!(ctx, web_table, "url", url_table, "web.url");
 
     log::register(ctx, &web_table, host_state.clone());
 
     let storage_table = storage::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "storage", storage_table);
+    set_protected!(ctx, web_table, "storage", storage_table, "web.storage");
 
     let tab_table = tab::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "tab", tab_table);
+    set_protected!(ctx, web_table, "tab", tab_table, "web.tab");
 
     let cookies_table = cookies::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "cookies", cookies_table);
+    set_protected!(ctx, web_table, "cookies", cookies_table, "web.cookies");
 
     let history_table = history::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "history", history_table);
+    set_protected!(ctx, web_table, "history", history_table, "web.history");
 
     let bookmarks_table = bookmarks::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "bookmarks", bookmarks_table);
+    set_protected!(ctx, web_table, "bookmarks", bookmarks_table, "web.bookmarks");
 
     let notifications_table = notifications::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "notifications", notifications_table);
+    set_protected!(ctx, web_table, "notifications", notifications_table, "web.notifications");
 
     let clipboard_table = clipboard::register(ctx, host_state.clone());
-    web_table.set_field(ctx, "clipboard", clipboard_table);
+    set_protected!(ctx, web_table, "clipboard", clipboard_table, "web.clipboard");
 
     chrome::register(ctx, host_state.clone());
     dom::register(ctx, host_state.clone());
@@ -127,5 +165,5 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     host::register(ctx, host_state.clone());
     runtime::register(ctx, host_state.clone());
 
-    ctx.set_global("web", web_table);
+    set_protected_global!(ctx, "web", web_table, "web");
 }

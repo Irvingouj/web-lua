@@ -63,5 +63,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "any" => "Handler response",
     );
-    ctx.set_global("host", host_table);
+    set_protected_global!(ctx, "host", host_table, "host");
 }

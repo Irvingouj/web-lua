@@ -25,7 +25,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_snapshot params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "snapshot", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -71,8 +71,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg =
-                            format!("Invalid page_snapshot_data params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "snapshot_data", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -118,8 +117,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg =
-                            format!("Invalid page_snapshot_text params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "snapshot_text", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -171,7 +169,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_click params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "click", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -223,7 +221,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_dblclick params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "dblclick", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -282,7 +280,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_fill params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "fill", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -342,7 +340,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_type params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "type", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -392,7 +390,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_press params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "press", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -453,7 +451,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_select params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "select", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -514,7 +512,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_check params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "check", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -566,7 +564,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_hover params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "hover", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -654,7 +652,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_scroll params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "scroll", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -706,7 +704,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_scroll_to params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "scroll_to", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -845,7 +843,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_goto params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "goto", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -985,7 +983,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_wait params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "wait", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -1213,6 +1211,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
+<<<<<<< HEAD
     // page.find(selector) — async
     {
         let hs_page = host_state.clone();
@@ -1232,7 +1231,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_find params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "find", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -1292,7 +1291,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_wait_for params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "wait_for", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -1350,7 +1349,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_extract params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "extract", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -1411,7 +1410,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid page_append params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("page", "append", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -1444,5 +1443,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
-    ctx.set_global("page", page_table);
+    set_protected_global!(ctx, "page", page_table, "page");
 }

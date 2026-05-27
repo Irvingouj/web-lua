@@ -145,5 +145,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>) -> Table<'a> {
     returns: "string" => "URL-encoded query string",
     );
 
-    url_table
+    crate::web::protector::protect_api_table(ctx, url_table, "web.url")
 }
