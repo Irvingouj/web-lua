@@ -1,5 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+use tsify::Tsify;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct LuaApiDoc {
@@ -24,6 +25,14 @@ pub struct ParamDoc {
 pub struct ReturnDoc {
     pub lua_type: String,
     pub description: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Tsify)]
+#[serde(rename_all = "lowercase")]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub enum ApiDocFormat {
+    Json,
+    Markdown,
 }
 
 static REGISTRY: Mutex<Vec<LuaApiDoc>> = Mutex::new(Vec::new());
@@ -86,10 +95,9 @@ pub fn generate_markdown() -> String {
     md
 }
 
-pub fn generate(format: &str) -> String {
+pub fn generate(format: ApiDocFormat) -> String {
     match format {
-        "json" => generate_json(),
-        "markdown" => generate_markdown(),
-        _ => generate_json(),
+        ApiDocFormat::Json => generate_json(),
+        ApiDocFormat::Markdown => generate_markdown(),
     }
 }

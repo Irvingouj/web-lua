@@ -15,8 +15,6 @@ export type CellError = { "kind": "compile", message: string, line: number | nul
  */
 export type CellStatus = "done" | "async_pending";
 
-export type DomFormatParams = { snapshot: unknown, format: string, };
-
 export type DomSnapshotParams = { interactive_only: boolean, max_nodes: bigint, };
 
 export type FetchParams = { url: string, method: string, headers: { [key in string]: string }, body: string | null, timeout: bigint, };
@@ -68,4 +66,4 @@ export type TabFillParams = { tabId: bigint, refId: string, value: string, };
 
 export type TabScrollToParams = { tabId: bigint, x: number, y: number, refId: string | null, };
 
-export type TabWaitForLoadParams = { tabId: bigint, };
+export type TabWaitForLoadParams = { tabId: bigint, timeout: bigint, };

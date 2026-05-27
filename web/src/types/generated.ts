@@ -15,8 +15,6 @@ export type CellError = { "kind": "compile", message: string, line: number | nul
  */
 export type CellStatus = "done" | "async_pending";
 
-export type DomFormatParams = { snapshot: unknown, format: string, };
-
 export type DomSnapshotParams = { interactive_only: boolean, max_nodes: bigint, };
 
 export type FetchParams = { url: string, method: string, headers: { [key in string]: string }, body: string | null, timeout: bigint, };

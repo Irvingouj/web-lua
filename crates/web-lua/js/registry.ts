@@ -4,11 +4,11 @@
 
 const hostHandlers: Record<string, (params: unknown) => Promise<unknown>> = {};
 
-export function registerHostHandler(
+export function registerHostHandler<T, R>(
   action: string,
-  handler: (params: unknown) => Promise<unknown>,
+  handler: (params: T) => Promise<R>,
 ) {
-  hostHandlers[action] = handler;
+  hostHandlers[action] = handler as (params: unknown) => Promise<unknown>;
 }
 
 export function registerHostHandlers(

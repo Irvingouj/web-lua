@@ -355,18 +355,56 @@
     "namespace": "web.tab",
     "name": "snapshot",
     "action": "tab_snapshot",
-    "description": "Take a DOM snapshot of the target tab.",
+    "description": "Take a DOM snapshot of the target tab and return readable text. Defaults to active tab.",
     "params": [
       {
         "name": "tab_id",
         "lua_type": "number",
-        "required": true,
-        "description": "Target tab ID"
+        "required": false,
+        "description": "Target tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Human-readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "snapshot_text",
+    "action": "tab_snapshot_text",
+    "description": "Take a DOM snapshot and return readable text (explicit alias). Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": false,
+        "description": "Target tab ID (defaults to active tab)"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Human-readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "web.tab",
+    "name": "snapshot_data",
+    "action": "tab_snapshot_data",
+    "description": "Take a DOM snapshot and return structured data. Defaults to active tab.",
+    "params": [
+      {
+        "name": "tab_id",
+        "lua_type": "number",
+        "required": false,
+        "description": "Target tab ID (defaults to active tab)"
       }
     ],
     "returns": {
       "lua_type": "table",
-      "description": "Simplified inline DOM snapshot with refIds"
+      "description": "Structured snapshot with nodes, url, title, viewport"
     },
     "source": "rust_core"
   },

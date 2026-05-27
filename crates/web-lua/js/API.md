@@ -946,13 +946,33 @@ Fill an input element by refId in the target tab.
 
 ### `web.tab.snapshot _(action: `tab_snapshot`)_`
 
-Take a DOM snapshot of the target tab.
+Take a DOM snapshot of the target tab and return readable text. Defaults to active tab.
 
 **Parameters**
 
-- `tab_id` (`number`, required): Target tab ID
+- `tab_id` (`number`, optional): Target tab ID (defaults to active tab)
 
-**Returns** `table`: Simplified inline DOM snapshot with refIds
+**Returns** `string`: Human-readable accessibility tree with refIds
+
+### `web.tab.snapshot_text _(action: `tab_snapshot_text`)_`
+
+Take a DOM snapshot and return readable text (explicit alias). Defaults to active tab.
+
+**Parameters**
+
+- `tab_id` (`number`, optional): Target tab ID (defaults to active tab)
+
+**Returns** `string`: Human-readable accessibility tree with refIds
+
+### `web.tab.snapshot_data _(action: `tab_snapshot_data`)_`
+
+Take a DOM snapshot and return structured data. Defaults to active tab.
+
+**Parameters**
+
+- `tab_id` (`number`, optional): Target tab ID (defaults to active tab)
+
+**Returns** `table`: Structured snapshot with nodes, url, title, viewport
 
 ### `web.tab.scroll_to _(action: `tab_scroll_to`)_`
 
