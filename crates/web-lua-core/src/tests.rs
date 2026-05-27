@@ -979,10 +979,7 @@ mod tests {
     #[test]
     fn test_type_of_sentinel() {
         let mut session = NotebookSession::new();
-        let result = session.run_cell(
-            r#"print(type(page.notexist))"#,
-            "",
-        );
+        let result = session.run_cell(r#"print(type(page.notexist))"#, "");
         assert!(
             result.error.is_none(),
             "type() of sentinel should not crash, got: {:?}",

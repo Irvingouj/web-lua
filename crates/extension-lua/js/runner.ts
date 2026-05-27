@@ -2,13 +2,13 @@
 // Main-thread command executor for extension-lua runner
 // Handles all commands relayed from the extension Worker.
 
-import { logger } from "./logger.js";
 import {
-  init as initDomSnapshot,
   collectDocument,
   formatSnapshot,
+  init as initDomSnapshot,
   type TreeSnapshot,
 } from "@pi-oxide/dom-semantic-tree";
+import { logger } from "./logger.js";
 
 let domSnapshotReady: Promise<void> | null = null;
 
@@ -41,41 +41,23 @@ function throwIfAborted(): void {
 // ─── Generated types from Rust ts-rs ───────────────────────────
 
 import type {
+  DomSnapshotParams,
   FetchParams,
-  SleepParams,
-  PageClickParams,
-  PageDblClickParams,
-  PageFillParams,
-  PageTypeParams,
-  PagePressParams,
-  PageSelectParams,
   PageCheckParams,
-  PageHoverParams,
-  PageScrollParams,
-  PageScrollToParams,
+  PageExtractParams,
+  PageFillParams,
+  PageFindParams,
   PageGotoParams,
+  PagePressParams,
+  PageScrollParams,
+  PageSelectParams,
+  PageTypeParams,
+  PageWaitForParams,
   PageWaitParams,
+  SleepParams,
+  StorageDeleteParams,
   StorageGetParams,
   StorageSetParams,
-  StorageDeleteParams,
-  DomSnapshotParams,
-  TabClickParams,
-  TabFillParams,
-  TabTypeParams,
-  TabPressParams,
-  TabSelectParams,
-  TabCheckParams,
-  TabHoverParams,
-  TabUnhoverParams,
-  TabScrollParams,
-  TabDblClickParams,
-  TabEvaluateParams,
-  TabBackParams,
-  TabWaitForLoadParams,
-  TabScrollToParams,
-  PageFindParams,
-  PageWaitForParams,
-  PageExtractParams,
 } from "./generated.js";
 
 declare global {
@@ -119,9 +101,15 @@ type DomSnapshotValue = {
 
 type TabMessage =
   | { action: "click"; params: { refId?: string; label?: string } }
-  | { action: "fill"; params: { refId?: string; value: string; label?: string } }
+  | {
+      action: "fill";
+      params: { refId?: string; value: string; label?: string };
+    }
   | { action: "type"; params: { refId?: string; text: string; label?: string } }
-  | { action: "append"; params: { refId?: string; text: string; label?: string } }
+  | {
+      action: "append";
+      params: { refId?: string; text: string; label?: string };
+    }
   | { action: "press"; params: { key: string } }
   | { action: "select"; params: { refId: string; value: string } }
   | { action: "check"; params: { refId: string; checked: boolean } }
@@ -166,7 +154,7 @@ export function registerHostHandlers(handlers: Record<string, HostHandler>) {
 function expectParams<T>(params: unknown): T {
   if (typeof params !== "object" || params === null || Array.isArray(params)) {
     throw new Error(
-      `Expected params object, got ${params === null ? "null" : Array.isArray(params) ? "array" : typeof params}`
+      `Expected params object, got ${params === null ? "null" : Array.isArray(params) ? "array" : typeof params}`,
     );
   }
   return params as T;
@@ -197,23 +185,19 @@ function extractTabId(params: unknown): number | null {
   return typeof tabId === "number" ? tabId : null;
 }
 
-function extractArg<T>(
-  params: unknown,
-  index: number,
-  fallback?: T,
-): T {
+function extractArg<T>(params: unknown, index: number, fallback?: T): T {
   if (Array.isArray(params)) return (params[index] ?? fallback) as T;
   if (typeof params === "object" && params !== null) return fallback as T;
   if (index === 0) return params as T;
   return fallback as T;
 }
 
-function getStringParam(params: unknown, key: string): string {
+function _getStringParam(params: unknown, key: string): string {
   const val = asRecord(params)[key];
   return typeof val === "string" ? val : "";
 }
 
-function getNumberParam(
+function _getNumberParam(
   params: unknown,
   key: string,
   fallback: number,
@@ -331,14 +315,20 @@ export async function executeMainThreadCommand(
     case "page_url": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       return executeInTab(activeTab, () => window.location.href, []);
     }
     case "page_title": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       return executeInTab(activeTab, () => document.title, []);
     }
@@ -346,30 +336,51 @@ export async function executeMainThreadCommand(
       const { url } = expectParams<PageGotoParams>(params);
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
-      return handleChromeApi({ action: "chrome_tabs_update", params: { tabId: activeTab, update: { url } } });
+      return handleChromeApi({
+        action: "chrome_tabs_update",
+        params: { tabId: activeTab, update: { url } },
+      });
     }
     case "page_back": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       return sendMessageToTab(activeTab, { action: "back", params: {} });
     }
     case "page_forward": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
-      return executeInTab(activeTab, () => { window.history.forward(); return true; }, []);
+      return executeInTab(activeTab, () => {
+        window.history.forward();
+        return true;
+      }, []);
     }
     case "page_reload": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
-      return handleChromeApi({ action: "chrome_tabs_reload", params: { tabId: activeTab } });
+      return handleChromeApi({
+        action: "chrome_tabs_reload",
+        params: { tabId: activeTab },
+      });
     }
     case "page_wait": {
       const { duration } = expectParams<PageWaitParams>(params);
@@ -382,9 +393,18 @@ export async function executeMainThreadCommand(
       const refId = extractRefId(params);
       const label = obj.label ?? "";
       if (!refId && !label) {
-        return { ok: false, error: { message: "page_click requires refId or label", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_click requires refId or label",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "click", params: { refId, label: String(label) } });
+      return sendMessageToTab(activeTab, {
+        action: "click",
+        params: { refId, label: String(label) },
+      });
     }
     case "page_fill": {
       const activeTab = getActiveTabId();
@@ -393,9 +413,18 @@ export async function executeMainThreadCommand(
       const value = obj.value ?? "";
       const label = obj.label ?? "";
       if (!refId && !label) {
-        return { ok: false, error: { message: "page_fill requires refId or label", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_fill requires refId or label",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "fill", params: { refId, label: String(label), value: String(value) } });
+      return sendMessageToTab(activeTab, {
+        action: "fill",
+        params: { refId, label: String(label), value: String(value) },
+      });
     }
     case "page_type": {
       const activeTab = getActiveTabId();
@@ -404,9 +433,18 @@ export async function executeMainThreadCommand(
       const text = obj.text ?? "";
       const label = obj.label ?? "";
       if (!refId && !label) {
-        return { ok: false, error: { message: "page_type requires refId or label", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_type requires refId or label",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "type", params: { refId, label: String(label), text: String(text) } });
+      return sendMessageToTab(activeTab, {
+        action: "type",
+        params: { refId, label: String(label), text: String(text) },
+      });
     }
     case "page_append": {
       const activeTab = getActiveTabId();
@@ -415,9 +453,18 @@ export async function executeMainThreadCommand(
       const text = obj.text ?? "";
       const label = obj.label ?? "";
       if (!refId && !label) {
-        return { ok: false, error: { message: "page_append requires refId or label", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_append requires refId or label",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "append", params: { refId, label: String(label), text: String(text) } });
+      return sendMessageToTab(activeTab, {
+        action: "append",
+        params: { refId, label: String(label), text: String(text) },
+      });
     }
     case "page_press": {
       const activeTab = getActiveTabId();
@@ -430,9 +477,18 @@ export async function executeMainThreadCommand(
       const refId = extractRefId(params);
       const value = obj.value ?? "";
       if (!refId) {
-        return { ok: false, error: { message: "page_select requires refId", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_select requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "select", params: { refId, value: String(value) } });
+      return sendMessageToTab(activeTab, {
+        action: "select",
+        params: { refId, value: String(value) },
+      });
     }
     case "page_check": {
       const activeTab = getActiveTabId();
@@ -440,17 +496,35 @@ export async function executeMainThreadCommand(
       const refId = extractRefId(params);
       const checked = typeof obj.checked === "boolean" ? obj.checked : true;
       if (!refId) {
-        return { ok: false, error: { message: "page_check requires refId", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_check requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "check", params: { refId, checked } });
+      return sendMessageToTab(activeTab, {
+        action: "check",
+        params: { refId, checked },
+      });
     }
     case "page_hover": {
       const activeTab = getActiveTabId();
       const refId = extractRefId(params);
       if (!refId) {
-        return { ok: false, error: { message: "page_hover requires refId", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_hover requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "hover", params: { refId } });
+      return sendMessageToTab(activeTab, {
+        action: "hover",
+        params: { refId },
+      });
     }
     case "page_unhover": {
       const activeTab = getActiveTabId();
@@ -459,28 +533,52 @@ export async function executeMainThreadCommand(
     case "page_scroll": {
       const activeTab = getActiveTabId();
       const { direction, amount } = expectParams<PageScrollParams>(params);
-      return sendMessageToTab(activeTab, { action: "scroll", params: { direction, amount } });
+      return sendMessageToTab(activeTab, {
+        action: "scroll",
+        params: { direction, amount },
+      });
     }
     case "page_scroll_to": {
       const activeTab = getActiveTabId();
       const refId = extractRefId(params);
       if (!refId) {
-        return { ok: false, error: { message: "page_scroll_to requires refId", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_scroll_to requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "scrollTo", params: { x: 0, y: 0, refId } });
+      return sendMessageToTab(activeTab, {
+        action: "scrollTo",
+        params: { x: 0, y: 0, refId },
+      });
     }
     case "page_dblclick": {
       const activeTab = getActiveTabId();
       const refId = extractRefId(params);
       if (!refId) {
-        return { ok: false, error: { message: "page_dblclick requires refId", code: "E_MISSING_PARAM" } };
+        return {
+          ok: false,
+          error: {
+            message: "page_dblclick requires refId",
+            code: "E_MISSING_PARAM",
+          },
+        };
       }
-      return sendMessageToTab(activeTab, { action: "dblclick", params: { refId } });
+      return sendMessageToTab(activeTab, {
+        action: "dblclick",
+        params: { refId },
+      });
     }
     case "page_find": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       const { selector } = expectParams<PageFindParams>(params);
       return executeInTab(
@@ -499,7 +597,10 @@ export async function executeMainThreadCommand(
     case "page_wait_for": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       const { selector, timeout } = expectParams<PageWaitForParams>(params);
       const start = Date.now();
@@ -526,11 +627,15 @@ export async function executeMainThreadCommand(
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
+      break;
     }
     case "page_extract": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       const { fields } = expectParams<PageExtractParams>(params);
       return executeInTab(
@@ -547,7 +652,9 @@ export async function executeMainThreadCommand(
                 result.url = window.location.href;
                 break;
               case "headings": {
-                const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+                const headings = Array.from(
+                  document.querySelectorAll("h1, h2, h3, h4, h5, h6"),
+                );
                 result.headings = headings.map((el) => ({
                   tag: el.tagName,
                   text: el.textContent?.trim().slice(0, 200) || "",
@@ -563,7 +670,8 @@ export async function executeMainThreadCommand(
                 break;
               }
               case "text":
-                result.text = document.body?.textContent?.trim().slice(0, 500) || "";
+                result.text =
+                  document.body?.textContent?.trim().slice(0, 500) || "";
                 break;
             }
           }
@@ -607,12 +715,20 @@ export async function executeMainThreadCommand(
     }
     case "sidepanel_snapshot":
     case "sidepanel_snapshot_text": {
-      const result = await handleDomSnapshot(expectParams<DomSnapshotParams>(params));
+      const result = await handleDomSnapshot(
+        expectParams<DomSnapshotParams>(params),
+      );
       if (result.ok && result.value && typeof result.value === "object") {
         const val = result.value as Record<string, unknown>;
         return { ok: true, value: val.text };
       }
-      return { ok: false, error: { message: "Failed to get sidepanel snapshot", code: "E_SNAPSHOT" } };
+      return {
+        ok: false,
+        error: {
+          message: "Failed to get sidepanel snapshot",
+          code: "E_SNAPSHOT",
+        },
+      };
     }
     case "sidepanel_snapshot_data": {
       return handleDomSnapshot(expectParams<DomSnapshotParams>(params));
@@ -621,14 +737,18 @@ export async function executeMainThreadCommand(
     case "page_snapshot_text": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       const obj = asRecord(params);
       const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
       const result = await executeInTab(
         activeTab,
         (maxNodesArg: unknown) => {
-          const maxNodesNum = typeof maxNodesArg === "number" ? maxNodesArg : 500;
+          const maxNodesNum =
+            typeof maxNodesArg === "number" ? maxNodesArg : 500;
           // inlineSnapshot is injected into content-script.ts
           // but executeInTab runs in MAIN world where it may not exist.
           // We inline a minimal snapshot here.
@@ -636,11 +756,21 @@ export async function executeMainThreadCommand(
             const tag = el.tagName.toLowerCase();
             const ariaRole = el.getAttribute("role");
             if (ariaRole) return ariaRole;
-            if (tag === "button" || (tag === "input" && (el as HTMLInputElement).type === "submit")) return "button";
+            if (
+              tag === "button" ||
+              (tag === "input" && (el as HTMLInputElement).type === "submit")
+            )
+              return "button";
             if (tag === "a") return "link";
             if (tag === "input") {
               const type = (el as HTMLInputElement).type;
-              if (type === "text" || type === "email" || type === "password" || type === "search") return "textbox";
+              if (
+                type === "text" ||
+                type === "email" ||
+                type === "password" ||
+                type === "search"
+              )
+                return "textbox";
               if (type === "checkbox") return "checkbox";
               if (type === "radio") return "radio";
               if (type === "submit" || type === "button") return "button";
@@ -648,7 +778,15 @@ export async function executeMainThreadCommand(
             if (tag === "textarea") return "textbox";
             if (tag === "select") return "combobox";
             if (tag === "img") return "img";
-            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6") return "heading";
+            if (
+              tag === "h1" ||
+              tag === "h2" ||
+              tag === "h3" ||
+              tag === "h4" ||
+              tag === "h5" ||
+              tag === "h6"
+            )
+              return "heading";
             if (tag === "li") return "listitem";
             if (tag === "ul" || tag === "ol") return "list";
             if (tag === "table") return "table";
@@ -663,7 +801,8 @@ export async function executeMainThreadCommand(
             if (tag === "dialog" || tag === "modal") return "dialog";
             if (tag === "figure") return "figure";
             if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick) return "button";
+            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
+              return "button";
             return "generic";
           }
           function getAccessibleName(el: Element): string {
@@ -682,7 +821,15 @@ export async function executeMainThreadCommand(
             const title = (el as HTMLElement).title;
             if (title) return title;
             const role = getAccessibleRole(el);
-            if (role !== "generic" && role !== "list" && role !== "table" && role !== "row" && role !== "region" && role !== "navigation" && role !== "main") {
+            if (
+              role !== "generic" &&
+              role !== "list" &&
+              role !== "table" &&
+              role !== "row" &&
+              role !== "region" &&
+              role !== "navigation" &&
+              role !== "main"
+            ) {
               const text = el.textContent?.trim().slice(0, 60) || "";
               return text;
             }
@@ -694,17 +841,29 @@ export async function executeMainThreadCommand(
             if (role === "presentation" || role === "none") return false;
             if ((el as HTMLElement).hidden) return false;
             const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden") return false;
+            if (style.display === "none" || style.visibility === "hidden")
+              return false;
             return true;
           }
-          type DomNode = { refId: number; role: string; tag: string; name?: string };
+          type DomNode = {
+            refId: number;
+            role: string;
+            tag: string;
+            name?: string;
+          };
           const nodes: DomNode[] = [];
           const lines: string[] = [];
           let nextRefId = 1;
           function traverse(el: Element, depth: number) {
             if (nodes.length >= maxNodesNum) return;
             const tag = el.tagName.toLowerCase();
-            if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template") return;
+            if (
+              tag === "script" ||
+              tag === "style" ||
+              tag === "noscript" ||
+              tag === "template"
+            )
+              return;
             const included = shouldInclude(el);
             let currentDepth = depth;
             if (included) {
@@ -727,9 +886,19 @@ export async function executeMainThreadCommand(
             }
           }
           if (document.body) traverse(document.body, 0);
-          const header = [`URL: ${window.location.href}`, `Title: ${document.title}`, ""];
+          const header = [
+            `URL: ${window.location.href}`,
+            `Title: ${document.title}`,
+            "",
+          ];
           const text = header.concat(lines).join("\n");
-          return { text, nodes, url: window.location.href, title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight } };
+          return {
+            text,
+            nodes,
+            url: window.location.href,
+            title: document.title,
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+          };
         },
         [maxNodes],
       );
@@ -737,28 +906,45 @@ export async function executeMainThreadCommand(
         const val = result.value as Record<string, unknown>;
         return { ok: true, value: val.text };
       }
-      return { ok: false, error: { message: "Failed to get page snapshot", code: "E_SNAPSHOT" } };
+      return {
+        ok: false,
+        error: { message: "Failed to get page snapshot", code: "E_SNAPSHOT" },
+      };
     }
     case "page_snapshot_data": {
       const activeTab = getActiveTabId();
       if (activeTab === null) {
-        return { ok: false, error: { message: "No active tab", code: "E_NO_TAB" } };
+        return {
+          ok: false,
+          error: { message: "No active tab", code: "E_NO_TAB" },
+        };
       }
       const obj = asRecord(params);
       const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
       return executeInTab(
         activeTab,
         (maxNodesArg: unknown) => {
-          const maxNodesNum = typeof maxNodesArg === "number" ? maxNodesArg : 500;
+          const maxNodesNum =
+            typeof maxNodesArg === "number" ? maxNodesArg : 500;
           function getAccessibleRole(el: Element): string {
             const tag = el.tagName.toLowerCase();
             const ariaRole = el.getAttribute("role");
             if (ariaRole) return ariaRole;
-            if (tag === "button" || (tag === "input" && (el as HTMLInputElement).type === "submit")) return "button";
+            if (
+              tag === "button" ||
+              (tag === "input" && (el as HTMLInputElement).type === "submit")
+            )
+              return "button";
             if (tag === "a") return "link";
             if (tag === "input") {
               const type = (el as HTMLInputElement).type;
-              if (type === "text" || type === "email" || type === "password" || type === "search") return "textbox";
+              if (
+                type === "text" ||
+                type === "email" ||
+                type === "password" ||
+                type === "search"
+              )
+                return "textbox";
               if (type === "checkbox") return "checkbox";
               if (type === "radio") return "radio";
               if (type === "submit" || type === "button") return "button";
@@ -766,7 +952,15 @@ export async function executeMainThreadCommand(
             if (tag === "textarea") return "textbox";
             if (tag === "select") return "combobox";
             if (tag === "img") return "img";
-            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6") return "heading";
+            if (
+              tag === "h1" ||
+              tag === "h2" ||
+              tag === "h3" ||
+              tag === "h4" ||
+              tag === "h5" ||
+              tag === "h6"
+            )
+              return "heading";
             if (tag === "li") return "listitem";
             if (tag === "ul" || tag === "ol") return "list";
             if (tag === "table") return "table";
@@ -781,7 +975,8 @@ export async function executeMainThreadCommand(
             if (tag === "dialog" || tag === "modal") return "dialog";
             if (tag === "figure") return "figure";
             if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick) return "button";
+            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
+              return "button";
             return "generic";
           }
           function getAccessibleName(el: Element): string {
@@ -800,7 +995,15 @@ export async function executeMainThreadCommand(
             const title = (el as HTMLElement).title;
             if (title) return title;
             const role = getAccessibleRole(el);
-            if (role !== "generic" && role !== "list" && role !== "table" && role !== "row" && role !== "region" && role !== "navigation" && role !== "main") {
+            if (
+              role !== "generic" &&
+              role !== "list" &&
+              role !== "table" &&
+              role !== "row" &&
+              role !== "region" &&
+              role !== "navigation" &&
+              role !== "main"
+            ) {
               const text = el.textContent?.trim().slice(0, 60) || "";
               return text;
             }
@@ -812,17 +1015,29 @@ export async function executeMainThreadCommand(
             if (role === "presentation" || role === "none") return false;
             if ((el as HTMLElement).hidden) return false;
             const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden") return false;
+            if (style.display === "none" || style.visibility === "hidden")
+              return false;
             return true;
           }
-          type DomNode = { refId: number; role: string; tag: string; name?: string };
+          type DomNode = {
+            refId: number;
+            role: string;
+            tag: string;
+            name?: string;
+          };
           const nodes: DomNode[] = [];
           const lines: string[] = [];
           let nextRefId = 1;
           function traverse(el: Element, depth: number) {
             if (nodes.length >= maxNodesNum) return;
             const tag = el.tagName.toLowerCase();
-            if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template") return;
+            if (
+              tag === "script" ||
+              tag === "style" ||
+              tag === "noscript" ||
+              tag === "template"
+            )
+              return;
             const included = shouldInclude(el);
             let currentDepth = depth;
             if (included) {
@@ -845,9 +1060,26 @@ export async function executeMainThreadCommand(
             }
           }
           if (document.body) traverse(document.body, 0);
-          const header = [`URL: ${window.location.href}`, `Title: ${document.title}`, ""];
+          const header = [
+            `URL: ${window.location.href}`,
+            `Title: ${document.title}`,
+            "",
+          ];
           const text = header.concat(lines).join("\n");
-          return { data: { nodes, elements: nodes, url: window.location.href, title: document.title, viewport: { width: window.innerWidth, height: window.innerHeight }, version: "1.0" }, text };
+          return {
+            data: {
+              nodes,
+              elements: nodes,
+              url: window.location.href,
+              title: document.title,
+              viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+              },
+              version: "1.0",
+            },
+            text,
+          };
         },
         [maxNodes],
       );
@@ -859,7 +1091,7 @@ export async function executeMainThreadCommand(
       return handleDomFormat(expectParams<DomFormatParams>(params));
     }
     case "page_close": {
-      const obj = asRecord(params);
+      const _obj = asRecord(params);
       const tabId = extractTabId(params);
       return handleChromeApi({
         action: "chrome_tabs_remove",
@@ -1118,14 +1350,13 @@ export async function executeMainThreadCommand(
             typeof headersArg === "object" && headersArg !== null
               ? (headersArg as Record<string, string>)
               : {};
-          const bodyStr = bodyArg !== null && bodyArg !== undefined ? String(bodyArg) : null;
-          const timeoutNum = typeof timeoutArg === "number" ? timeoutArg : 30_000;
+          const bodyStr =
+            bodyArg !== null && bodyArg !== undefined ? String(bodyArg) : null;
+          const timeoutNum =
+            typeof timeoutArg === "number" ? timeoutArg : 30_000;
 
           const controller = new AbortController();
-          const timeoutId = setTimeout(
-            () => controller.abort(),
-            timeoutNum,
-          );
+          const timeoutId = setTimeout(() => controller.abort(), timeoutNum);
           const fetchOpts: RequestInit = {
             method: methodStr || "GET",
             headers: headersRec,
@@ -1192,7 +1423,14 @@ export async function executeMainThreadCommand(
             if (tag === "textarea") return "textbox";
             if (tag === "select") return "combobox";
             if (tag === "img") return "img";
-            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
+            if (
+              tag === "h1" ||
+              tag === "h2" ||
+              tag === "h3" ||
+              tag === "h4" ||
+              tag === "h5" ||
+              tag === "h6"
+            )
               return "heading";
             if (tag === "li") return "listitem";
             if (tag === "ul" || tag === "ol") return "list";
@@ -1268,7 +1506,12 @@ export async function executeMainThreadCommand(
               if (nodes.length >= maxNodes) return;
 
               const tag = el.tagName.toLowerCase();
-              if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template")
+              if (
+                tag === "script" ||
+                tag === "style" ||
+                tag === "noscript" ||
+                tag === "template"
+              )
                 return;
 
               const included = shouldInclude(el);
@@ -1369,7 +1612,14 @@ export async function executeMainThreadCommand(
             if (tag === "textarea") return "textbox";
             if (tag === "select") return "combobox";
             if (tag === "img") return "img";
-            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
+            if (
+              tag === "h1" ||
+              tag === "h2" ||
+              tag === "h3" ||
+              tag === "h4" ||
+              tag === "h5" ||
+              tag === "h6"
+            )
               return "heading";
             if (tag === "li") return "listitem";
             if (tag === "ul" || tag === "ol") return "list";
@@ -1445,7 +1695,12 @@ export async function executeMainThreadCommand(
               if (nodes.length >= maxNodes) return;
 
               const tag = el.tagName.toLowerCase();
-              if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template")
+              if (
+                tag === "script" ||
+                tag === "style" ||
+                tag === "noscript" ||
+                tag === "template"
+              )
                 return;
 
               const included = shouldInclude(el);
@@ -1546,7 +1801,14 @@ export async function executeMainThreadCommand(
             if (tag === "textarea") return "textbox";
             if (tag === "select") return "combobox";
             if (tag === "img") return "img";
-            if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
+            if (
+              tag === "h1" ||
+              tag === "h2" ||
+              tag === "h3" ||
+              tag === "h4" ||
+              tag === "h5" ||
+              tag === "h6"
+            )
               return "heading";
             if (tag === "li") return "listitem";
             if (tag === "ul" || tag === "ol") return "list";
@@ -1622,7 +1884,12 @@ export async function executeMainThreadCommand(
               if (nodes.length >= maxNodes) return;
 
               const tag = el.tagName.toLowerCase();
-              if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template")
+              if (
+                tag === "script" ||
+                tag === "style" ||
+                tag === "noscript" ||
+                tag === "template"
+              )
                 return;
 
               const included = shouldInclude(el);
@@ -1749,13 +2016,18 @@ export async function executeMainThreadCommand(
 
 // ─── Fetch handler ───────────────────────────────────────────────
 
-async function handleFetch(params: FetchParams): Promise<AsyncResponse<FetchValue>> {
+async function handleFetch(
+  params: FetchParams,
+): Promise<AsyncResponse<FetchValue>> {
   throwIfAborted();
   const { url, method, headers, body, timeout } = params;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), Number(timeout) ?? 30_000);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      Number(timeout) ?? 30_000,
+    );
     const fetchOpts: RequestInit = {
       method: method || "GET",
       headers:
@@ -2062,7 +2334,7 @@ async function handleSidepanelAction(
   action: string,
   params: unknown,
 ): Promise<AsyncResponse<null>> {
-  const obj = asRecord(params);
+  const _obj = asRecord(params);
   const refId = extractRefId(params);
   const element = refId ? getElementByRefId(refId) : null;
 
@@ -2229,14 +2501,19 @@ async function handleSidepanelAction(
     default:
       return {
         ok: false,
-        error: { message: `Unknown sidepanel action: ${action}`, code: "EUNKNOWN" },
+        error: {
+          message: `Unknown sidepanel action: ${action}`,
+          code: "EUNKNOWN",
+        },
       };
   }
 }
 
 // ─── DOM snapshot ──────────────────────────────────────────────
 
-async function handleDomSnapshot(params: DomSnapshotParams): Promise<AsyncResponse<DomSnapshotValue>> {
+async function handleDomSnapshot(
+  params: DomSnapshotParams,
+): Promise<AsyncResponse<DomSnapshotValue>> {
   try {
     await ensureDomSnapshot();
     const { max_nodes, interactive_only } = params;
@@ -2259,7 +2536,9 @@ async function handleDomSnapshot(params: DomSnapshotParams): Promise<AsyncRespon
   }
 }
 
-async function handleDomFormat(params: DomFormatParams): Promise<AsyncResponse<string>> {
+async function handleDomFormat(
+  params: DomFormatParams,
+): Promise<AsyncResponse<string>> {
   try {
     await ensureDomSnapshot();
     const { snapshot, format } = params;
@@ -2274,7 +2553,7 @@ async function handleDomFormat(params: DomFormatParams): Promise<AsyncResponse<s
   }
 }
 
-function getElementRole(el: Element): string {
+function _getElementRole(el: Element): string {
   const tag = el.tagName.toLowerCase();
   const ariaRole = el.getAttribute("role");
   if (ariaRole) return ariaRole;
@@ -2412,6 +2691,7 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         const updateProps = firstRec.update || second || {};
         result = await chrome.tabs.update(
           typeof tabId === "number" ? tabId : (null as unknown as number),
+          // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
           updateProps as any,
         );
         break;
@@ -2432,6 +2712,7 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         const reloadProps = firstRec.reload || second || {};
         await chrome.tabs.reload(
           typeof tabId === "number" ? tabId : (undefined as unknown as number),
+          // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
           reloadProps as any,
         );
         result = null;
@@ -2458,21 +2739,25 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         break;
       }
       case "chrome_action_setBadgeText": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         await chrome.action.setBadgeText((firstRec || {}) as any);
         result = null;
         break;
       }
       case "chrome_action_setBadgeBackgroundColor": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         await chrome.action.setBadgeBackgroundColor((firstRec || {}) as any);
         result = null;
         break;
       }
       case "chrome_action_setTitle": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         await chrome.action.setTitle((firstRec || {}) as any);
         result = null;
         break;
       }
       case "chrome_action_setIcon": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.action.setIcon((firstRec || {}) as any);
         break;
       }
@@ -2512,18 +2797,22 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         break;
       }
       case "chrome_cookies_get": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.cookies.get((firstRec || {}) as any);
         break;
       }
       case "chrome_cookies_set": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.cookies.set((firstRec || {}) as any);
         break;
       }
       case "chrome_cookies_remove": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.cookies.remove((firstRec || {}) as any);
         break;
       }
       case "chrome_cookies_getAll": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.cookies.getAll((firstRec || {}) as any);
         break;
       }
@@ -2544,6 +2833,7 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         break;
       }
       case "chrome_history_search": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.history.search((firstRec || {}) as any);
         break;
       }
@@ -2566,6 +2856,7 @@ async function handleChromeApi(command: Command): Promise<AsyncResponse> {
         break;
       }
       case "chrome_scripting_executeScript": {
+        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
         result = await chrome.scripting.executeScript((firstRec || {}) as any);
         break;
       }

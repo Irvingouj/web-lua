@@ -1,9 +1,9 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    File, FileSystemCreateWritableOptions, FileSystemDirectoryHandle,
-    FileSystemGetDirectoryOptions, FileSystemGetFileOptions, FileSystemFileHandle,
-    FileSystemHandleKind, FileSystemRemoveOptions, FileSystemWritableFileStream, StorageManager,
+    File, FileSystemCreateWritableOptions, FileSystemDirectoryHandle, FileSystemFileHandle,
+    FileSystemGetDirectoryOptions, FileSystemGetFileOptions, FileSystemHandleKind,
+    FileSystemRemoveOptions, FileSystemWritableFileStream, StorageManager,
 };
 
 use crate::{DirEntry, EntryKind, FsError, Metadata, Result};
@@ -107,7 +107,9 @@ async fn resolve_dir_create(path: &std::path::Path) -> Result<FileSystemDirector
     Ok(current)
 }
 
-async fn resolve_parent_and_name(path: &std::path::Path) -> Result<(FileSystemDirectoryHandle, String)> {
+async fn resolve_parent_and_name(
+    path: &std::path::Path,
+) -> Result<(FileSystemDirectoryHandle, String)> {
     let parts = path_parts(path)?;
     if parts.is_empty() {
         return Err(FsError::InvalidPath);
@@ -274,7 +276,9 @@ pub async fn list(path: impl AsRef<std::path::Path>) -> Result<Vec<DirEntry>> {
 
     loop {
         let promise = entries_iter.next().map_err(|e| js_err_to_fs_err(&e))?;
-        let result = JsFuture::from(promise).await.map_err(|e| js_err_to_fs_err(&e))?;
+        let result = JsFuture::from(promise)
+            .await
+            .map_err(|e| js_err_to_fs_err(&e))?;
         let done = js_sys::Reflect::get(&result, &"done".into())
             .ok()
             .and_then(|v| v.as_bool())
@@ -377,7 +381,11 @@ pub async fn read_base64(path: impl AsRef<std::path::Path>) -> Result<String> {
     Ok(data_encoding::BASE64.encode(&bytes))
 }
 
-pub async fn read_range(path: impl AsRef<std::path::Path>, offset: u64, len: usize) -> Result<Vec<u8>> {
+pub async fn read_range(
+    path: impl AsRef<std::path::Path>,
+    offset: u64,
+    len: usize,
+) -> Result<Vec<u8>> {
     let bytes = read(path).await?;
     let start = offset as usize;
     if start >= bytes.len() {
@@ -387,35 +395,23 @@ pub async fn read_range(path: impl AsRef<std::path::Path>, offset: u64, len: usi
     Ok(bytes[start..end].to_vec())
 }
 
-pub async fn write(
-    path: impl AsRef<std::path::Path>,
-    data: impl AsRef<[u8]>,
-) -> Result<()> {
+pub async fn write(path: impl AsRef<std::path::Path>, data: impl AsRef<[u8]>) -> Result<()> {
     let handle = resolve_file_create(path.as_ref()).await?;
     write_to_handle(&handle, data.as_ref(), None).await
 }
 
-pub async fn write_text(
-    path: impl AsRef<std::path::Path>,
-    text: impl AsRef<str>,
-) -> Result<()> {
+pub async fn write_text(path: impl AsRef<std::path::Path>, text: impl AsRef<str>) -> Result<()> {
     write(path, text.as_ref().as_bytes()).await
 }
 
-pub async fn write_base64(
-    path: impl AsRef<std::path::Path>,
-    b64: impl AsRef<str>,
-) -> Result<()> {
+pub async fn write_base64(path: impl AsRef<std::path::Path>, b64: impl AsRef<str>) -> Result<()> {
     let bytes = data_encoding::BASE64
         .decode(b64.as_ref().as_bytes())
         .map_err(|_| FsError::InvalidEncoding)?;
     write(path, &bytes).await
 }
 
-pub async fn append(
-    path: impl AsRef<std::path::Path>,
-    data: impl AsRef<[u8]>,
-) -> Result<()> {
+pub async fn append(path: impl AsRef<std::path::Path>, data: impl AsRef<[u8]>) -> Result<()> {
     let path = path.as_ref();
     let handle = match resolve_file(path).await {
         Ok(h) => h,
@@ -426,17 +422,11 @@ pub async fn append(
     write_to_handle(&handle, data.as_ref(), Some(size)).await
 }
 
-pub async fn append_text(
-    path: impl AsRef<std::path::Path>,
-    text: impl AsRef<str>,
-) -> Result<()> {
+pub async fn append_text(path: impl AsRef<std::path::Path>, text: impl AsRef<str>) -> Result<()> {
     append(path, text.as_ref().as_bytes()).await
 }
 
-pub async fn append_base64(
-    path: impl AsRef<std::path::Path>,
-    b64: impl AsRef<str>,
-) -> Result<()> {
+pub async fn append_base64(path: impl AsRef<std::path::Path>, b64: impl AsRef<str>) -> Result<()> {
     let bytes = data_encoding::BASE64
         .decode(b64.as_ref().as_bytes())
         .map_err(|_| FsError::InvalidEncoding)?;
@@ -459,13 +449,21 @@ pub async fn hash(path: impl AsRef<std::path::Path>, algo: &str) -> Result<Strin
             use sha2::{Digest, Sha256};
             let mut hasher = Sha256::new();
             hasher.update(&bytes);
-            hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+            hasher
+                .finalize()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect()
         }
         "sha1" => {
             use sha1::{Digest, Sha1};
             let mut hasher = Sha1::new();
             hasher.update(&bytes);
-            hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect()
+            hasher
+                .finalize()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect()
         }
         _ => return Err(FsError::InvalidEncoding),
     };

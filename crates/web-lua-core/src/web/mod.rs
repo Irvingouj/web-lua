@@ -151,13 +151,31 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     set_protected!(ctx, web_table, "history", history_table, "web.history");
 
     let bookmarks_table = bookmarks::register(ctx, host_state.clone());
-    set_protected!(ctx, web_table, "bookmarks", bookmarks_table, "web.bookmarks");
+    set_protected!(
+        ctx,
+        web_table,
+        "bookmarks",
+        bookmarks_table,
+        "web.bookmarks"
+    );
 
     let notifications_table = notifications::register(ctx, host_state.clone());
-    set_protected!(ctx, web_table, "notifications", notifications_table, "web.notifications");
+    set_protected!(
+        ctx,
+        web_table,
+        "notifications",
+        notifications_table,
+        "web.notifications"
+    );
 
     let clipboard_table = clipboard::register(ctx, host_state.clone());
-    set_protected!(ctx, web_table, "clipboard", clipboard_table, "web.clipboard");
+    set_protected!(
+        ctx,
+        web_table,
+        "clipboard",
+        clipboard_table,
+        "web.clipboard"
+    );
 
     let fs_table = fs::register(ctx, host_state.clone());
     web_table.set_field(ctx, "fs", fs_table);

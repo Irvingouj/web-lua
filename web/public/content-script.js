@@ -3,16 +3,23 @@
 const __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 };
 let __logLevel = 3; // default "error"
 const logger = {
-    debug: (...args) => { if (__logLevel <= 0)
-        console.log(...args); },
-    info: (...args) => { if (__logLevel <= 1)
-        console.log(...args); },
-    warn: (...args) => { if (__logLevel <= 2)
-        console.warn(...args); },
-    error: (...args) => { if (__logLevel <= 3)
-        console.error(...args); },
+    debug: (...args) => {
+        if (__logLevel <= 0)
+            console.log(...args);
+    },
+    info: (...args) => {
+        if (__logLevel <= 1)
+            console.log(...args);
+    },
+    warn: (...args) => {
+        if (__logLevel <= 2)
+            console.warn(...args);
+    },
+    error: (...args) => {
+        if (__logLevel <= 3)
+            console.error(...args);
+    },
 };
-// biome-ignore lint/suspicious/noGlobalAssign: exposed for dev console tuning
 window.__luaNotebookSetLogLevel = (level) => {
     __logLevel = __LOG_LEVELS[level] ?? 3;
 };
@@ -42,7 +49,8 @@ function findElementByLabel(query) {
                 return el;
         }
         const parentLabel = el.closest("label");
-        if (parentLabel && parentLabel.textContent?.trim().toLowerCase() === lowerQuery)
+        if (parentLabel &&
+            parentLabel.textContent?.trim().toLowerCase() === lowerQuery)
             return el;
         const text = el.textContent?.trim().toLowerCase() || "";
         if (text === lowerQuery)
@@ -65,7 +73,9 @@ function findCandidateLabels(query) {
         if (text)
             candidates.add(text);
     }
-    return Array.from(candidates).filter((c) => c.toLowerCase().includes(lowerQuery)).slice(0, 5);
+    return Array.from(candidates)
+        .filter((c) => c.toLowerCase().includes(lowerQuery))
+        .slice(0, 5);
 }
 function asRecord(obj) {
     return typeof obj === "object" && obj !== null && !Array.isArray(obj)
@@ -110,7 +120,12 @@ function getAccessibleRole(el) {
         return "combobox";
     if (tag === "img")
         return "img";
-    if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
+    if (tag === "h1" ||
+        tag === "h2" ||
+        tag === "h3" ||
+        tag === "h4" ||
+        tag === "h5" ||
+        tag === "h6")
         return "heading";
     if (tag === "li")
         return "listitem";
@@ -197,7 +212,10 @@ function inlineSnapshot(maxNodes) {
         if (nodes.length >= maxNodes)
             return;
         const tag = el.tagName.toLowerCase();
-        if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template")
+        if (tag === "script" ||
+            tag === "style" ||
+            tag === "noscript" ||
+            tag === "template")
             return;
         const included = shouldInclude(el);
         let currentDepth = depth;
@@ -446,7 +464,9 @@ const handlers = {
         try {
             const fetchOpts = {
                 method: method || "GET",
-                headers: typeof headers === "object" && headers !== null ? headers : {},
+                headers: typeof headers === "object" && headers !== null
+                    ? headers
+                    : {},
                 signal: controller.signal,
             };
             if (body !== null && body !== undefined) {

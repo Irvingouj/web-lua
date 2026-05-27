@@ -22,7 +22,8 @@
       "web/src/**/*.ts",
       "web/tests/**/*.ts",
       "crates/*/js/**/*.ts",
-      "packages/**/*.ts"
+      "packages/**/*.ts",
+      "!!**/*.d.ts"
     ]
   }
 }

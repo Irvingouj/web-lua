@@ -6,6 +6,7 @@
 import type { CellResult, WasmGlobalsSnapshot } from "./extension_lua.js";
 import { generateApiDocs } from "./extension_lua.js";
 import { logger } from "./logger.js";
+import type { Command } from "./runner.js";
 import {
   executeMainThreadCommand,
   registerHostHandler,
@@ -13,10 +14,12 @@ import {
   removeExtensionListeners,
   setRunnerAbortController,
 } from "./runner.js";
-import type { Command } from "./runner.js";
 
-export type { CellResult as LuaRunResult, WasmGlobalsSnapshot as LuaGlobalsSnapshot };
-export { registerHostHandler, registerHostHandlers, generateApiDocs };
+export type {
+  CellResult as LuaRunResult,
+  WasmGlobalsSnapshot as LuaGlobalsSnapshot,
+};
+export { generateApiDocs, registerHostHandler, registerHostHandlers };
 
 export interface LuaApiDoc {
   namespace: string;
@@ -169,10 +172,20 @@ export class ExtensionSession {
       case "asyncRelay": {
         if (!msg.id || !msg.command) break;
         const action = (msg.command as Record<string, unknown>)?.action;
-        logger.debug("[ExtensionSession] asyncRelay action:", action, "id:", msg.id);
+        logger.debug(
+          "[ExtensionSession] asyncRelay action:",
+          action,
+          "id:",
+          msg.id,
+        );
         executeMainThreadCommand(msg.command as Command)
           .then((result) => {
-            logger.debug("[ExtensionSession] asyncRelayResult action:", action, "resultType:", typeof result);
+            logger.debug(
+              "[ExtensionSession] asyncRelayResult action:",
+              action,
+              "resultType:",
+              typeof result,
+            );
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,
@@ -181,7 +194,12 @@ export class ExtensionSession {
           })
           .catch((err: Error | unknown) => {
             const message = err instanceof Error ? err.message : String(err);
-            logger.error("[ExtensionSession] asyncRelay error action:", action, "msg:", message);
+            logger.error(
+              "[ExtensionSession] asyncRelay error action:",
+              action,
+              "msg:",
+              message,
+            );
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,

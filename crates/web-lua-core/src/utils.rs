@@ -129,10 +129,7 @@ pub(crate) fn format_unknown_api_error(namespace: &str, name: &str) -> String {
         if !apis.is_empty() {
             msg.push_str(&format!("\nSub-namespaces under '{}':\n", namespace));
         } else {
-            msg.push_str(&format!(
-                "Available namespaces under '{}':\n",
-                namespace
-            ));
+            msg.push_str(&format!("Available namespaces under '{}':\n", namespace));
         }
         for child in &children {
             msg.push_str(&format!("  {}\n", child));
@@ -147,7 +144,11 @@ pub(crate) fn format_unknown_api_error(namespace: &str, name: &str) -> String {
 }
 
 /// Build a human-friendly parameter error message using `LuaApiDoc` metadata.
-pub(crate) fn format_param_error(namespace: &str, name: &str, serde_err: &serde_json::Error) -> String {
+pub(crate) fn format_param_error(
+    namespace: &str,
+    name: &str,
+    serde_err: &serde_json::Error,
+) -> String {
     let registry = REGISTRY.lock().unwrap();
     let doc = registry
         .iter()
@@ -166,10 +167,7 @@ pub(crate) fn format_param_error(namespace: &str, name: &str, serde_err: &serde_
             })
             .collect::<Vec<_>>()
             .join("\n");
-        format!(
-            "{}.{}({{\n{}\n}})",
-            namespace, name, params
-        )
+        format!("{}.{}({{\n{}\n}})", namespace, name, params)
     });
 
     let mut msg = format!("{}.{}: invalid parameters.\n", namespace, name);

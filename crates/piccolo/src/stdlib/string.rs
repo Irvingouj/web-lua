@@ -209,7 +209,8 @@ pub fn load_string<'gc>(ctx: Context<'gc>) {
             stack.clear();
             match result {
                 Some((full_range, captures)) => {
-                    let explicit_captures: Vec<_> = captures.into_iter().filter_map(|c| c).collect();
+                    let explicit_captures: Vec<_> =
+                        captures.into_iter().filter_map(|c| c).collect();
                     if !explicit_captures.is_empty() {
                         for range in explicit_captures {
                             stack.push_back(Value::String(ctx.intern(&text[range])));
@@ -241,8 +242,9 @@ pub fn load_string<'gc>(ctx: Context<'gc>) {
                 let pos: i64 = state.get(ctx, "pos")?;
                 let text = s.as_bytes();
                 let start = compute_start_index(text.len(), pos);
-                let pattern_str = std::str::from_utf8(pattern.as_bytes())
-                    .map_err(|_| Error::from("malformed pattern (invalid UTF-8)".into_value(ctx)))?;
+                let pattern_str = std::str::from_utf8(pattern.as_bytes()).map_err(|_| {
+                    Error::from("malformed pattern (invalid UTF-8)".into_value(ctx))
+                })?;
                 let mut parser = lsonar::Parser::new(pattern_str)
                     .map_err(|e| Error::from(format!("bad pattern: {}", e).into_value(ctx)))?;
                 let ast = parser
@@ -253,7 +255,8 @@ pub fn load_string<'gc>(ctx: Context<'gc>) {
                 stack.clear();
                 match result {
                     Some((full_range, captures)) => {
-                        let explicit_captures: Vec<_> = captures.into_iter().filter_map(|c| c).collect();
+                        let explicit_captures: Vec<_> =
+                            captures.into_iter().filter_map(|c| c).collect();
                         if !explicit_captures.is_empty() {
                             for range in explicit_captures {
                                 stack.push_back(Value::String(ctx.intern(&text[range])));
@@ -428,7 +431,8 @@ mod tests {
             let mut fuel = Fuel::with(10000);
             while !executor.step(ctx, &mut fuel)? {}
             let Variadic(results) = executor.take_result::<Variadic<Vec<Value>>>(ctx)??;
-            let strings: Vec<std::string::String> = results.iter().map(|v| v.display().to_string()).collect();
+            let strings: Vec<std::string::String> =
+                results.iter().map(|v| v.display().to_string()).collect();
             Ok(strings)
         })
     }

@@ -23,7 +23,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "any" => "Response from the recipient",
     );
-    set_protected!(ctx, chrome_table, "runtime", runtime_table, "chrome.runtime");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "runtime",
+        runtime_table,
+        "chrome.runtime"
+    );
 
     // chrome.tabs
     let tabs_table = Table::new(&ctx);
@@ -209,7 +215,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "boolean" => "Whether removal succeeded",
     );
-    set_protected!(ctx, chrome_table, "contextMenus", context_menus_table, "chrome.contextMenus");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "contextMenus",
+        context_menus_table,
+        "chrome.contextMenus"
+    );
 
     // chrome.windows
     let windows_table = Table::new(&ctx);
@@ -258,7 +270,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "boolean" => "Whether close succeeded",
     );
-    set_protected!(ctx, chrome_table, "windows", windows_table, "chrome.windows");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "windows",
+        windows_table,
+        "chrome.windows"
+    );
 
     // chrome.sidePanel
     let side_panel_table = Table::new(&ctx);
@@ -273,7 +291,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "boolean" => "Whether options were set",
     );
-    set_protected!(ctx, chrome_table, "sidePanel", side_panel_table, "chrome.sidePanel");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "sidePanel",
+        side_panel_table,
+        "chrome.sidePanel"
+    );
 
     // chrome.cookies
     let cookies_table = Table::new(&ctx);
@@ -321,7 +345,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "table" => "Array of cookie objects",
     );
-    set_protected!(ctx, chrome_table, "cookies", cookies_table, "chrome.cookies");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "cookies",
+        cookies_table,
+        "chrome.cookies"
+    );
 
     // chrome.bookmarks
     let bookmarks_table = Table::new(&ctx);
@@ -358,7 +388,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "boolean" => "Whether removal succeeded",
     );
-    set_protected!(ctx, chrome_table, "bookmarks", bookmarks_table, "chrome.bookmarks");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "bookmarks",
+        bookmarks_table,
+        "chrome.bookmarks"
+    );
 
     // chrome.history
     let history_table = Table::new(&ctx);
@@ -384,7 +420,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "boolean" => "Whether deletion succeeded",
     );
-    set_protected!(ctx, chrome_table, "history", history_table, "chrome.history");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "history",
+        history_table,
+        "chrome.history"
+    );
 
     // chrome.notifications
     let notifications_table = Table::new(&ctx);
@@ -411,7 +453,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "boolean" => "Whether notification was cleared",
     );
-    set_protected!(ctx, chrome_table, "notifications", notifications_table, "chrome.notifications");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "notifications",
+        notifications_table,
+        "chrome.notifications"
+    );
 
     // chrome.scripting
     let scripting_table = Table::new(&ctx);
@@ -427,7 +475,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     ],
     returns: "table" => "Array of injection results",
     );
-    set_protected!(ctx, chrome_table, "scripting", scripting_table, "chrome.scripting");
+    set_protected!(
+        ctx,
+        chrome_table,
+        "scripting",
+        scripting_table,
+        "chrome.scripting"
+    );
 
     set_protected_global!(ctx, "chrome", chrome_table, "chrome");
 }

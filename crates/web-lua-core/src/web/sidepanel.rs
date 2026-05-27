@@ -68,7 +68,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = crate::utils::format_param_error("sidepanel", "snapshot_data", &e);
+                        let msg =
+                            crate::utils::format_param_error("sidepanel", "snapshot_data", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };

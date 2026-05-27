@@ -12,7 +12,7 @@ use opfs as imp;
 use stub as imp;
 
 pub use error::{FsError, Result};
-pub use metadata::{Metadata, DirEntry, EntryKind};
+pub use metadata::{DirEntry, EntryKind, Metadata};
 
 pub async fn exists(path: impl AsRef<std::path::Path>) -> bool {
     imp::exists(path).await
@@ -34,11 +34,17 @@ pub async fn delete(path: impl AsRef<std::path::Path>) -> Result<()> {
     imp::delete(path).await
 }
 
-pub async fn copy(from: impl AsRef<std::path::Path>, to: impl AsRef<std::path::Path>) -> Result<()> {
+pub async fn copy(
+    from: impl AsRef<std::path::Path>,
+    to: impl AsRef<std::path::Path>,
+) -> Result<()> {
     imp::copy(from, to).await
 }
 
-pub async fn rename(from: impl AsRef<std::path::Path>, to: impl AsRef<std::path::Path>) -> Result<()> {
+pub async fn rename(
+    from: impl AsRef<std::path::Path>,
+    to: impl AsRef<std::path::Path>,
+) -> Result<()> {
     imp::rename(from, to).await
 }
 
@@ -54,7 +60,11 @@ pub async fn read_base64(path: impl AsRef<std::path::Path>) -> Result<String> {
     imp::read_base64(path).await
 }
 
-pub async fn read_range(path: impl AsRef<std::path::Path>, offset: u64, len: usize) -> Result<Vec<u8>> {
+pub async fn read_range(
+    path: impl AsRef<std::path::Path>,
+    offset: u64,
+    len: usize,
+) -> Result<Vec<u8>> {
     imp::read_range(path, offset, len).await
 }
 
@@ -82,7 +92,11 @@ pub async fn append_base64(path: impl AsRef<std::path::Path>, b64: impl AsRef<st
     imp::append_base64(path, b64).await
 }
 
-pub async fn update(path: impl AsRef<std::path::Path>, offset: u64, data: impl AsRef<[u8]>) -> Result<()> {
+pub async fn update(
+    path: impl AsRef<std::path::Path>,
+    offset: u64,
+    data: impl AsRef<[u8]>,
+) -> Result<()> {
     imp::update(path, offset, data).await
 }
 

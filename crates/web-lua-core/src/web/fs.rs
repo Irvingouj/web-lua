@@ -66,7 +66,9 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                     other => {
                         let msg = format!(
                             "fs.{} expects {} as string, got {}",
-                            name, field1, other.type_name()
+                            name,
+                            field1,
+                            other.type_name()
                         );
                         return Err(msg.into_value(ctx).into());
                     }
@@ -82,7 +84,9 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                     other => {
                         let msg = format!(
                             "fs.{} expects {} as string, got {}",
-                            name, field2, other.type_name()
+                            name,
+                            field2,
+                            other.type_name()
                         );
                         return Err(msg.into_value(ctx).into());
                     }
@@ -377,7 +381,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => {
-                        let msg = format!("fs.write expects path as string, got {}", other.type_name());
+                        let msg =
+                            format!("fs.write expects path as string, got {}", other.type_name());
                         return Err(msg.into_value(ctx).into());
                     }
                 }
@@ -390,7 +395,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(1) {
                     Value::String(s) => data_encoding::BASE64.encode(s.as_bytes()),
                     other => {
-                        let msg = format!("fs.write expects string data, got {}", other.type_name());
+                        let msg =
+                            format!("fs.write expects string data, got {}", other.type_name());
                         return Err(msg.into_value(ctx).into());
                     }
                 }
@@ -441,7 +447,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
 
     // ── fs.write_text(path, text) ──
     {
-        let cb = make_2str_cb("write_text", "fs_write_text", "path", "data", host_state.clone());
+        let cb = make_2str_cb(
+            "write_text",
+            "fs_write_text",
+            "path",
+            "data",
+            host_state.clone(),
+        );
         fs_table.set_field(ctx, "write_text", cb);
         crate::lua_api_doc!(
             namespace: "fs",
@@ -458,7 +470,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
 
     // ── fs.write_base64(path, b64) ──
     {
-        let cb = make_2str_cb("write_base64", "fs_write_base64", "path", "data", host_state.clone());
+        let cb = make_2str_cb(
+            "write_base64",
+            "fs_write_base64",
+            "path",
+            "data",
+            host_state.clone(),
+        );
         fs_table.set_field(ctx, "write_base64", cb);
         crate::lua_api_doc!(
             namespace: "fs",
@@ -481,7 +499,10 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => {
-                        let msg = format!("fs.append expects path as string, got {}", other.type_name());
+                        let msg = format!(
+                            "fs.append expects path as string, got {}",
+                            other.type_name()
+                        );
                         return Err(msg.into_value(ctx).into());
                     }
                 }
@@ -494,7 +515,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(1) {
                     Value::String(s) => data_encoding::BASE64.encode(s.as_bytes()),
                     other => {
-                        let msg = format!("fs.append expects string data, got {}", other.type_name());
+                        let msg =
+                            format!("fs.append expects string data, got {}", other.type_name());
                         return Err(msg.into_value(ctx).into());
                     }
                 }
@@ -545,7 +567,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
 
     // ── fs.append_text(path, text) ──
     {
-        let cb = make_2str_cb("append_text", "fs_append_text", "path", "data", host_state.clone());
+        let cb = make_2str_cb(
+            "append_text",
+            "fs_append_text",
+            "path",
+            "data",
+            host_state.clone(),
+        );
         fs_table.set_field(ctx, "append_text", cb);
         crate::lua_api_doc!(
             namespace: "fs",
@@ -562,7 +590,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
 
     // ── fs.append_base64(path, b64) ──
     {
-        let cb = make_2str_cb("append_base64", "fs_append_base64", "path", "data", host_state.clone());
+        let cb = make_2str_cb(
+            "append_base64",
+            "fs_append_base64",
+            "path",
+            "data",
+            host_state.clone(),
+        );
         fs_table.set_field(ctx, "append_base64", cb);
         crate::lua_api_doc!(
             namespace: "fs",
@@ -618,7 +652,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(2) {
                     Value::String(s) => data_encoding::BASE64.encode(s.as_bytes()),
                     other => {
-                        let msg = format!("fs.update expects string data, got {}", other.type_name());
+                        let msg =
+                            format!("fs.update expects string data, got {}", other.type_name());
                         return Err(msg.into_value(ctx).into());
                     }
                 }
@@ -676,10 +711,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => {
-                        let msg = format!(
-                            "fs.hash expects path as string, got {}",
-                            other.type_name()
-                        );
+                        let msg =
+                            format!("fs.hash expects path as string, got {}", other.type_name());
                         return Err(msg.into_value(ctx).into());
                     }
                 }
@@ -692,10 +725,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match stack.get(1) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                     other => {
-                        let msg = format!(
-                            "fs.hash expects algo as string, got {}",
-                            other.type_name()
-                        );
+                        let msg =
+                            format!("fs.hash expects algo as string, got {}", other.type_name());
                         return Err(msg.into_value(ctx).into());
                     }
                 }

@@ -1,14 +1,13 @@
 use crate::browser_api::{
-    execute_dom_format, execute_dom_snapshot, execute_fetch, execute_host_call, execute_page_check,
-    execute_page_dblclick, execute_page_hover, execute_page_press, execute_page_scroll,
-    execute_page_scroll_to, execute_page_select, execute_page_type, execute_page_unhover,
-    execute_page_wait, execute_sleep, execute_storage_delete, execute_storage_get,
-    execute_storage_list, execute_storage_set,
-    execute_fs_exists, execute_fs_stat, execute_fs_list, execute_fs_mkdir, execute_fs_delete,
-    execute_fs_copy, execute_fs_move, execute_fs_read, execute_fs_read_text, execute_fs_read_base64,
-    execute_fs_read_range, execute_fs_write, execute_fs_write_text, execute_fs_write_base64,
-    execute_fs_append, execute_fs_append_text, execute_fs_append_base64, execute_fs_update,
-    execute_fs_hash,
+    execute_dom_format, execute_dom_snapshot, execute_fetch, execute_fs_append,
+    execute_fs_append_base64, execute_fs_append_text, execute_fs_copy, execute_fs_delete,
+    execute_fs_exists, execute_fs_hash, execute_fs_list, execute_fs_mkdir, execute_fs_move,
+    execute_fs_read, execute_fs_read_base64, execute_fs_read_range, execute_fs_read_text,
+    execute_fs_stat, execute_fs_update, execute_fs_write, execute_fs_write_base64,
+    execute_fs_write_text, execute_host_call, execute_page_check, execute_page_dblclick,
+    execute_page_hover, execute_page_press, execute_page_scroll, execute_page_scroll_to,
+    execute_page_select, execute_page_type, execute_page_unhover, execute_page_wait, execute_sleep,
+    execute_storage_delete, execute_storage_get, execute_storage_list, execute_storage_set,
 };
 use std::cell::Cell;
 use wasm_bindgen::prelude::*;
@@ -994,97 +993,116 @@ impl WebSession {
             }
             Action::StorageList => Ok(execute_storage_list().await),
             Action::FsExists => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_exists params: {}", e))?;
                 Ok(execute_fs_exists(params).await)
             }
             Action::FsStat => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_stat params: {}", e))?;
                 Ok(execute_fs_stat(params).await)
             }
             Action::FsList => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_list params: {}", e))?;
                 Ok(execute_fs_list(params).await)
             }
             Action::FsMkdir => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_mkdir params: {}", e))?;
                 Ok(execute_fs_mkdir(params).await)
             }
             Action::FsDelete => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_delete params: {}", e))?;
                 Ok(execute_fs_delete(params).await)
             }
             Action::FsCopy => {
-                let params = cmd.parse_params::<FsCopyParams>()
+                let params = cmd
+                    .parse_params::<FsCopyParams>()
                     .map_err(|e| format!("Invalid fs_copy params: {}", e))?;
                 Ok(execute_fs_copy(params).await)
             }
             Action::FsMove => {
-                let params = cmd.parse_params::<FsCopyParams>()
+                let params = cmd
+                    .parse_params::<FsCopyParams>()
                     .map_err(|e| format!("Invalid fs_move params: {}", e))?;
                 Ok(execute_fs_move(params).await)
             }
             Action::FsRead => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_read params: {}", e))?;
                 Ok(execute_fs_read(params).await)
             }
             Action::FsReadText => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_read_text params: {}", e))?;
                 Ok(execute_fs_read_text(params).await)
             }
             Action::FsReadBase64 => {
-                let params = cmd.parse_params::<FsPathParams>()
+                let params = cmd
+                    .parse_params::<FsPathParams>()
                     .map_err(|e| format!("Invalid fs_read_base64 params: {}", e))?;
                 Ok(execute_fs_read_base64(params).await)
             }
             Action::FsReadRange => {
-                let params = cmd.parse_params::<FsReadRangeParams>()
+                let params = cmd
+                    .parse_params::<FsReadRangeParams>()
                     .map_err(|e| format!("Invalid fs_read_range params: {}", e))?;
                 Ok(execute_fs_read_range(params).await)
             }
             Action::FsWrite => {
-                let params = cmd.parse_params::<FsWriteParams>()
+                let params = cmd
+                    .parse_params::<FsWriteParams>()
                     .map_err(|e| format!("Invalid fs_write params: {}", e))?;
                 Ok(execute_fs_write(params).await)
             }
             Action::FsWriteText => {
-                let params = cmd.parse_params::<FsWriteParams>()
+                let params = cmd
+                    .parse_params::<FsWriteParams>()
                     .map_err(|e| format!("Invalid fs_write_text params: {}", e))?;
                 Ok(execute_fs_write_text(params).await)
             }
             Action::FsWriteBase64 => {
-                let params = cmd.parse_params::<FsWriteParams>()
+                let params = cmd
+                    .parse_params::<FsWriteParams>()
                     .map_err(|e| format!("Invalid fs_write_base64 params: {}", e))?;
                 Ok(execute_fs_write_base64(params).await)
             }
             Action::FsAppend => {
-                let params = cmd.parse_params::<FsWriteParams>()
+                let params = cmd
+                    .parse_params::<FsWriteParams>()
                     .map_err(|e| format!("Invalid fs_append params: {}", e))?;
                 Ok(execute_fs_append(params).await)
             }
             Action::FsAppendText => {
-                let params = cmd.parse_params::<FsWriteParams>()
+                let params = cmd
+                    .parse_params::<FsWriteParams>()
                     .map_err(|e| format!("Invalid fs_append_text params: {}", e))?;
                 Ok(execute_fs_append_text(params).await)
             }
             Action::FsAppendBase64 => {
-                let params = cmd.parse_params::<FsWriteParams>()
+                let params = cmd
+                    .parse_params::<FsWriteParams>()
                     .map_err(|e| format!("Invalid fs_append_base64 params: {}", e))?;
                 Ok(execute_fs_append_base64(params).await)
             }
             Action::FsUpdate => {
-                let params = cmd.parse_params::<FsUpdateParams>()
+                let params = cmd
+                    .parse_params::<FsUpdateParams>()
                     .map_err(|e| format!("Invalid fs_update params: {}", e))?;
                 Ok(execute_fs_update(params).await)
             }
             Action::FsHash => {
-                let params = cmd.parse_params::<FsHashParams>()
+                let params = cmd
+                    .parse_params::<FsHashParams>()
                     .map_err(|e| format!("Invalid fs_hash params: {}", e))?;
                 Ok(execute_fs_hash(params).await)
             }

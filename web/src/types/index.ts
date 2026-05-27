@@ -1,6 +1,4 @@
-import type {
-  CellError as CellErrorType,
-} from "./generated";
+import type { CellError as CellErrorType } from "./generated";
 
 export type CellError = CellErrorType;
 

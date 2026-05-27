@@ -12,13 +12,20 @@ const __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 } as const;
 let __logLevel = 3; // default "error"
 
 const logger = {
-  debug: (...args: unknown[]) => { if (__logLevel <= 0) console.log(...args); },
-  info: (...args: unknown[]) => { if (__logLevel <= 1) console.log(...args); },
-  warn: (...args: unknown[]) => { if (__logLevel <= 2) console.warn(...args); },
-  error: (...args: unknown[]) => { if (__logLevel <= 3) console.error(...args); },
+  debug: (...args: unknown[]) => {
+    if (__logLevel <= 0) console.log(...args);
+  },
+  info: (...args: unknown[]) => {
+    if (__logLevel <= 1) console.log(...args);
+  },
+  warn: (...args: unknown[]) => {
+    if (__logLevel <= 2) console.warn(...args);
+  },
+  error: (...args: unknown[]) => {
+    if (__logLevel <= 3) console.error(...args);
+  },
 };
 
-// biome-ignore lint/suspicious/noGlobalAssign: exposed for dev console tuning
 window.__luaNotebookSetLogLevel = (level: string) => {
   __logLevel = __LOG_LEVELS[level as keyof typeof __LOG_LEVELS] ?? 3;
 };
@@ -35,19 +42,29 @@ function getElementByRefId(refId: string | number): Element | null {
 function findElementByLabel(query: string): Element | null {
   const lowerQuery = query.toLowerCase().trim();
   if (!lowerQuery) return null;
-  const all = Array.from(document.querySelectorAll('input, textarea, select, button, a, [role="button"], [role="link"]'));
+  const all = Array.from(
+    document.querySelectorAll(
+      'input, textarea, select, button, a, [role="button"], [role="link"]',
+    ),
+  );
   for (const el of all) {
     const ariaLabel = el.getAttribute("aria-label");
     if (ariaLabel && ariaLabel.toLowerCase().trim() === lowerQuery) return el;
     const placeholder = (el as HTMLInputElement).placeholder;
-    if (placeholder && placeholder.toLowerCase().trim() === lowerQuery) return el;
+    if (placeholder && placeholder.toLowerCase().trim() === lowerQuery)
+      return el;
     const id = el.id;
     if (id) {
       const label = document.querySelector(`label[for='${CSS.escape(id)}']`);
-      if (label && label.textContent?.trim().toLowerCase() === lowerQuery) return el;
+      if (label && label.textContent?.trim().toLowerCase() === lowerQuery)
+        return el;
     }
     const parentLabel = el.closest("label");
-    if (parentLabel && parentLabel.textContent?.trim().toLowerCase() === lowerQuery) return el;
+    if (
+      parentLabel &&
+      parentLabel.textContent?.trim().toLowerCase() === lowerQuery
+    )
+      return el;
     const text = el.textContent?.trim().toLowerCase() || "";
     if (text === lowerQuery) return el;
   }
@@ -57,7 +74,11 @@ function findElementByLabel(query: string): Element | null {
 function findCandidateLabels(query: string): string[] {
   const lowerQuery = query.toLowerCase().trim();
   const candidates = new Set<string>();
-  const all = Array.from(document.querySelectorAll('input, textarea, select, button, a, [role="button"], [role="link"]'));
+  const all = Array.from(
+    document.querySelectorAll(
+      'input, textarea, select, button, a, [role="button"], [role="link"]',
+    ),
+  );
   for (const el of all) {
     const ariaLabel = el.getAttribute("aria-label");
     if (ariaLabel) candidates.add(ariaLabel.trim());
@@ -66,7 +87,9 @@ function findCandidateLabels(query: string): string[] {
     const text = el.textContent?.trim() || "";
     if (text) candidates.add(text);
   }
-  return Array.from(candidates).filter((c) => c.toLowerCase().includes(lowerQuery)).slice(0, 5);
+  return Array.from(candidates)
+    .filter((c) => c.toLowerCase().includes(lowerQuery))
+    .slice(0, 5);
 }
 
 function asRecord(obj: unknown): Record<string, unknown> {
@@ -80,7 +103,11 @@ function getStringParam(params: unknown, key: string): string {
   return typeof val === "string" ? val : "";
 }
 
-function getNumberParam(params: unknown, key: string, fallback: number): number {
+function getNumberParam(
+  params: unknown,
+  key: string,
+  fallback: number,
+): number {
   const val = asRecord(params)[key];
   return typeof val === "number" ? val : fallback;
 }
@@ -111,7 +138,14 @@ function getAccessibleRole(el: Element): string {
   if (tag === "textarea") return "textbox";
   if (tag === "select") return "combobox";
   if (tag === "img") return "img";
-  if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
+  if (
+    tag === "h1" ||
+    tag === "h2" ||
+    tag === "h3" ||
+    tag === "h4" ||
+    tag === "h5" ||
+    tag === "h6"
+  )
     return "heading";
   if (tag === "li") return "listitem";
   if (tag === "ul" || tag === "ol") return "list";
@@ -203,7 +237,12 @@ function inlineSnapshot(maxNodes: number): SnapshotResult {
     if (nodes.length >= maxNodes) return;
 
     const tag = el.tagName.toLowerCase();
-    if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template")
+    if (
+      tag === "script" ||
+      tag === "style" ||
+      tag === "noscript" ||
+      tag === "template"
+    )
       return;
 
     const included = shouldInclude(el);
@@ -268,7 +307,9 @@ const handlers: Record<string, Handler> = {
     if (!el) {
       const query = label || refId;
       const candidates = query ? findCandidateLabels(query) : [];
-      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+      throw new Error(
+        `Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
+      );
     }
     (el as HTMLElement).click();
     return null;
@@ -285,7 +326,9 @@ const handlers: Record<string, Handler> = {
     if (!el) {
       const query = label || refId;
       const candidates = query ? findCandidateLabels(query) : [];
-      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+      throw new Error(
+        `Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
+      );
     }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       el.value = value;
@@ -307,7 +350,9 @@ const handlers: Record<string, Handler> = {
     if (!el) {
       const query = label || refId;
       const candidates = query ? findCandidateLabels(query) : [];
-      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+      throw new Error(
+        `Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
+      );
     }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       el.value = text;
@@ -329,7 +374,9 @@ const handlers: Record<string, Handler> = {
     if (!el) {
       const query = label || refId;
       const candidates = query ? findCandidateLabels(query) : [];
-      throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
+      throw new Error(
+        `Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`,
+      );
     }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       el.value += text;
@@ -457,9 +504,13 @@ const handlers: Record<string, Handler> = {
 
   snapshot: async (params) => {
     const obj = asRecord(params);
-    const maxNodes =
-      typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-    logger.debug("[content-script] snapshot called, maxNodes:", maxNodes, "document.body:", !!document.body);
+    const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
+    logger.debug(
+      "[content-script] snapshot called, maxNodes:",
+      maxNodes,
+      "document.body:",
+      !!document.body,
+    );
     const r = inlineSnapshot(maxNodes);
     logger.debug("[content-script] snapshot result nodes:", r.nodes.length);
     return r;
@@ -479,7 +530,9 @@ const handlers: Record<string, Handler> = {
       const fetchOpts: RequestInit = {
         method: method || "GET",
         headers:
-          typeof headers === "object" && headers !== null ? (headers as Record<string, string>) : {},
+          typeof headers === "object" && headers !== null
+            ? (headers as Record<string, string>)
+            : {},
         signal: controller.signal,
       };
       if (body !== null && body !== undefined) {
@@ -503,7 +556,12 @@ const handlers: Record<string, Handler> = {
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   const action = (request as Record<string, unknown>)?.action;
-  logger.debug("[content-script] received action:", action, "params:", (request as Record<string, unknown>)?.params);
+  logger.debug(
+    "[content-script] received action:",
+    action,
+    "params:",
+    (request as Record<string, unknown>)?.params,
+  );
   const handler = handlers[action as string];
   if (!handler) {
     logger.debug("[content-script] no handler for action:", action);
@@ -519,7 +577,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     if (result instanceof Promise) {
       result
         .then((value) => {
-          logger.debug("[content-script] async response for", action, ":", typeof value);
+          logger.debug(
+            "[content-script] async response for",
+            action,
+            ":",
+            typeof value,
+          );
           sendResponse(value);
         })
         .catch((err: unknown) => {
@@ -529,7 +592,12 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         });
       return true;
     }
-    logger.debug("[content-script] sync response for", action, ":", typeof result);
+    logger.debug(
+      "[content-script] sync response for",
+      action,
+      ":",
+      typeof result,
+    );
     sendResponse(result);
     return false;
   } catch (err) {

@@ -1,8 +1,11 @@
 // Web Worker for extension-lua
 // Loads extension-lua WASM, defines __extension_lua_relay, and communicates with main thread.
 
+import init, {
+  ExtensionSession,
+  setLogLevel as setWasmLogLevel,
+} from "./extension_lua.js";
 import { logger } from "./logger.js";
-import init, { ExtensionSession, setLogLevel as setWasmLogLevel } from "./extension_lua.js";
 
 let session: ExtensionSession | null = null;
 let initialized = false;
@@ -20,7 +23,10 @@ const workerSelf = self as unknown as WorkerSelf;
 
 // Define the relay function that extension-lua WASM expects globally
 workerSelf.__extension_lua_relay = (cmd: unknown) => {
-  logger.debug("[worker] __extension_lua_relay cmd:", (cmd as Record<string, unknown>)?.action);
+  logger.debug(
+    "[worker] __extension_lua_relay cmd:",
+    (cmd as Record<string, unknown>)?.action,
+  );
   return new Promise((resolve) => {
     const relayId = generateId();
     pendingRelays.set(relayId, resolve);
@@ -143,13 +149,21 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
     case "asyncRelayResult": {
-      logger.debug("[worker] asyncRelayResult id:", msg.id, "result:", typeof msg.result);
+      logger.debug(
+        "[worker] asyncRelayResult id:",
+        msg.id,
+        "result:",
+        typeof msg.result,
+      );
       const resolve = pendingRelays.get(msg.id);
       if (resolve) {
         pendingRelays.delete(msg.id);
         resolve(msg.result);
       } else {
-        logger.warn("[worker] asyncRelayResult: no pending relay for id", msg.id);
+        logger.warn(
+          "[worker] asyncRelayResult: no pending relay for id",
+          msg.id,
+        );
       }
       break;
     }
