@@ -24,7 +24,8 @@ declare global {
 test("debug tab.fetch directly", async () => {
   const extensionPath = path.resolve("dist");
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    channel: "chromium",
+    headless: true,
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,

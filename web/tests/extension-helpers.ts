@@ -15,7 +15,8 @@ export async function launchExtensionContext(): Promise<{
   popup: Page;
 }> {
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    channel: "chromium",
+    headless: true,
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
