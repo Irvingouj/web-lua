@@ -103,6 +103,8 @@ pub(crate) fn setup_strict_mode(ctx: Context, host_state: Rc<RefCell<HostState>>
         "dom".into(),
         "page".into(),
         "runtime".into(),
+        "fs".into(),
+        "path".into(),
         // Stdlib functions
         "tostring".into(),
         "tonumber".into(),

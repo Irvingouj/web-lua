@@ -1,4 +1,4 @@
-use crate::{Callback, CallbackReturn, Context, FromValue, IntoValue, String, Table, Value};
+use crate::{Callback, CallbackReturn, Context, Error, FromValue, IntoValue, String, Table, Value};
 
 pub fn load_string<'gc>(ctx: Context<'gc>) {
     let string = Table::new(&ctx);
@@ -189,7 +189,108 @@ pub fn load_string<'gc>(ctx: Context<'gc>) {
         }),
     );
 
+    string.set_field(
+        ctx,
+        "match",
+        Callback::from_fn(&ctx, |ctx, _, mut stack| {
+            let (s, pattern, init): (String, String, Option<i64>) = stack.consume(ctx)?;
+            let init = init.unwrap_or(1);
+            let text = s.as_bytes();
+            let start = compute_start_index(text.len(), init);
+            let pattern_str = std::str::from_utf8(pattern.as_bytes())
+                .map_err(|_| Error::from("malformed pattern (invalid UTF-8)".into_value(ctx)))?;
+            let mut parser = lsonar::Parser::new(pattern_str)
+                .map_err(|e| Error::from(format!("bad pattern: {}", e).into_value(ctx)))?;
+            let ast = parser
+                .parse()
+                .map_err(|e| Error::from(format!("bad pattern: {}", e).into_value(ctx)))?;
+            let result = lsonar::engine::find_first_match(&ast, text, start)
+                .map_err(|e| Error::from(format!("pattern error: {}", e).into_value(ctx)))?;
+            stack.clear();
+            match result {
+                Some((full_range, captures)) => {
+                    let explicit_captures: Vec<_> = captures.into_iter().filter_map(|c| c).collect();
+                    if !explicit_captures.is_empty() {
+                        for range in explicit_captures {
+                            stack.push_back(Value::String(ctx.intern(&text[range])));
+                        }
+                    } else {
+                        stack.push_back(Value::String(ctx.intern(&text[full_range])));
+                    }
+                }
+                None => {
+                    stack.push_back(Value::Nil);
+                }
+            }
+            Ok(CallbackReturn::Return)
+        }),
+    );
+
+    string.set_field(
+        ctx,
+        "gmatch",
+        Callback::from_fn(&ctx, |ctx, _, mut stack| {
+            let (s, pattern): (String, String) = stack.consume(ctx)?;
+            let state = Table::new(&ctx);
+            state.set(ctx, "s", s)?;
+            state.set(ctx, "p", pattern)?;
+            state.set(ctx, "pos", 1i64)?;
+            let iter = Callback::from_fn_with(&ctx, state, |state, ctx, _, mut stack| {
+                let s: String = state.get(ctx, "s")?;
+                let pattern: String = state.get(ctx, "p")?;
+                let pos: i64 = state.get(ctx, "pos")?;
+                let text = s.as_bytes();
+                let start = compute_start_index(text.len(), pos);
+                let pattern_str = std::str::from_utf8(pattern.as_bytes())
+                    .map_err(|_| Error::from("malformed pattern (invalid UTF-8)".into_value(ctx)))?;
+                let mut parser = lsonar::Parser::new(pattern_str)
+                    .map_err(|e| Error::from(format!("bad pattern: {}", e).into_value(ctx)))?;
+                let ast = parser
+                    .parse()
+                    .map_err(|e| Error::from(format!("bad pattern: {}", e).into_value(ctx)))?;
+                let result = lsonar::engine::find_first_match(&ast, text, start)
+                    .map_err(|e| Error::from(format!("pattern error: {}", e).into_value(ctx)))?;
+                stack.clear();
+                match result {
+                    Some((full_range, captures)) => {
+                        let explicit_captures: Vec<_> = captures.into_iter().filter_map(|c| c).collect();
+                        if !explicit_captures.is_empty() {
+                            for range in explicit_captures {
+                                stack.push_back(Value::String(ctx.intern(&text[range])));
+                            }
+                        } else {
+                            stack.push_back(Value::String(ctx.intern(&text[full_range.clone()])));
+                        }
+                        let new_pos = if full_range.start == full_range.end {
+                            full_range.end + 1
+                        } else {
+                            full_range.end
+                        };
+                        state.set(ctx, "pos", (new_pos as i64) + 1)?;
+                    }
+                    None => {
+                        stack.push_back(Value::Nil);
+                    }
+                }
+                Ok(CallbackReturn::Return)
+            });
+            stack.replace(ctx, iter);
+            Ok(CallbackReturn::Return)
+        }),
+    );
+
     ctx.set_global("string", string);
+}
+
+fn compute_start_index(len: usize, init: i64) -> usize {
+    if init > 1 {
+        (init - 1) as usize
+    } else if init < 0 {
+        let abs = init.unsigned_abs() as usize;
+        len.saturating_sub(abs)
+    } else {
+        0
+    }
 }
 
 fn format_lua(fmt: &[u8], args: &[Value]) -> Result<std::string::String, std::string::String> {
@@ -313,4 +414,73 @@ fn sub(string: &[u8], i: i64, j: Option<i64>) -> Result<&[u8], std::num::TryFrom
     } else {
         &string[i..j]
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Closure, Executor, ExternError, Fuel, Lua, Value, Variadic};
+
+    fn eval(code: &str) -> Result<Vec<std::string::String>, ExternError> {
+        let mut lua = Lua::core();
+        lua.try_enter(|ctx| {
+            let closure = Closure::load(ctx, Some("test"), code.as_bytes())?;
+            let executor = Executor::start(ctx, closure.into(), ());
+            let mut fuel = Fuel::with(10000);
+            while !executor.step(ctx, &mut fuel)? {}
+            let Variadic(results) = executor.take_result::<Variadic<Vec<Value>>>(ctx)??;
+            let strings: Vec<std::string::String> = results.iter().map(|v| v.display().to_string()).collect();
+            Ok(strings)
+        })
+    }
+
+    #[test]
+    fn test_match_basic() {
+        let values = eval("return string.match('hello world', '%a+')").unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0], "hello");
+    }
+
+    #[test]
+    fn test_match_captures() {
+        let values = eval("return string.match('hello world', '(%a+) (%a+)')").unwrap();
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0], "hello");
+        assert_eq!(values[1], "world");
+    }
+
+    #[test]
+    fn test_match_no_match() {
+        let values = eval("return string.match('hello', '%d+')").unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0], "nil");
+    }
+
+    #[test]
+    fn test_gmatch_basic() {
+        let values = eval(
+            "local t = {}; for w in string.gmatch('hello world', '%a+') do t[#t+1] = w end; return t[1], t[2]"
+        ).unwrap();
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0], "hello");
+        assert_eq!(values[1], "world");
+    }
+
+    #[test]
+    fn test_gmatch_captures() {
+        let values = eval(
+            "local t = {}; for a, b in string.gmatch('a=1 b=2', '(%a+)=(%d+)') do t[#t+1] = a; t[#t+1] = b end; return t[1], t[2], t[3], t[4]"
+        ).unwrap();
+        assert_eq!(values.len(), 4);
+        assert_eq!(values[0], "a");
+        assert_eq!(values[1], "1");
+        assert_eq!(values[2], "b");
+        assert_eq!(values[3], "2");
+    }
+
+    #[test]
+    fn test_match_init() {
+        let values = eval("return string.match('hello world', '%a+', 7)").unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0], "world");
+    }
 }

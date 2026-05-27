@@ -998,6 +998,445 @@
     "source": "rust_core"
   },
   {
+    "namespace": "fs",
+    "name": "exists",
+    "action": "fs_exists",
+    "description": "Check whether a path exists in the virtual filesystem.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true if the path exists"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "stat",
+    "action": "fs_stat",
+    "description": "Get metadata for a path.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "table | nil",
+      "description": "Metadata object or nil if not found"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "list",
+    "action": "fs_list",
+    "description": "List entries in a directory.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "Array of DirEntry tables"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "mkdir",
+    "action": "fs_mkdir",
+    "description": "Create a directory (and parents if needed).",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS directory path"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "delete",
+    "action": "fs_delete",
+    "description": "Delete a file or directory (recursive for directories).",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path to delete"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "copy",
+    "action": "fs_copy",
+    "description": "Copy a file from one path to another.",
+    "params": [
+      {
+        "name": "from",
+        "lua_type": "string",
+        "required": true,
+        "description": "Source absolute VFS path"
+      },
+      {
+        "name": "to",
+        "lua_type": "string",
+        "required": true,
+        "description": "Destination absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "move",
+    "action": "fs_move",
+    "description": "Move (rename) a file from one path to another.",
+    "params": [
+      {
+        "name": "from",
+        "lua_type": "string",
+        "required": true,
+        "description": "Source absolute VFS path"
+      },
+      {
+        "name": "to",
+        "lua_type": "string",
+        "required": true,
+        "description": "Destination absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read",
+    "action": "fs_read",
+    "description": "Read raw bytes from a file. Returns base64-encoded string over the async wire.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Base64-encoded file contents"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read_text",
+    "action": "fs_read_text",
+    "description": "Read a file as UTF-8 text.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "File contents or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read_base64",
+    "action": "fs_read_base64",
+    "description": "Read a file and return its contents as base64.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "Base64-encoded contents or nil"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "read_range",
+    "action": "fs_read_range",
+    "description": "Read a byte range from a file.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "offset",
+        "lua_type": "number",
+        "required": true,
+        "description": "Byte offset to start reading"
+      },
+      {
+        "name": "len",
+        "lua_type": "number",
+        "required": true,
+        "description": "Number of bytes to read"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Base64-encoded range contents"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "write",
+    "action": "fs_write",
+    "description": "Write raw bytes to a file (overwrites existing). Data is base64-encoded over the wire.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "lua_type": "string",
+        "required": true,
+        "description": "Raw byte string to write"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "write_text",
+    "action": "fs_write_text",
+    "description": "Write UTF-8 text to a file (overwrites existing).",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to write"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "write_base64",
+    "action": "fs_write_base64",
+    "description": "Write base64-decoded bytes to a file (overwrites existing).",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "b64",
+        "lua_type": "string",
+        "required": true,
+        "description": "Base64-encoded data"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "append",
+    "action": "fs_append",
+    "description": "Append raw bytes to a file. Data is base64-encoded over the wire.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "data",
+        "lua_type": "string",
+        "required": true,
+        "description": "Raw byte string to append"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "append_text",
+    "action": "fs_append_text",
+    "description": "Append UTF-8 text to a file.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "text",
+        "lua_type": "string",
+        "required": true,
+        "description": "Text to append"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "append_base64",
+    "action": "fs_append_base64",
+    "description": "Append base64-decoded bytes to a file.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "b64",
+        "lua_type": "string",
+        "required": true,
+        "description": "Base64-encoded data"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "update",
+    "action": "fs_update",
+    "description": "Write raw bytes at a specific offset in a file. Data is base64-encoded over the wire.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "offset",
+        "lua_type": "number",
+        "required": true,
+        "description": "Byte offset"
+      },
+      {
+        "name": "data",
+        "lua_type": "string",
+        "required": true,
+        "description": "Raw byte string to write"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true on success"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "fs",
+    "name": "hash",
+    "action": "fs_hash",
+    "description": "Compute a hash of a file's contents.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS file path"
+      },
+      {
+        "name": "algo",
+        "lua_type": "string",
+        "required": true,
+        "description": "Hash algorithm (sha256 or sha1)"
+      }
+    ],
+    "returns": {
+      "lua_type": "string | nil",
+      "description": "Hex-encoded hash or nil"
+    },
+    "source": "rust_core"
+  },
+  {
     "namespace": "chrome.runtime",
     "name": "sendMessage",
     "action": "chrome_runtime_sendMessage",
@@ -3245,6 +3684,120 @@
     "returns": {
       "lua_type": "table",
       "description": "{ status, ok, body, headers }"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "path",
+    "name": "join",
+    "action": "",
+    "description": "Join path segments into an absolute VFS path.",
+    "params": [
+      {
+        "name": "parts",
+        "lua_type": "string",
+        "required": true,
+        "description": "Path segments to join"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Joined absolute path"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "path",
+    "name": "basename",
+    "action": "",
+    "description": "Get the last component of a path.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "File or directory name"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "path",
+    "name": "dirname",
+    "action": "",
+    "description": "Get the directory portion of a path.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Parent directory path"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "path",
+    "name": "extname",
+    "action": "",
+    "description": "Get the file extension including the leading dot.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Extension or empty string"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "path",
+    "name": "normalize",
+    "action": "",
+    "description": "Resolve . and .. segments in a path.",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Absolute VFS path"
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Normalized absolute path"
+    },
+    "source": "injected_lua"
+  },
+  {
+    "namespace": "path",
+    "name": "is_absolute",
+    "action": "",
+    "description": "Check whether a path is absolute (starts with /).",
+    "params": [
+      {
+        "name": "path",
+        "lua_type": "string",
+        "required": true,
+        "description": "Path to check"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true if absolute"
     },
     "source": "injected_lua"
   }

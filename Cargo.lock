@@ -205,6 +205,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-encoding"
+version = "2.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -267,6 +273,7 @@ checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
 name = "extension-lua"
 version = "0.1.0"
 dependencies = [
+ "data-encoding",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
@@ -275,6 +282,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "web-fs",
  "web-lua-base",
  "web-lua-core",
  "web-sys",
@@ -594,6 +602,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "lsonar"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "156eab9d44bb1641543489513038937530aa708cb2ebd19f9d9f343ef2aa930c"
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -693,7 +707,9 @@ dependencies = [
  "clap",
  "gc-arena",
  "getrandom 0.2.17",
+ "getrandom 0.3.4",
  "hashbrown",
+ "lsonar",
  "rand",
  "rustyline",
  "thiserror 1.0.69",
@@ -900,6 +916,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]
@@ -1257,9 +1284,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "684365b586a9a6256c1cc3544eee8680de48d6041142f581776ec7b139622ae9"
 
 [[package]]
+name = "web-fs"
+version = "0.1.0"
+dependencies = [
+ "data-encoding",
+ "js-sys",
+ "serde",
+ "sha1",
+ "sha2",
+ "thiserror 1.0.69",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "web-lua"
 version = "0.1.0"
 dependencies = [
+ "data-encoding",
  "dom-semantic-tree",
  "js-sys",
  "serde",
@@ -1269,6 +1312,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "web-fs",
  "web-lua-base",
  "web-lua-core",
  "web-sys",
@@ -1290,6 +1334,7 @@ dependencies = [
 name = "web-lua-core"
 version = "0.1.0"
 dependencies = [
+ "data-encoding",
  "dom-semantic-tree",
  "getrandom 0.3.4",
  "piccolo",
