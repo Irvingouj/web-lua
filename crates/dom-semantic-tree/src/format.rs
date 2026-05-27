@@ -1,11 +1,21 @@
 use crate::model::{SemanticNode, TreeSnapshot};
+use serde::{Deserialize, Serialize};
+use tsify::Tsify;
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default, Tsify)]
+#[serde(rename_all = "kebab-case")]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub enum SnapshotFormat {
+    #[default]
+    CompactText,
+    Json,
+    JsonPretty,
+}
 
-pub fn format_snapshot(snapshot: &TreeSnapshot, format: &str) -> String {
+pub fn format_snapshot(snapshot: &TreeSnapshot, format: SnapshotFormat) -> String {
     match format {
-        "compact-text" => format_compact(snapshot),
-        "json" => format_json(snapshot, false),
-        "json-pretty" => format_json(snapshot, true),
-        _ => format_compact(snapshot),
+        SnapshotFormat::CompactText => format_compact(snapshot),
+        SnapshotFormat::Json => format_json(snapshot, false),
+        SnapshotFormat::JsonPretty => format_json(snapshot, true),
     }
 }
 

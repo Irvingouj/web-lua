@@ -9,20 +9,17 @@ description = "DOM-derived semantic tree extractor for browser agents"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[features]
-default = ["wasm"]
-wasm = ["dep:wasm-bindgen", "dep:web-sys", "dep:js-sys", "dep:serde-wasm-bindgen"]
-
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-wasm-bindgen = { version = "0.2", optional = true }
-serde-wasm-bindgen = { version = "0.6", optional = true }
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+tsify = "0.5"
+ts-rs = "12"
+js-sys = "0.3"
 
 [dependencies.web-sys]
 version = "0.3"
-optional = true
 features = [
   "console",
   "Document",
@@ -44,10 +41,6 @@ features = [
   "HtmlCollection",
   "CharacterData",
 ]
-
-[dependencies.js-sys]
-version = "0.3"
-optional = true
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

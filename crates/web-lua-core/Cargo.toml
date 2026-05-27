@@ -10,4 +10,7 @@ serde.workspace = true
 serde_json.workspace = true
 getrandom.workspace = true
 ts-rs = "12"
+tsify = "0.5"
+wasm-bindgen = "0.2"
+dom-semantic-tree.workspace = true
 url.workspace = true

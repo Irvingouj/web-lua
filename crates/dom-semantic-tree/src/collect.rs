@@ -1,99 +1,70 @@
-#[cfg(feature = "wasm")]
-use serde_wasm_bindgen;
-#[cfg(feature = "wasm")]
-use wasm_bindgen::{JsCast, JsValue};
-#[cfg(feature = "wasm")]
+use wasm_bindgen::JsCast;
 use web_sys::{Document, Element, HtmlElement, Node, Window};
 
-use crate::model::{CollectOptions, TreeSnapshot};
-#[cfg(feature = "wasm")]
-use crate::model::{OutlineNode, SemanticNode, Viewport};
-#[cfg(feature = "wasm")]
+use crate::model::{CollectOptions, OutlineNode, SemanticNode, TreeSnapshot, Viewport};
 use crate::name::{compute_name, NameContext};
-#[cfg(feature = "wasm")]
 use crate::refs::RefAllocator;
-#[cfg(feature = "wasm")]
 use crate::role::{infer_role, is_interactive_role};
-#[cfg(feature = "wasm")]
 use crate::state::{extract_states, StateInput};
-#[cfg(feature = "wasm")]
 use crate::visibility::{is_display_none, is_visibility_hidden, is_zero_size};
 
-#[cfg(feature = "wasm")]
 use crate::geometry::dom_rect_to_rect;
 
-#[cfg(feature = "wasm")]
 const EXCLUDED_TAGS: &[&str] = &[
     "script", "style", "meta", "link", "template", "noscript", "head",
 ];
 
-#[cfg(feature = "wasm")]
-pub fn collect_document(options: JsValue) -> JsValue {
-    let opts: CollectOptions = if options.is_undefined() || options.is_null() {
-        CollectOptions::default()
-    } else {
-        serde_wasm_bindgen::from_value(options).unwrap_or_default()
-    };
+fn empty_snapshot() -> TreeSnapshot {
+    TreeSnapshot {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        url: None,
+        title: None,
+        viewport: None,
+        nodes: vec![],
+        outline: None,
+    }
+}
 
+pub fn collect_document(options: CollectOptions) -> TreeSnapshot {
     let window = match web_sys::window() {
         Some(w) => w,
-        None => return error_value("no window"),
+        None => return empty_snapshot(),
     };
     let document = match window.document() {
         Some(d) => d,
-        None => return error_value("no document"),
+        None => return empty_snapshot(),
     };
 
     let body = match document.body() {
         Some(b) => b,
-        None => {
-            return serde_wasm_bindgen::to_value(&TreeSnapshot {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                url: None,
-                title: None,
-                viewport: None,
-                nodes: vec![],
-                outline: None,
-            })
-            .unwrap_or(JsValue::NULL)
-        }
+        None => return empty_snapshot(),
     };
 
-    collect_element_with_context(&body.into(), &opts, &window, &document)
+    collect_element_with_context(&body.into(), &options, &window, &document)
 }
 
-#[cfg(feature = "wasm")]
-pub fn collect_element_js(root: &Element, options: &JsValue) -> JsValue {
-    let opts: CollectOptions = if options.is_undefined() || options.is_null() {
-        CollectOptions::default()
-    } else {
-        serde_wasm_bindgen::from_value(options.clone()).unwrap_or_default()
-    };
-
+pub fn collect_element(root: &Element, options: CollectOptions) -> TreeSnapshot {
     let window = match web_sys::window() {
         Some(w) => w,
-        None => return error_value("no window"),
+        None => return empty_snapshot(),
     };
     let document = match window.document() {
         Some(d) => d,
-        None => return error_value("no document"),
+        None => return empty_snapshot(),
     };
 
-    collect_element_with_context(root, &opts, &window, &document)
+    collect_element_with_context(root, &options, &window, &document)
 }
 
-#[cfg(feature = "wasm")]
 fn collect_element_with_context(
     root: &Element,
     opts: &CollectOptions,
     window: &Window,
     document: &Document,
-) -> JsValue {
-    let result = collect_element_internal(root, opts, window, document);
-    serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
+) -> TreeSnapshot {
+    collect_element_internal(root, opts, window, document)
 }
 
-#[cfg(feature = "wasm")]
 fn collect_element_internal(
     root: &Element,
     opts: &CollectOptions,
@@ -149,7 +120,6 @@ fn collect_element_internal(
     }
 }
 
-#[cfg(feature = "wasm")]
 #[allow(clippy::too_many_arguments)]
 fn traverse(
     element: &Element,
@@ -514,7 +484,6 @@ fn traverse(
     );
 }
 
-#[cfg(feature = "wasm")]
 #[allow(clippy::too_many_arguments)]
 fn recurse_children(
     element: &Element,
@@ -540,7 +509,6 @@ fn recurse_children(
     }
 }
 
-#[cfg(feature = "wasm")]
 fn find_ancestor_label(element: &Element, _document: &Document) -> Option<String> {
     let mut current: Option<Node> = Some(element.clone().into());
     while let Some(node) = current {
@@ -554,27 +522,4 @@ fn find_ancestor_label(element: &Element, _document: &Document) -> Option<String
         }
     }
     None
-}
-
-#[cfg(feature = "wasm")]
-fn error_value(msg: &str) -> JsValue {
-    let obj = js_sys::Object::new();
-    js_sys::Reflect::set(&obj, &"error".into(), &msg.into()).ok();
-    obj.into()
-}
-
-/// Non-WASM fallback to build a snapshot from an abstract tree (used in native tests).
-#[cfg(not(feature = "wasm"))]
-pub fn build_snapshot_from_abstract(
-    _root: &crate::model::SemanticNode,
-    _opts: &CollectOptions,
-) -> TreeSnapshot {
-    TreeSnapshot {
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        url: None,
-        title: None,
-        viewport: None,
-        nodes: vec![],
-        outline: None,
-    }
 }

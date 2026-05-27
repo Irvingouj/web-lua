@@ -1,3 +1,4 @@
+use dom_semantic_tree::format::SnapshotFormat;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use ts_rs::TS;
@@ -34,10 +35,6 @@ fn default_false() -> bool {
 
 fn default_max_nodes() -> u64 {
     500
-}
-
-fn default_compact_text() -> String {
-    "compact-text".to_string()
 }
 
 // ─── Normalization helpers ─────────────────────────────────────
@@ -202,13 +199,11 @@ pub struct DomSnapshotParams {
     pub max_nodes: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export_to = "web/src/types/generated.ts")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DomFormatParams {
-    #[ts(type = "unknown")]
     pub snapshot: serde_json::Value,
-    #[serde(default = "default_compact_text")]
-    pub format: String,
+    #[serde(default)]
+    pub format: SnapshotFormat,
 }
 
 // ─── web.tab.* ───────────────────────────────────────────────────

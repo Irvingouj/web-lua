@@ -1,13 +1,91 @@
 /* tslint:disable */
 /* eslint-disable */
+export interface CollectOptions {
+    includeHidden?: boolean;
+    includeNonInteractive?: boolean;
+    includeGeometry?: boolean;
+    includePath?: boolean;
+    maxTextLength?: number;
+    maxNodes?: number;
+    interactiveOnly?: boolean;
+    format?: SnapshotFormat;
+}
 
-export function collect_document(options: any): any;
+export interface OutlineNode {
+    role: string;
+    name: string;
+    ref_id: string;
+}
 
-export function collect_element(root: Element, options: any): any;
+export interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+}
 
-export function format_snapshot_js(snapshot: any, format?: string | null): string;
+export interface SemanticNode {
+    refId: string;
+    role: string;
+    name?: string;
+    description?: string;
+    tag: string;
+    id?: string;
+    classes?: string[];
+    value?: string;
+    placeholder?: string;
+    href?: string;
+    states: States;
+    inputType?: string;
+    rect?: Rect;
+    inViewport: boolean;
+    visible: boolean;
+    path?: string;
+}
 
-export function version_js(): string;
+export interface States {
+    disabled?: boolean;
+    checked?: boolean;
+    selected?: boolean;
+    expanded?: boolean;
+    pressed?: boolean;
+    required?: boolean;
+    readonly?: boolean;
+    invalid?: boolean;
+    hidden?: boolean;
+    focusable?: boolean;
+    interactive?: boolean;
+    current?: boolean;
+}
+
+export interface TreeSnapshot {
+    version: string;
+    url: string | null;
+    title: string | null;
+    viewport: Viewport | null;
+    nodes: SemanticNode[];
+    outline?: OutlineNode[];
+}
+
+export interface Viewport {
+    width: number;
+    height: number;
+    scrollX: number;
+    scrollY: number;
+}
+
+export type SnapshotFormat = "compact-text" | "json" | "json-pretty";
+
+
+export function collect_document(options: CollectOptions): TreeSnapshot;
+
+export function collect_element(root: Element, options: CollectOptions): TreeSnapshot;
+
+export function format_snapshot_js(snapshot: TreeSnapshot, format?: SnapshotFormat | null): string;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -15,8 +93,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly collect_document: (a: any) => any;
     readonly collect_element: (a: any, b: any) => any;
-    readonly format_snapshot_js: (a: any, b: number, c: number) => [number, number];
-    readonly version_js: () => [number, number];
+    readonly format_snapshot_js: (a: any, b: number) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

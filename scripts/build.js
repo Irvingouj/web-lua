@@ -122,11 +122,41 @@ async function buildTarget(target) {
 function copyExtensionAssets() {
   console.log("\n📦 Copying extension assets to web/public/...");
   const srcDir = path.join(rootDir, "crates/extension-lua/js");
+  const distDir = path.join(srcDir, "dist");
   const destDir = path.join(rootDir, "web/public");
   ensureDir(destDir);
 
+  // Compile TypeScript sources if any .ts files need it.
+  // runner.ts etc. are built by the web app pipeline; we only need tsc for
+  // content-script.ts and other files referenced directly by the extension.
+  const hasTsSources = fs.readdirSync(srcDir).some((f) => f.endsWith(".ts"));
+  if (hasTsSources) {
+    // runner.ts imports ./generated.js — copy the source so tsc can resolve it.
+    const generatedSrc = path.join(rootDir, "web/src/types/generated.ts");
+    const generatedTmp = path.join(srcDir, "generated.ts");
+    let generatedCopied = false;
+    if (fs.existsSync(generatedSrc) && !fs.existsSync(generatedTmp)) {
+      fs.copyFileSync(generatedSrc, generatedTmp);
+      generatedCopied = true;
+    }
+    try {
+      execSync("tsc", { cwd: srcDir, stdio: "pipe" });
+      console.log("  Compiled TypeScript sources");
+    } catch (e) {
+      console.error("  TypeScript compilation failed:", e.message);
+      process.exit(1);
+    } finally {
+      if (generatedCopied && fs.existsSync(generatedTmp)) {
+        fs.unlinkSync(generatedTmp);
+      }
+    }
+  }
+
   for (const file of ["content-script.js", "manifest.json", "background.js"]) {
-    const src = path.join(srcDir, file);
+    // Prefer compiled artifacts from dist/, fall back to source dir
+    const src = fs.existsSync(path.join(distDir, file))
+      ? path.join(distDir, file)
+      : path.join(srcDir, file);
     const dest = path.join(destDir, file);
     if (fs.existsSync(src)) {
       fs.copyFileSync(src, dest);

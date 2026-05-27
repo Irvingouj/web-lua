@@ -41,75 +41,7 @@ impl ExtensionSession {
             base: BaseSession::new(),
         };
         // Inject Lua aliases so the Lua API surface matches the design
-        let _ = session.base.load_library(
-            r#"
-local function tab_current()
-  local tabs = chrome.tabs.query({active = true, currentWindow = true})
-  if tabs and tabs[1] then
-    return tabs[1].id
-  end
-  return nil
-end
-local function tab_url(tab_id)
-  local id = tab_id or tab_current()
-  if not id then return nil end
-  local t = chrome.tabs.get(id)
-  return t and t.url
-end
-local function tab_title(tab_id)
-  local id = tab_id or tab_current()
-  if not id then return nil end
-  local t = chrome.tabs.get(id)
-  return t and t.title
-end
-tab = {
-  query = web.tab.query,
-  create = web.tab.create,
-  activate = web.tab.activate,
-  close = web.tab.close,
-  execute_script = web.tab.execute_script,
-  click = web.tab.click,
-  fill = web.tab.fill,
-  snapshot = web.tab.snapshot,
-  scroll_to = web.tab.scroll_to,
-  evaluate = web.tab.evaluate,
-  back = web.tab.back,
-  wait_for_load = web.tab.wait_for_load,
-  fetch = web.tab.fetch,
-  open = function(url)
-    local t = chrome.tabs.create({url = url or ""})
-    return t and t.id
-  end,
-  current = tab_current,
-  focus = function(tab_id)
-    local id = tab_id or tab_current()
-    if id then
-      chrome.tabs.update(id, {active = true})
-    end
-    return id
-  end,
-  url = tab_url,
-  title = tab_title,
-  reload = function(tab_id)
-    local id = tab_id or tab_current()
-    if id then
-      chrome.tabs.reload(id)
-    end
-    return id
-  end,
-}
-runtime = {
-  fetch = web.fetch,
-  sleep = web.sleep,
-  storage = web.storage,
-  clipboard = web.clipboard,
-  notifications = web.notifications,
-}
-page.fetch = function(url, opts)
-  return tab.fetch(tab.current(), url, opts)
-end
-"#,
-        );
+        let _ = session.base.load_library(include_str!("prelude.lua"));
         // Register injected alias metadata
         web_lua_core::lua_api_doc!(
             namespace: "tab",
@@ -183,7 +115,9 @@ end
         web_lua_core::lua_api_doc!(namespace: "tab", name: "execute_script", action: "tab_execute_script", doc: "Alias for web.tab.execute_script.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", script: "string | table", required, "Script to inject"], returns: "table" => "Injection results");
         web_lua_core::lua_api_doc!(namespace: "tab", name: "click", action: "tab_click", doc: "Alias for web.tab.click.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", ref_id: "number", required, "Element refId"], returns: "boolean" => "Whether click succeeded");
         web_lua_core::lua_api_doc!(namespace: "tab", name: "fill", action: "tab_fill", doc: "Alias for web.tab.fill.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", ref_id: "number", required, "Element refId", value: "string", required, "Text to fill"], returns: "boolean" => "Whether fill succeeded");
-        web_lua_core::lua_api_doc!(namespace: "tab", name: "snapshot", action: "tab_snapshot", doc: "Alias for web.tab.snapshot.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "table" => "DOM snapshot");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "snapshot", action: "tab_snapshot", doc: "Alias for web.tab.snapshot. Returns human-readable text. Defaults to active tab.", source: "injected_lua", params: [tab_id: "number", optional, "Tab ID (defaults to active tab)"], returns: "string" => "Human-readable accessibility tree with refIds");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "snapshot_text", action: "tab_snapshot_text", doc: "Alias for web.tab.snapshot_text. Defaults to active tab.", source: "injected_lua", params: [tab_id: "number", optional, "Tab ID (defaults to active tab)"], returns: "string" => "Human-readable accessibility tree with refIds");
+        web_lua_core::lua_api_doc!(namespace: "tab", name: "snapshot_data", action: "tab_snapshot_data", doc: "Alias for web.tab.snapshot_data. Defaults to active tab.", source: "injected_lua", params: [tab_id: "number", optional, "Tab ID (defaults to active tab)"], returns: "table" => "Structured snapshot with nodes, url, title, viewport");
         web_lua_core::lua_api_doc!(namespace: "tab", name: "scroll_to", action: "tab_scroll_to", doc: "Alias for web.tab.scroll_to.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", ref_id: "number", required, "Element refId"], returns: "boolean" => "Whether scroll succeeded");
         web_lua_core::lua_api_doc!(namespace: "tab", name: "evaluate", action: "tab_evaluate", doc: "Alias for web.tab.evaluate.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID", script: "string", required, "JavaScript to evaluate"], returns: "any" => "Evaluation result");
         web_lua_core::lua_api_doc!(namespace: "tab", name: "back", action: "tab_back", doc: "Alias for web.tab.back.", source: "injected_lua", params: [tab_id: "number", required, "Tab ID"], returns: "boolean" => "Whether navigation succeeded");
@@ -215,75 +149,7 @@ end
     /// Reset the session, clearing all Lua state.
     pub fn reset(&mut self) {
         self.base.reset();
-        let _ = self.base.load_library(
-            r#"
-local function tab_current()
-  local tabs = chrome.tabs.query({active = true, currentWindow = true})
-  if tabs and tabs[1] then
-    return tabs[1].id
-  end
-  return nil
-end
-local function tab_url(tab_id)
-  local id = tab_id or tab_current()
-  if not id then return nil end
-  local t = chrome.tabs.get(id)
-  return t and t.url
-end
-local function tab_title(tab_id)
-  local id = tab_id or tab_current()
-  if not id then return nil end
-  local t = chrome.tabs.get(id)
-  return t and t.title
-end
-tab = {
-  query = web.tab.query,
-  create = web.tab.create,
-  activate = web.tab.activate,
-  close = web.tab.close,
-  execute_script = web.tab.execute_script,
-  click = web.tab.click,
-  fill = web.tab.fill,
-  snapshot = web.tab.snapshot,
-  scroll_to = web.tab.scroll_to,
-  evaluate = web.tab.evaluate,
-  back = web.tab.back,
-  wait_for_load = web.tab.wait_for_load,
-  fetch = web.tab.fetch,
-  open = function(url)
-    local t = chrome.tabs.create({url = url or ""})
-    return t and t.id
-  end,
-  current = tab_current,
-  focus = function(tab_id)
-    local id = tab_id or tab_current()
-    if id then
-      chrome.tabs.update(id, {active = true})
-    end
-    return id
-  end,
-  url = tab_url,
-  title = tab_title,
-  reload = function(tab_id)
-    local id = tab_id or tab_current()
-    if id then
-      chrome.tabs.reload(id)
-    end
-    return id
-  end,
-}
-runtime = {
-  fetch = web.fetch,
-  sleep = web.sleep,
-  storage = web.storage,
-  clipboard = web.clipboard,
-  notifications = web.notifications,
-}
-page.fetch = function(url, opts)
-  return tab.fetch(tab.current(), url, opts)
-end
-"#,
-        );
+        let _ = self.base.load_library(include_str!("prelude.lua"));
     }
 
     /// Set the fuel limit for execution.

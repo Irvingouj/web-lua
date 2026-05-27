@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 web-lua-base = { path = "../web-lua-base" }
 web-lua-core = { path = "../web-lua-core" }
-dom-semantic-tree = { workspace = true, features = ["wasm"] }
+dom-semantic-tree = { workspace = true }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 serde.workspace = true

@@ -418,59 +418,15 @@ pub async fn execute_host_call(action: &str, params: serde_json::Value) -> WasmA
 // ─── DOM Snapshot ───────────────────────────────────────────────
 
 pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
-    let options = serde_json::json!({
-        "interactive_only": params.interactive_only,
-        "max_nodes": params.max_nodes as usize,
-    });
-
-    let js_options = match serde_wasm_bindgen::to_value(&options) {
-        Ok(v) => v,
-        Err(_) => {
-            return WasmAsyncResponse {
-                ok: false,
-                value: None,
-                error: Some(WasmAsyncError {
-                    message: "Failed to serialize snapshot options".into(),
-                    code: "E_SNAPSHOT".into(),
-                }),
-            }
-        }
+    let opts = dom_semantic_tree::model::CollectOptions {
+        interactive_only: params.interactive_only,
+        max_nodes: params.max_nodes as usize,
+        ..Default::default()
     };
 
-    let snap_js = dom_semantic_tree::collect::collect_document(js_options);
+    let snapshot = dom_semantic_tree::collect::collect_document(opts);
 
-    let snap_json = match js_sys::JSON::stringify(&snap_js)
-        .ok()
-        .and_then(|s| s.as_string())
-    {
-        Some(s) => s,
-        None => {
-            return WasmAsyncResponse {
-                ok: false,
-                value: None,
-                error: Some(WasmAsyncError {
-                    message: "Failed to stringify snapshot".into(),
-                    code: "E_SNAPSHOT".into(),
-                }),
-            }
-        }
-    };
-
-    let snapshot: dom_semantic_tree::model::TreeSnapshot = match serde_json::from_str(&snap_json) {
-        Ok(s) => s,
-        Err(_) => {
-            return WasmAsyncResponse {
-                ok: false,
-                value: None,
-                error: Some(WasmAsyncError {
-                    message: "Failed to parse snapshot".into(),
-                    code: "E_SNAPSHOT".into(),
-                }),
-            }
-        }
-    };
-
-    let text = dom_semantic_tree::format::format_snapshot(&snapshot, "compact-text");
+    let text = dom_semantic_tree::format::format_snapshot(&snapshot, dom_semantic_tree::format::SnapshotFormat::CompactText);
 
     let data = match serde_json::to_value(&snapshot) {
         Ok(v) => v,
@@ -514,7 +470,7 @@ pub fn execute_dom_format(params: DomFormatParams) -> WasmAsyncResponse {
                 }
             }
         };
-    let text = dom_semantic_tree::format::format_snapshot(&snap, &params.format);
+    let text = dom_semantic_tree::format::format_snapshot(&snap, params.format);
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::String(text)),

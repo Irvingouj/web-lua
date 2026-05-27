@@ -1,6 +1,9 @@
+use crate::format::SnapshotFormat;
 use serde::{Deserialize, Serialize};
+use tsify::Tsify;
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 #[serde(rename_all = "camelCase")]
 pub struct TreeSnapshot {
     pub version: String,
@@ -12,7 +15,7 @@ pub struct TreeSnapshot {
     pub outline: Option<Vec<OutlineNode>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct Viewport {
     pub width: f64,
@@ -21,7 +24,7 @@ pub struct Viewport {
     pub scroll_y: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct SemanticNode {
     pub ref_id: String,
@@ -53,7 +56,7 @@ pub struct SemanticNode {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct States {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -99,7 +102,7 @@ impl States {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct Rect {
     pub x: f64,
@@ -112,14 +115,15 @@ pub struct Rect {
     pub left: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
 pub struct OutlineNode {
     pub role: String,
     pub name: String,
     pub ref_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Tsify)]
+#[tsify(from_wasm_abi)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectOptions {
     #[serde(default = "default_false")]
@@ -137,7 +141,7 @@ pub struct CollectOptions {
     #[serde(default = "default_true")]
     pub interactive_only: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub format: Option<SnapshotFormat>,
 }
 
 impl Default for CollectOptions {

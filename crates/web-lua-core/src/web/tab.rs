@@ -93,11 +93,33 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         action: "tab_snapshot",
         host_state: host_state,
         namespace: "web.tab",
-        doc: "Take a DOM snapshot of the target tab.",
+        doc: "Take a DOM snapshot of the target tab and return readable text. Defaults to active tab.",
         params: [
-            tab_id: "number", required, "Target tab ID",
+            tab_id: "number", optional, "Target tab ID (defaults to active tab)",
         ],
-        returns: "table" => "Simplified inline DOM snapshot with refIds",
+        returns: "string" => "Human-readable accessibility tree with refIds",
+    );
+    lua_api!(ctx, tab_table,
+        name: "snapshot_text",
+        action: "tab_snapshot_text",
+        host_state: host_state,
+        namespace: "web.tab",
+        doc: "Take a DOM snapshot and return readable text (explicit alias). Defaults to active tab.",
+        params: [
+            tab_id: "number", optional, "Target tab ID (defaults to active tab)",
+        ],
+        returns: "string" => "Human-readable accessibility tree with refIds",
+    );
+    lua_api!(ctx, tab_table,
+        name: "snapshot_data",
+        action: "tab_snapshot_data",
+        host_state: host_state,
+        namespace: "web.tab",
+        doc: "Take a DOM snapshot and return structured data. Defaults to active tab.",
+        params: [
+            tab_id: "number", optional, "Target tab ID (defaults to active tab)",
+        ],
+        returns: "table" => "Structured snapshot with nodes, url, title, viewport",
     );
     lua_api!(ctx, tab_table,
     name: "scroll_to",

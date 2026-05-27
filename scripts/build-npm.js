@@ -72,8 +72,13 @@ execSync("tsc", { cwd: absDir, stdio: "inherit" });
 
 // Copy WASM bundles and static assets into dist/
 for (const file of [...pkg.wasm, ...pkg.extra]) {
-  const src = path.join(absDir, file);
   const dest = path.join(distDir, file);
+  // Skip if tsc already emitted this file into dist/
+  if (fs.existsSync(dest)) {
+    console.log(`  Already in dist/: ${file}`);
+    continue;
+  }
+  const src = path.join(absDir, file);
   if (fs.existsSync(src)) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(src, dest);

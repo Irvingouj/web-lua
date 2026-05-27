@@ -234,6 +234,8 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "ts-rs",
+ "tsify",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "web-sys",
@@ -1288,12 +1290,15 @@ dependencies = [
 name = "web-lua-core"
 version = "0.1.0"
 dependencies = [
+ "dom-semantic-tree",
  "getrandom 0.3.4",
  "piccolo",
  "serde",
  "serde_json",
  "ts-rs",
+ "tsify",
  "url",
+ "wasm-bindgen",
 ]
 
 [[package]]

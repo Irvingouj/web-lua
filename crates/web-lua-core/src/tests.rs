@@ -54,7 +54,6 @@ mod tests {
         crate::command_params::StorageSetParams::export_all(&cfg).unwrap();
         crate::command_params::StorageDeleteParams::export_all(&cfg).unwrap();
         crate::command_params::DomSnapshotParams::export_all(&cfg).unwrap();
-        crate::command_params::DomFormatParams::export_all(&cfg).unwrap();
         crate::command_params::TabClickParams::export_all(&cfg).unwrap();
         crate::command_params::TabFillParams::export_all(&cfg).unwrap();
         crate::command_params::TabEvaluateParams::export_all(&cfg).unwrap();
@@ -1676,6 +1675,90 @@ mod tests {
             serde_json::from_value(serde_json::json!({"tabId": 123, "timeout": 5000})).unwrap();
         assert_eq!(params.tab_id, 123);
         assert_eq!(params.timeout, 5_000);
+    }
+
+    #[test]
+    fn test_tab_snapshot_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local data = web.tab.snapshot(123)
+            print(data.title)
+            print(#data.nodes)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "tab_snapshot");
+        assert_eq!(cmd.params, serde_json::json!(123));
+
+        let resume = session.resume_cell(
+            r#"{"ok": true, "value": {"text": "URL: https://example.com\nTitle: Example\n\n- link \"About\" [ref=2]", "nodes": [{"refId": 2, "role": "link", "tag": "a", "name": "About"}], "url": "https://example.com", "title": "Example", "viewport": {"width": 800, "height": 600}}}"#
+        );
+        assert_eq!(resume.status, CellStatus::Done);
+        assert_eq!(resume.stdout, vec!["Example", "1"]);
+    }
+
+    #[test]
+    fn test_tab_snapshot_text_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local text = web.tab.snapshot_text(123)
+            print(text)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "tab_snapshot_text");
+        assert_eq!(cmd.params, serde_json::json!(123));
+    }
+
+    #[test]
+    fn test_tab_snapshot_data_yields_and_returns_table() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local data = web.tab.snapshot_data(123)
+            print(data.title)
+            print(data.url)
+            print(#data.nodes)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "tab_snapshot_data");
+        assert_eq!(cmd.params, serde_json::json!(123));
+
+        let resume = session.resume_cell(
+            r#"{"ok": true, "value": {"nodes": [{"refId": 1, "role": "link", "tag": "a", "name": "About"}], "url": "https://example.com", "title": "Example", "viewport": {"width": 800, "height": 600}}}"#
+        );
+        assert_eq!(resume.status, CellStatus::Done);
+        assert_eq!(resume.stdout, vec!["Example", "https://example.com", "1"]);
+    }
+
+    #[test]
+    fn test_tab_snapshot_defaults_to_active_tab() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local data = web.tab.snapshot()
+            print(data.title)
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "tab_snapshot");
+
+        let resume = session.resume_cell(
+            r#"{"ok": true, "value": {"text": "URL: https://example.com\nTitle: Example\n\n- link \"About\" [ref=2]", "nodes": [], "url": "https://example.com", "title": "Example", "viewport": {"width": 800, "height": 600}}}"#
+        );
+        assert_eq!(resume.status, CellStatus::Done);
+        assert_eq!(resume.stdout, vec!["Example"]);
     }
 
     #[test]
