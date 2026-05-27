@@ -349,7 +349,14 @@ export async function executeMainThreadCommand(
     case "page_dblclick": {
       return handlePageAction(command.action, params);
     }
-    case "page_snapshot":
+    case "page_snapshot": {
+      const result = await handleDomSnapshot(expectParams<DomSnapshotParams>(params));
+      if (result.ok && result.value) {
+        return { ok: true, value: result.value.text };
+      }
+      return result as AsyncResponse<string>;
+    }
+    case "page_snapshot_data":
     case "dom_snapshot": {
       return handleDomSnapshot(expectParams<DomSnapshotParams>(params));
     }

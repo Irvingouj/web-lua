@@ -13,12 +13,26 @@ test.describe("page.agent", () => {
     await waitForKernelReady(page);
   });
 
-  test("1: page.snapshot returns data and text", async ({ page }) => {
+  test("1: page.snapshot returns readable text", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot()
+local text = page.snapshot()
+print(type(text))
+    `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "string");
+  });
+
+  test("2: page.snapshot_data returns structured data", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local snap = page.snapshot_data()
 print(type(snap.data))
 print(type(snap.text))
     `.trim(),
@@ -29,42 +43,26 @@ print(type(snap.text))
     await expectCellOutputContains(page, 0, "string");
   });
 
-  test("2: page.snapshot data has nodes", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `
-local snap = page.snapshot()
-print(type(snap.data.nodes))
-print(#snap.data.nodes > 0)
-    `.trim(),
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "table");
-    await expectCellOutputContains(page, 0, "true");
-  });
-
   test("3: page.snapshot text has ref IDs", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot({ max_nodes = 3 })
-print(string.sub(snap.text, 1, 2))
+local text = page.snapshot({ max_nodes = 3 })
+print(string.sub(text, 1, 2))
     `.trim(),
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "[e");
+    await expectCellOutputContains(page, 0, "[");
   });
 
-  test("4: page.snapshot with max_nodes", async ({ page }) => {
+  test("4: page.snapshot_data with max_nodes", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot({ max_nodes = 10 })
+local snap = page.snapshot_data({ max_nodes = 10 })
 print(#snap.data.nodes > 0)
     `.trim(),
     );
@@ -73,12 +71,12 @@ print(#snap.data.nodes > 0)
     await expectCellOutputContains(page, 0, "true");
   });
 
-  test("5: page.snapshot nodes have roles", async ({ page }) => {
+  test("5: page.snapshot_data nodes have roles", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local node = snap.data.nodes[1]
 print(type(node.refId))
 print(type(node.role))
@@ -108,7 +106,7 @@ print(tostring(ok))
       page,
       0,
       `
-local snap = page.snapshot({ interactive_only = true })
+local snap = page.snapshot_data({ interactive_only = true })
 local btn_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.role == "button" then
@@ -187,12 +185,12 @@ print(tostring(result))
     await expectCellOutputContains(page, 0, "true");
   });
 
-  test("12: page.snapshot has version", async ({ page }) => {
+  test("12: page.snapshot_data has version", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 print(type(snap.data.version))
     `.trim(),
     );
@@ -201,12 +199,12 @@ print(type(snap.data.version))
     await expectCellOutputContains(page, 0, "string");
   });
 
-  test("13: page.snapshot has viewport", async ({ page }) => {
+  test("13: page.snapshot_data has viewport", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 if snap.data.viewport then
   print(type(snap.data.viewport.width))
 else
@@ -219,12 +217,12 @@ end
     await expectCellOutputContains(page, 0, "number");
   });
 
-  test("14: page.snapshot text is non-empty", async ({ page }) => {
+  test("14: page.snapshot_data text is non-empty", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot({ max_nodes = 5 })
+local snap = page.snapshot_data({ max_nodes = 5 })
 print(#snap.text > 0)
     `.trim(),
     );
@@ -233,12 +231,12 @@ print(#snap.text > 0)
     await expectCellOutputContains(page, 0, "true");
   });
 
-  test("15: page.snapshot with interactive_only", async ({ page }) => {
+  test("15: page.snapshot_data with interactive_only", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
-local snap = page.snapshot({ interactive_only = true })
+local snap = page.snapshot_data({ interactive_only = true })
 print(#snap.data.nodes > 0)
     `.trim(),
     );

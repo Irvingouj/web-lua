@@ -1507,19 +1507,38 @@
   {
     "namespace": "page",
     "name": "snapshot",
-    "action": "page_snapshot",
-    "description": "Take a DOM snapshot of the current page.",
+    "action": "page_snapshot_text",
+    "description": "Take a DOM snapshot and return readable text.",
     "params": [
       {
         "name": "opts",
         "lua_type": "table | nil",
         "required": false,
-        "description": "Options: refId, maxDepth, etc."
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "snapshot_data",
+    "action": "page_snapshot_data",
+    "description": "Take a DOM snapshot and return structured data.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
       }
     ],
     "returns": {
       "lua_type": "table",
-      "description": "DOM snapshot object"
+      "description": "Structured snapshot with nodes, url, title, viewport"
     },
     "source": "rust_core"
   },

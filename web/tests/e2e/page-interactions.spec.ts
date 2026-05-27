@@ -35,7 +35,7 @@ test.describe("page interactions", () => {
       page,
       0,
       `
-local snap = page.snapshot({ interactive_only = true })
+local snap = page.snapshot_data({ interactive_only = true })
 local btn_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.role == "button" then
@@ -61,7 +61,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot({ interactive_only = true })
+local snap = page.snapshot_data({ interactive_only = true })
 local btn_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.role == "button" then
@@ -87,7 +87,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local input_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.tag == "input" and node.role == "textbox" then
@@ -113,7 +113,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local input_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.tag == "input" and node.role == "textbox" then
@@ -139,7 +139,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local input_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.tag == "input" and node.role == "textbox" then
@@ -166,7 +166,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local select_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.tag == "select" or node.role == "combobox" then
@@ -192,7 +192,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local check_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.role == "checkbox" then
@@ -218,7 +218,7 @@ end
       page,
       0,
       `
-local snap = page.snapshot()
+local snap = page.snapshot_data()
 local tall_ref = nil
 for _, node in ipairs(snap.data.nodes) do
   if node.tag == "div" and node.refId then

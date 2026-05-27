@@ -93,8 +93,8 @@ sleep = web.sleep
     }
 
     /// Load a Lua library by executing its source code.
-    pub fn load_library(&mut self, source: &str) -> WasmRunResult {
-        self.base.load_library(source)
+    pub fn load_library(&mut self, source: &str) -> CellResult {
+        self.base.load_library(source).into()
     }
 
     /// Inspect all global variables in the current Lua state.
@@ -114,7 +114,7 @@ sleep = web.sleep
     /// Run a cell, automatically resolving all async calls
     /// directly via web_sys without yielding to JS.
     #[wasm_bindgen(js_name = runCellAsync)]
-    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> WasmRunResult {
+    pub async fn run_cell_async(&mut self, code: String, stdin: String) -> CellResult {
         self.aborted.set(false);
         let result = web_lua_base::run_cell_async_loop(
             &mut self.base,
@@ -138,7 +138,7 @@ sleep = web.sleep
             self.aborted.set(false);
         }
 
-        result
+        result.into()
     }
 }
 
@@ -284,6 +284,29 @@ impl WebSession {
                 })
             }
             Action::DomSnapshot | Action::PageSnapshot => {
+                let params = cmd
+                    .parse_params::<DomSnapshotParams>()
+                    .map_err(|e| format!("Invalid snapshot params: {}", e))?;
+                Ok(execute_dom_snapshot(params))
+            }
+            Action::PageSnapshotText => {
+                let params = cmd
+                    .parse_params::<DomSnapshotParams>()
+                    .map_err(|e| format!("Invalid snapshot params: {}", e))?;
+                let resp = execute_dom_snapshot(params);
+                // Extract just the text string from the result
+                if let Some(ref value) = resp.value {
+                    if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
+                        return Ok(WasmAsyncResponse {
+                            ok: true,
+                            value: Some(serde_json::Value::String(text.to_string())),
+                            error: None,
+                        });
+                    }
+                }
+                Ok(resp)
+            }
+            Action::PageSnapshotData => {
                 let params = cmd
                     .parse_params::<DomSnapshotParams>()
                     .map_err(|e| format!("Invalid snapshot params: {}", e))?;

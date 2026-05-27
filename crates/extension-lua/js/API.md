@@ -399,15 +399,25 @@ Call a registered host handler by name.
 
 ## `page` module
 
-### `page.snapshot _(action: `page_snapshot`)_`
+### `page.snapshot _(action: `page_snapshot_text`)_`
 
-Take a DOM snapshot of the current page.
+Take a DOM snapshot and return readable text.
 
 **Parameters**
 
-- `opts` (`table | nil`, optional): Options: refId, maxDepth, etc.
+- `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
 
-**Returns** `table`: DOM snapshot object
+**Returns** `string`: Readable accessibility tree with refIds
+
+### `page.snapshot_data _(action: `page_snapshot_data`)_`
+
+Take a DOM snapshot and return structured data.
+
+**Parameters**
+
+- `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
+
+**Returns** `table`: Structured snapshot with nodes, url, title, viewport
 
 ### `page.click _(action: `page_click`)_`
 

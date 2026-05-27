@@ -33,7 +33,7 @@ pub struct WasmAsyncResponse {
 }
 
 /// Structured error from running a cell.
-#[derive(Debug, Clone, Serialize, Tsify)]
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WasmCellError {
@@ -45,7 +45,7 @@ pub enum WasmCellError {
 }
 
 /// A single global variable observed by `inspect_globals`.
-#[derive(Debug, Clone, Serialize, Tsify)]
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct WasmGlobalVariable {
     pub name: String,
@@ -56,7 +56,7 @@ pub struct WasmGlobalVariable {
 }
 
 /// Snapshot of all Lua globals.
-#[derive(Debug, Clone, Serialize, Tsify)]
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct WasmGlobalsSnapshot {
     pub variables: Vec<WasmGlobalVariable>,
@@ -64,7 +64,7 @@ pub struct WasmGlobalsSnapshot {
 }
 
 /// An async command yielded from Lua, waiting for external resolution.
-#[derive(Debug, Clone, Serialize, Tsify)]
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct WasmAsyncCommand {
     pub call_id: u32,
@@ -79,42 +79,58 @@ impl WasmAsyncCommand {
     }
 }
 
-/// Result of running a single cell.
-#[derive(Debug, Clone, Serialize, Tsify)]
-#[tsify(into_wasm_abi)]
-pub struct WasmRunResult {
-    pub stdout: Vec<String>,
-    pub stderr: Vec<String>,
-    pub result: Option<String>,
-    pub error: Option<WasmCellError>,
-    #[tsify(type = "unknown[]")]
-    pub commands: Vec<serde_json::Value>,
-    pub fuel_exhausted: bool,
-    pub execution_count: u32,
-    pub status: WasmCellStatus,
-    pub pending_command: Option<WasmAsyncCommand>,
-}
+// ─── Result types ──────────────────────────────────────────────
 
 /// Consumer-facing result of running a single cell.
-/// Stripped of internal async-loop fields (commands, fuel_exhausted, status, pending_command).
-#[derive(Debug, Clone, Serialize, Tsify)]
+/// Either success with an optional result string, or an error.
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
-pub struct CellResult {
-    pub stdout: Vec<String>,
-    pub stderr: Vec<String>,
-    pub result: Option<String>,
-    pub error: Option<WasmCellError>,
-    pub execution_count: u32,
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum CellResult {
+    Ok {
+        stdout: Vec<String>,
+        stderr: Vec<String>,
+        result: Option<String>,
+        execution_count: u32,
+    },
+    Err {
+        stdout: Vec<String>,
+        stderr: Vec<String>,
+        error: WasmCellError,
+        execution_count: u32,
+    },
 }
 
-impl From<web_lua_core::CellStatus> for WasmCellStatus {
-    fn from(s: web_lua_core::CellStatus) -> Self {
-        match s {
-            web_lua_core::CellStatus::Done => WasmCellStatus::Done,
-            web_lua_core::CellStatus::AsyncPending => WasmCellStatus::AsyncPending,
-        }
-    }
+/// Result of running a single cell, including async-loop state.
+/// Either still pending (waiting for async resolution) or done.
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum WasmRunResult {
+    Pending {
+        stdout: Vec<String>,
+        stderr: Vec<String>,
+        #[tsify(type = "unknown[]")]
+        commands: Vec<serde_json::Value>,
+        fuel_exhausted: bool,
+        execution_count: u32,
+        pending_command: WasmAsyncCommand,
+    },
+    Ok {
+        stdout: Vec<String>,
+        stderr: Vec<String>,
+        result: Option<String>,
+        execution_count: u32,
+    },
+    Err {
+        stdout: Vec<String>,
+        stderr: Vec<String>,
+        error: WasmCellError,
+        execution_count: u32,
+    },
 }
+
+// ─── From impls ────────────────────────────────────────────────
 
 impl From<web_lua_core::CellError> for WasmCellError {
     fn from(e: web_lua_core::CellError) -> Self {
@@ -162,42 +178,81 @@ impl From<web_lua_core::AsyncCommand> for WasmAsyncCommand {
     }
 }
 
-impl From<web_lua_core::RunResult> for WasmRunResult {
+impl From<web_lua_core::RunResult> for CellResult {
     fn from(r: web_lua_core::RunResult) -> Self {
-        WasmRunResult {
-            stdout: r.stdout,
-            stderr: r.stderr,
-            result: r.result,
-            error: r.error.map(Into::into),
-            commands: r.commands,
-            fuel_exhausted: r.fuel_exhausted,
-            execution_count: r.execution_count,
-            status: r.status.into(),
-            pending_command: r.pending_command.map(Into::into),
+        if let Some(error) = r.error {
+            CellResult::Err {
+                stdout: r.stdout,
+                stderr: r.stderr,
+                error: error.into(),
+                execution_count: r.execution_count,
+            }
+        } else {
+            CellResult::Ok {
+                stdout: r.stdout,
+                stderr: r.stderr,
+                result: r.result,
+                execution_count: r.execution_count,
+            }
         }
     }
 }
 
-impl From<web_lua_core::RunResult> for CellResult {
+impl From<web_lua_core::RunResult> for WasmRunResult {
     fn from(r: web_lua_core::RunResult) -> Self {
-        CellResult {
-            stdout: r.stdout,
-            stderr: r.stderr,
-            result: r.result,
-            error: r.error.map(Into::into),
-            execution_count: r.execution_count,
+        match r.status {
+            web_lua_core::CellStatus::AsyncPending => WasmRunResult::Pending {
+                stdout: r.stdout,
+                stderr: r.stderr,
+                commands: r.commands,
+                fuel_exhausted: r.fuel_exhausted,
+                execution_count: r.execution_count,
+                pending_command: r.pending_command.expect("AsyncPending without pending_command").into(),
+            },
+            web_lua_core::CellStatus::Done => {
+                if let Some(error) = r.error {
+                    WasmRunResult::Err {
+                        stdout: r.stdout,
+                        stderr: r.stderr,
+                        error: error.into(),
+                        execution_count: r.execution_count,
+                    }
+                } else {
+                    WasmRunResult::Ok {
+                        stdout: r.stdout,
+                        stderr: r.stderr,
+                        result: r.result,
+                        execution_count: r.execution_count,
+                    }
+                }
+            }
         }
     }
 }
 
 impl From<WasmRunResult> for CellResult {
     fn from(r: WasmRunResult) -> Self {
-        CellResult {
-            stdout: r.stdout,
-            stderr: r.stderr,
-            result: r.result,
-            error: r.error,
-            execution_count: r.execution_count,
+        match r {
+            WasmRunResult::Ok { stdout, stderr, result, execution_count } => CellResult::Ok {
+                stdout,
+                stderr,
+                result,
+                execution_count,
+            },
+            WasmRunResult::Err { stdout, stderr, error, execution_count } => CellResult::Err {
+                stdout,
+                stderr,
+                error,
+                execution_count,
+            },
+            WasmRunResult::Pending { stdout, stderr, execution_count, .. } => CellResult::Err {
+                stdout,
+                stderr,
+                error: WasmCellError::Internal {
+                    message: "Pending result converted to CellResult".into(),
+                },
+                execution_count,
+            },
         }
     }
 }

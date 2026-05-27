@@ -12,7 +12,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── page module (Agent API: snapshot + element actions + navigation) ──
     let page_table = Table::new(&ctx);
 
-    // page.snapshot(opts?) — async, yields "page_snapshot"
+    // page.snapshot(opts?) — async, yields "page_snapshot_text"
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
@@ -34,7 +34,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageSnapshot,
+                action: crate::action::Action::PageSnapshotText,
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -49,12 +49,58 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         crate::lua_api_doc!(
         namespace: "page",
         name: "snapshot",
-        action: "page_snapshot",
-        doc: "Take a DOM snapshot of the current page.",
+        action: "page_snapshot_text",
+        doc: "Take a DOM snapshot and return readable text.",
         params: [
-        opts: "table | nil", optional, "Options: refId, maxDepth, etc.",
+        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
         ],
-        returns: "table" => "DOM snapshot object",
+        returns: "string" => "Readable accessibility tree with refIds",
+        );
+    }
+
+    // page.snapshot_data(opts?) — async, yields "page_snapshot_data"
+    {
+        let hs_page = host_state.clone();
+        let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+            let params = if stack.is_empty() {
+                serde_json::json!({})
+            } else {
+                lua_value_to_json(ctx, stack.get(0)).unwrap_or(serde_json::Value::Null)
+            };
+            let _validated: crate::command_params::DomSnapshotParams =
+                match serde_json::from_value(params.clone()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let msg = format!("Invalid page_snapshot_data params built from Lua: {}", e);
+                        return Err(msg.into_value(ctx).into());
+                    }
+                };
+
+            let mut hs = hs_page.borrow_mut();
+            hs.async_call_counter += 1;
+            let command = AsyncCommand {
+                call_id: hs.async_call_counter,
+                action: crate::action::Action::PageSnapshotData,
+                params,
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        });
+        page_table.set_field(ctx, "snapshot_data", cb);
+
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "snapshot_data",
+        action: "page_snapshot_data",
+        doc: "Take a DOM snapshot and return structured data.",
+        params: [
+        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+        ],
+        returns: "table" => "Structured snapshot with nodes, url, title, viewport",
         );
     }
 

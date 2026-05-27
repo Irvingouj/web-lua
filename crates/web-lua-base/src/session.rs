@@ -94,7 +94,7 @@ where
 {
     let mut result = base.run_cell(code, stdin);
 
-    while result.status == WasmCellStatus::AsyncPending {
+    while let WasmRunResult::Pending { ref pending_command, .. } = result {
         if let Some(flag) = aborted {
             if flag.get() {
                 let err_json = serde_json::to_string(&WasmAsyncResponse {
@@ -111,10 +111,7 @@ where
             }
         }
 
-        let cmd = match result.pending_command.as_ref() {
-            Some(c) => c.clone(),
-            None => break,
-        };
+        let cmd = pending_command.clone();
 
         let response = match handle_command(cmd).await {
             Ok(r) => r,
