@@ -22,8 +22,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg =
-                            format!("Invalid sidepanel_snapshot params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "snapshot", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -69,10 +68,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!(
-                            "Invalid sidepanel_snapshot_data params built from Lua: {}",
-                            e
-                        );
+                        let msg = crate::utils::format_param_error("sidepanel", "snapshot_data", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -124,7 +120,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_click params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "click", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -176,8 +172,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg =
-                            format!("Invalid sidepanel_dblclick params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "dblclick", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -238,7 +233,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_fill params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "fill", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -300,7 +295,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_type params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "type", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -352,7 +347,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_press params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "press", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -413,7 +408,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_select params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "select", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -474,7 +469,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_check params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "check", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -526,7 +521,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_hover params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "hover", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -614,7 +609,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_scroll params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "scroll", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -666,8 +661,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg =
-                            format!("Invalid sidepanel_scroll_to params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "scroll_to", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -777,7 +771,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_wait params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "wait", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -838,7 +832,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
                     Err(e) => {
-                        let msg = format!("Invalid sidepanel_append params built from Lua: {}", e);
+                        let msg = crate::utils::format_param_error("sidepanel", "append", &e);
                         return Err(msg.into_value(ctx).into());
                     }
                 };
@@ -871,5 +865,5 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
-    ctx.set_global("sidepanel", sidepanel_table);
+    set_protected_global!(ctx, "sidepanel", sidepanel_table, "sidepanel");
 }

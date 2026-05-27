@@ -1211,7 +1211,6 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
-<<<<<<< HEAD
     // page.find(selector) — async
     {
         let hs_page = host_state.clone();
