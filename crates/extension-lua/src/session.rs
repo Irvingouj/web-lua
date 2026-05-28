@@ -304,6 +304,9 @@ impl ExtensionSession {
 
 impl ExtensionSession {
     async fn handle_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
+        if cmd.action.starts_with("fs_") {
+            return Self::handle_fs_command(cmd).await;
+        }
         // Serialize command to a JSON string, then parse to a JS object.
         // This avoids serde_wasm_bindgen's default map-to-JS-Map behavior,
         // ensuring serde_json::Value::Object becomes a plain JS Object.
@@ -331,5 +334,254 @@ impl ExtensionSession {
             resp.ok
         ));
         Ok(resp)
+    }
+
+    async fn handle_fs_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
+        fn ok(value: serde_json::Value) -> WasmAsyncResponse {
+            WasmAsyncResponse {
+                ok: true,
+                value: Some(value),
+                error: None,
+            }
+        }
+        fn err(e: web_fs::FsError) -> WasmAsyncResponse {
+            WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: e.wire_message(),
+                    code: e.wire_code().into(),
+                }),
+            }
+        }
+
+        match cmd.action.as_str() {
+            "fs_exists" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                Ok(ok(serde_json::Value::Bool(
+                    web_fs::exists(&params.path).await,
+                )))
+            }
+            "fs_stat" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::stat(&params.path).await {
+                    Ok(meta) => match serde_json::to_value(&meta) {
+                        Ok(v) => Ok(ok(v)),
+                        Err(e) => Ok(err(web_fs::FsError::Io(format!(
+                            "Failed to serialize metadata: {}",
+                            e
+                        )))),
+                    },
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_list" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::list(&params.path).await {
+                    Ok(entries) => match serde_json::to_value(&entries) {
+                        Ok(v) => Ok(ok(v)),
+                        Err(e) => Ok(err(web_fs::FsError::Io(format!(
+                            "Failed to serialize entries: {}",
+                            e
+                        )))),
+                    },
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_mkdir" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::mkdir(&params.path).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_delete" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::delete(&params.path).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_copy" => {
+                let params: web_lua_core::command_params::FsCopyParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::copy(&params.from, &params.to).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_move" => {
+                let params: web_lua_core::command_params::FsCopyParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::rename(&params.from, &params.to).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_read" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::read(&params.path).await {
+                    Ok(bytes) => Ok(ok(serde_json::Value::String(
+                        data_encoding::BASE64.encode(&bytes),
+                    ))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_read_text" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::read_text(&params.path).await {
+                    Ok(text) => Ok(ok(serde_json::Value::String(text))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_read_base64" => {
+                let params: web_lua_core::command_params::FsPathParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::read_base64(&params.path).await {
+                    Ok(text) => Ok(ok(serde_json::Value::String(text))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_read_range" => {
+                let params: web_lua_core::command_params::FsReadRangeParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::read_range(&params.path, params.offset, params.len).await {
+                    Ok(bytes) => Ok(ok(serde_json::Value::String(
+                        data_encoding::BASE64.encode(&bytes),
+                    ))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_write" => {
+                let params: web_lua_core::command_params::FsWriteParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                let data = match data_encoding::BASE64.decode(params.data.as_bytes()) {
+                    Ok(d) => d,
+                    Err(_) => {
+                        return Ok(WasmAsyncResponse {
+                            ok: false,
+                            value: None,
+                            error: Some(WasmAsyncError {
+                                message: "Invalid base64 data".into(),
+                                code: "E_INVALID_ENCODING".into(),
+                            }),
+                        })
+                    }
+                };
+                match web_fs::write(&params.path, &data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_write_text" => {
+                let params: web_lua_core::command_params::FsWriteParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::write_text(&params.path, &params.data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_write_base64" => {
+                let params: web_lua_core::command_params::FsWriteParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::write_base64(&params.path, &params.data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_append" => {
+                let params: web_lua_core::command_params::FsWriteParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                let data = match data_encoding::BASE64.decode(params.data.as_bytes()) {
+                    Ok(d) => d,
+                    Err(_) => {
+                        return Ok(WasmAsyncResponse {
+                            ok: false,
+                            value: None,
+                            error: Some(WasmAsyncError {
+                                message: "Invalid base64 data".into(),
+                                code: "E_INVALID_ENCODING".into(),
+                            }),
+                        })
+                    }
+                };
+                match web_fs::append(&params.path, &data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_append_text" => {
+                let params: web_lua_core::command_params::FsWriteParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::append_text(&params.path, &params.data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_append_base64" => {
+                let params: web_lua_core::command_params::FsWriteParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::append_base64(&params.path, &params.data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_update" => {
+                let params: web_lua_core::command_params::FsUpdateParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                let data = match data_encoding::BASE64.decode(params.data.as_bytes()) {
+                    Ok(d) => d,
+                    Err(_) => {
+                        return Ok(WasmAsyncResponse {
+                            ok: false,
+                            value: None,
+                            error: Some(WasmAsyncError {
+                                message: "Invalid base64 data".into(),
+                                code: "E_INVALID_ENCODING".into(),
+                            }),
+                        })
+                    }
+                };
+                match web_fs::update(&params.path, params.offset, &data).await {
+                    Ok(()) => Ok(ok(serde_json::Value::Bool(true))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            "fs_hash" => {
+                let params: web_lua_core::command_params::FsHashParams = cmd
+                    .parse_params()
+                    .map_err(|e| format!("Invalid params: {}", e))?;
+                match web_fs::hash(&params.path, &params.algo).await {
+                    Ok(hex) => Ok(ok(serde_json::Value::String(hex))),
+                    Err(e) => Ok(err(e)),
+                }
+            }
+            _ => Err(format!("Unknown fs action: {}", cmd.action)),
+        }
     }
 }

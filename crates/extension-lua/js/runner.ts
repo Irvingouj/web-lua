@@ -8,7 +8,6 @@ import {
   init as initDomSnapshot,
   type TreeSnapshot,
 } from "@pi-oxide/dom-semantic-tree";
-import { logger } from "./logger.js";
 
 let domSnapshotReady: Promise<void> | null = null;
 
@@ -1297,18 +1296,46 @@ export async function executeMainThreadCommand(
         1,
         obj.script ?? obj.code ?? obj.js ?? "",
       );
-      return executeInTab(
-        tabId,
-        (code: unknown) => {
-          const codeStr = String(code);
-          if (typeof code !== "string") {
-            throw new Error("tab.evaluate requires a string argument");
+      const targetTab = typeof tabId === "number" ? tabId : getActiveTabId();
+      if (targetTab === null) {
+        return {
+          ok: false,
+          error: {
+            message: "No active tab available",
+            code: "E_NO_TAB",
+            category: "resource",
+          },
+        };
+      }
+      const codeStr = String(script);
+      const evalFunc = (code: string) => {
+        // biome-ignore lint/security/noGlobalEval: Chrome executeScript context only supports eval, not new Function()
+        return eval(code);
+      };
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: targetTab },
+          func: evalFunc,
+          args: [codeStr],
+          world: "MAIN",
+        });
+        if (results?.[0]) {
+          if (results[0].error) {
+            return {
+              ok: false,
+              error: {
+                message: String(results[0].error),
+                code: "E_SCRIPT_EXECUTION",
+                category: "script",
+              },
+            };
           }
-          // Use new Function to avoid capturing local scope (marginally safer than eval)
-          return new Function(codeStr)();
-        },
-        [String(script)],
-      );
+          return { ok: true, value: results[0].result };
+        }
+        return { ok: true, value: null };
+      } catch (err: unknown) {
+        return normalizeChromeError(err);
+      }
     }
     case "tab_back": {
       const tabId = extractTabId(params);
@@ -2116,6 +2143,16 @@ async function executeInTab(
       world: "MAIN",
     });
     if (results?.[0]) {
+      if (results[0].error) {
+        return {
+          ok: false,
+          error: {
+            message: String(results[0].error),
+            code: "E_SCRIPT_EXECUTION",
+            category: "script",
+          },
+        };
+      }
       return { ok: true, value: results[0].result };
     }
     return { ok: true, value: null };
@@ -2258,11 +2295,9 @@ async function sendMessageToTab(
       },
     };
   }
-  logger.debug("[sendMessageToTab] targetTab:", targetTab, "message:", message);
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const result = await chrome.tabs.sendMessage(targetTab, message);
-      logger.debug("[sendMessageToTab] raw result:", result);
       // Content-script handlers may return { ok: false, error: msg } on failure.
       // Flatten that so Lua consumers always see a single error shape.
       if (
@@ -2272,7 +2307,6 @@ async function sendMessageToTab(
       ) {
         const raw = (result as Record<string, unknown>).error;
         const msg = typeof raw === "string" ? raw : String(raw);
-        logger.debug("[sendMessageToTab] content-script error:", msg);
         return {
           ok: false,
           error: {
@@ -2281,7 +2315,6 @@ async function sendMessageToTab(
           },
         };
       }
-      logger.debug("[sendMessageToTab] success, result:", result);
       return { ok: true, value: result };
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : String(err)) || "";

@@ -62,7 +62,7 @@ runtime = {
   clipboard = web.clipboard,
   notifications = web.notifications,
 }
-page.go = page.goto
+page.go = page["goto"]
 page.open = page.new_tab
 page.type = page.fill
 page.see = page.snapshot

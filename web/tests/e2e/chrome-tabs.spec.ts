@@ -279,9 +279,9 @@ print("result: " .. tostring(result))
         `
 local newTab = tab.open("https://example.com")
 tab.wait_for_load(newTab)
-local snap = tab.snapshot(newTab)
-print("has_nodes: " .. tostring(snap.data.nodes ~= nil))
-print("has_url: " .. tostring(snap.data.url ~= nil))
+local snap = tab.snapshot_data(newTab)
+print("has_nodes: " .. tostring(snap.nodes ~= nil))
+print("has_url: " .. tostring(snap.url ~= nil))
       `,
       );
       await runCell(popup, 0);
