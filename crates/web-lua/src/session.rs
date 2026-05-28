@@ -269,6 +269,9 @@ impl WebSession {
                     .map_err(|e| format!("Invalid fetch params: {}", e))?;
                 Ok(execute_fetch(params).await)
             }
+            Action::FetchDom => {
+                Err(format!("{} is not available in web-lua context", cmd.action))
+            }
             Action::Sleep => {
                 let params = cmd
                     .parse_params::<SleepParams>()
@@ -653,6 +656,7 @@ impl WebSession {
                             result.insert("url".to_string(), serde_json::Value::String(href));
                         }
                         "headings" => {
+                            let max_headings = params.max_headings as usize;
                             let headings = document
                                 .query_selector_all("h1, h2, h3, h4, h5, h6")
                                 .map_err(|e| format!("{:?}", e))?;
@@ -660,9 +664,15 @@ impl WebSession {
                             for i in 0..headings.length() {
                                 if let Some(el) = headings.item(i) {
                                     if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                                        let text = el.text_content().unwrap_or_default().trim().to_string();
+                                        let text = if text.len() > max_headings {
+                                            text.chars().take(max_headings).collect::<String>()
+                                        } else {
+                                            text
+                                        };
                                         list.push(serde_json::json!({
                                             "tag": el.tag_name(),
-                                            "text": el.text_content().unwrap_or_default().trim().to_string(),
+                                            "text": text,
                                         }));
                                     }
                                 }
@@ -670,6 +680,7 @@ impl WebSession {
                             result.insert("headings".to_string(), serde_json::Value::Array(list));
                         }
                         "links" => {
+                            let max_links = params.max_links as usize;
                             let links = document
                                 .query_selector_all("a[href]")
                                 .map_err(|e| format!("{:?}", e))?;
@@ -677,9 +688,15 @@ impl WebSession {
                             for i in 0..links.length() {
                                 if let Some(el) = links.item(i) {
                                     if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                                        let text = el.text_content().unwrap_or_default().trim().to_string();
+                                        let text = if text.len() > max_links {
+                                            text.chars().take(max_links).collect::<String>()
+                                        } else {
+                                            text
+                                        };
                                         list.push(serde_json::json!({
                                             "href": el.get_attribute("href").unwrap_or_default(),
-                                            "text": el.text_content().unwrap_or_default().trim().to_string(),
+                                            "text": text,
                                         }));
                                     }
                                 }
@@ -687,13 +704,14 @@ impl WebSession {
                             result.insert("links".to_string(), serde_json::Value::Array(list));
                         }
                         "text" => {
+                            let max_text = params.max_text as usize;
                             let body_text = document
                                 .body()
                                 .and_then(|b| b.text_content())
                                 .unwrap_or_default()
                                 .trim()
                                 .chars()
-                                .take(500)
+                                .take(max_text)
                                 .collect::<String>();
                             result.insert("text".to_string(), serde_json::Value::String(body_text));
                         }
