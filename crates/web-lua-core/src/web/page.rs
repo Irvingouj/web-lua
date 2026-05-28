@@ -137,10 +137,21 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             })
         });
         page_table.set_field(ctx, "snapshot_text", cb);
+        page_table.set_field(ctx, "see", cb);
 
         crate::lua_api_doc!(
         namespace: "page",
         name: "snapshot_text",
+        action: "page_snapshot_text",
+        doc: "Alias for page.snapshot — returns readable text.",
+        params: [
+        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+        ],
+        returns: "string" => "Readable accessibility tree with refIds",
+        );
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "see",
         action: "page_snapshot_text",
         doc: "Alias for page.snapshot — returns readable text.",
         params: [
@@ -418,6 +429,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         params: [
         key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
         ],
+        returns: "nil" => "None",
+        );
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "enter",
+        action: "page_press",
+        doc: "Alias for page.press(\"Enter\") — press the Enter key.",
+        params: [],
         returns: "nil" => "None",
         );
     }
@@ -1036,6 +1055,16 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         ms: "number", optional, "Milliseconds to wait (default 1000)",
         ],
         returns: "nil" => "None",
+        );
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "wait_for_load",
+        action: "tab_wait_for_load",
+        doc: "Wait for the current tab to finish loading.",
+        params: [
+        timeout: "number", optional, "Timeout in milliseconds",
+        ],
+        returns: "boolean" => "true if loaded within timeout",
         );
     }
 

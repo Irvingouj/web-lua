@@ -253,6 +253,18 @@ const CodeMirrorEditor: FunctionalComponent<Props> = ({
     });
   }, [theme]);
 
+  // Update doc when value prop changes from outside (e.g. test fixture injection)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (current !== value) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: value },
+      });
+    }
+  }, [value]);
+
   return (
     <div
       ref={containerRef}

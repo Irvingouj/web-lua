@@ -21,6 +21,11 @@ const App: FunctionalComponent = () => {
   const notebookRef = useRef(notebook);
   notebookRef.current = notebook;
 
+  // Expose notebookRef for e2e tests
+  useEffect(() => {
+    (window as any).__notebookRef = notebookRef;
+  }, []);
+
   // ─── Kernel callbacks ──────────────────────────────────────────
   const handleResult = useCallback((cellId: string, data: WorkerRunResult) => {
     setNotebook(prev => {

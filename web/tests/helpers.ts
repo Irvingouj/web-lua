@@ -45,17 +45,21 @@ export function getCellRunButton(page: Page, index: number): Locator {
 
 /**
  * Set code in a cell's CodeMirror editor.
- * Uses keyboard: click, select all, type.
+ * Injects directly via the exposed notebookRef to avoid keyboard races.
  */
 export async function setCellCode(page: Page, index: number, code: string) {
-  const editor = getCellEditor(page, index);
-  await editor.click();
-  // Select all existing content
-  await page.keyboard.press("Meta+a");
-  // Delete it
-  await page.keyboard.press("Backspace");
-  // Type new content (split into chunks for reliability with special chars)
-  await page.keyboard.insertText(code);
+  await page.evaluate(
+    ({ idx, source }) => {
+      const notebookRef = (window as any).__notebookRef;
+      if (notebookRef && notebookRef.current) {
+        const cell = notebookRef.current.cells[idx];
+        if (cell) {
+          cell.source = source;
+        }
+      }
+    },
+    { idx: index, source: code },
+  );
 }
 
 /**
