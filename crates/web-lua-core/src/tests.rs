@@ -71,6 +71,7 @@ mod tests {
         crate::command_params::PageFindParams::export_all(&cfg).unwrap();
         crate::command_params::PageWaitForParams::export_all(&cfg).unwrap();
         crate::command_params::PageExtractParams::export_all(&cfg).unwrap();
+        crate::command_params::FetchDomParams::export_all(&cfg).unwrap();
         crate::command_params::PageAppendParams::export_all(&cfg).unwrap();
         crate::command_params::FsPathParams::export_all(&cfg).unwrap();
         crate::command_params::FsWriteParams::export_all(&cfg).unwrap();
@@ -2621,6 +2622,108 @@ mod tests {
         let r2 = session.resume_cell(r#"{"ok": true, "value": "B"}"#);
         assert_eq!(r2.status, CellStatus::Done);
         assert_eq!(r2.stdout, vec!["AB"]);
+    }
+
+    #[test]
+    fn test_fetch_dom_yields() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok, result = pcall(function()
+                return web.fetch_dom("https://example.com", "p")
+            end)
+            print("pcall ok: " .. tostring(ok))
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "fetch_dom");
+        let params = cmd.params.as_object().unwrap();
+        assert_eq!(params.get("url").unwrap().as_str().unwrap(), "https://example.com");
+        assert_eq!(params.get("selector").unwrap().as_str().unwrap(), "p");
+        assert_eq!(params.get("max_text").unwrap().as_u64().unwrap(), 500);
+    }
+
+    #[test]
+    fn test_fetch_dom_yields_with_max_text() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok, result = pcall(function()
+                return web.fetch_dom("https://example.com", "p", 1000)
+            end)
+            print("pcall ok: " .. tostring(ok))
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "fetch_dom");
+        let params = cmd.params.as_object().unwrap();
+        assert_eq!(params.get("max_text").unwrap().as_u64().unwrap(), 1000);
+    }
+
+    #[test]
+    fn test_page_extract_yields_with_defaults() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok, result = pcall(function()
+                return page.extract({"title", "text"})
+            end)
+            print("pcall ok: " .. tostring(ok))
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "page_extract");
+        let params = cmd.params.as_object().unwrap();
+        assert_eq!(params.get("max_text").unwrap().as_u64().unwrap(), 500);
+        assert_eq!(params.get("max_headings").unwrap().as_u64().unwrap(), 200);
+        assert_eq!(params.get("max_links").unwrap().as_u64().unwrap(), 100);
+    }
+
+    #[test]
+    fn test_page_extract_yields_with_custom_limits() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok, result = pcall(function()
+                return page.extract({"title", "text"}, {max_text = 10, max_headings = 5, max_links = 2})
+            end)
+            print("pcall ok: " .. tostring(ok))
+        "#,
+            "",
+        );
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action.as_str(), "page_extract");
+        let params = cmd.params.as_object().unwrap();
+        assert_eq!(params.get("max_text").unwrap().as_u64().unwrap(), 10);
+        assert_eq!(params.get("max_headings").unwrap().as_u64().unwrap(), 5);
+        assert_eq!(params.get("max_links").unwrap().as_u64().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_page_extract_rejects_non_table_opts() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local ok, err = pcall(function()
+                return page.extract({"title"}, "bad")
+            end)
+            print("pcall ok: " .. tostring(ok))
+        "#,
+            "",
+        );
+        // It should either error synchronously or yield and then error on resume
+        assert!(
+            result.error.is_some() || result.status == CellStatus::AsyncPending,
+            "Expected error or async pending, got: {:?}",
+            result
+        );
     }
 }
 

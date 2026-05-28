@@ -49,7 +49,7 @@ print(type(text))
       0,
       `
 local snap = page.snapshot_data()
-print(type(snap.data))
+print(type(snap.nodes))
 print(type(snap.text))
     `.trim(),
     );
@@ -79,7 +79,7 @@ print(string.sub(text, 1, 2))
       0,
       `
 local snap = page.snapshot_data({ max_nodes = 10 })
-print(#snap.data.nodes > 0)
+print(#snap.nodes > 0)
     `.trim(),
     );
     await runCell(page, 0);
@@ -93,7 +93,7 @@ print(#snap.data.nodes > 0)
       0,
       `
 local snap = page.snapshot_data()
-local node = snap.data.nodes[1]
+local node = snap.nodes[1]
 print(type(node.refId))
 print(type(node.role))
     `.trim(),
@@ -124,7 +124,7 @@ print(tostring(ok))
       `
 local snap = page.snapshot_data({ interactive_only = true })
 local btn_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "button" then
     btn_ref = node.refId
     break
@@ -207,7 +207,7 @@ print(tostring(result))
       0,
       `
 local snap = page.snapshot_data()
-print(type(snap.data.version))
+print(type(snap.version))
     `.trim(),
     );
     await runCell(page, 0);
@@ -221,8 +221,8 @@ print(type(snap.data.version))
       0,
       `
 local snap = page.snapshot_data()
-if snap.data.viewport then
-  print(type(snap.data.viewport.width))
+if snap.viewport then
+  print(type(snap.viewport.width))
 else
   print("no viewport")
 end
@@ -253,7 +253,7 @@ print(#snap.text > 0)
       0,
       `
 local snap = page.snapshot_data({ interactive_only = true })
-print(#snap.data.nodes > 0)
+print(#snap.nodes > 0)
     `.trim(),
     );
     await runCell(page, 0);
@@ -306,7 +306,22 @@ print(type(data.url))
     await expectCellOutputContains(page, 0, "string");
   });
 
-  test("19: page.snapshot_text alias returns string", async ({ page }) => {
+  test("19: page.extract with opts truncates text", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local data = page.extract({"title", "text"}, {max_text = 10})
+print("title type: " .. type(data.title))
+print("text length: " .. string.len(data.text))
+    `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "text length:");
+  });
+
+  test("20: page.snapshot_text alias returns string", async ({ page }) => {
     await setCellCode(
       page,
       0,
@@ -320,28 +335,14 @@ print(type(text))
     await expectCellOutputContains(page, 0, "string");
   });
 
-  test("20: page.snapshot_data has elements alias", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `
-local snap = page.snapshot_data({ max_nodes = 5 })
-print(#snap.data.elements > 0)
-    `.trim(),
-    );
-    await runCell(page, 0);
-    await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "true");
-  });
-
-  test("21: sidepanel.click on valid ref succeeds", async ({ page }) => {
+  test("22: sidepanel.click on valid ref succeeds", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data({ interactive_only = true })
 local btn_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "button" then
     btn_ref = node.refId
     break
@@ -360,14 +361,14 @@ end
     await expectCellOutputContains(page, 0, "clicked");
   });
 
-  test("22: sidepanel.fill on input succeeds", async ({ page }) => {
+  test("23: sidepanel.fill on input succeeds", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -386,14 +387,14 @@ end
     await expectCellOutputContains(page, 0, "filled");
   });
 
-  test("23: sidepanel.type on input sets value", async ({ page }) => {
+  test("24: sidepanel.type on input sets value", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -412,14 +413,14 @@ end
     await expectCellOutputContains(page, 0, "typed");
   });
 
-  test("24: sidepanel.append on input appends text", async ({ page }) => {
+  test("25: sidepanel.append on input appends text", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -439,14 +440,14 @@ end
     await expectCellOutputContains(page, 0, "appended");
   });
 
-  test("25: sidepanel.press dispatches key event", async ({ page }) => {
+  test("26: sidepanel.press dispatches key event", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -466,14 +467,14 @@ end
     await expectCellOutputContains(page, 0, "pressed");
   });
 
-  test("26: sidepanel.select on dropdown succeeds", async ({ page }) => {
+  test("27: sidepanel.select on dropdown succeeds", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local select_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "select" or node.role == "combobox" then
     select_ref = node.refId
     break
@@ -492,14 +493,14 @@ end
     await expectCellOutputContains(page, 0, "selected");
   });
 
-  test("27: sidepanel.check on checkbox succeeds", async ({ page }) => {
+  test("28: sidepanel.check on checkbox succeeds", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local check_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "checkbox" then
     check_ref = node.refId
     break
@@ -518,14 +519,14 @@ end
     await expectCellOutputContains(page, 0, "checked");
   });
 
-  test("28: sidepanel.hover and sidepanel.unhover work", async ({ page }) => {
+  test("29: sidepanel.hover and sidepanel.unhover work", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data({ interactive_only = true })
 local btn_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "button" then
     btn_ref = node.refId
     break
@@ -546,7 +547,7 @@ end
     await expectCellOutputContains(page, 0, "hover:");
   });
 
-  test("29: sidepanel.scroll works", async ({ page }) => {
+  test("30: sidepanel.scroll works", async ({ page }) => {
     await setCellCode(
       page,
       0,
@@ -560,14 +561,14 @@ print(tostring(result))
     await expectCellOutputContains(page, 0, "true");
   });
 
-  test("30: sidepanel.scroll_to on tall element succeeds", async ({ page }) => {
+  test("31: sidepanel.scroll_to on tall element succeeds", async ({ page }) => {
     await setCellCode(
       page,
       0,
       `
 local snap = sidepanel.snapshot_data()
 local tall_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "div" and node.refId then
     tall_ref = node.refId
   end
@@ -585,7 +586,7 @@ end
     await expectCellOutputContains(page, 0, "scrolled");
   });
 
-  test("31: sidepanel.url returns URL string", async ({ page }) => {
+  test("32: sidepanel.url returns URL string", async ({ page }) => {
     await setCellCode(
       page,
       0,
@@ -599,7 +600,7 @@ print(type(url))
     await expectCellOutputContains(page, 0, "string");
   });
 
-  test("32: sidepanel.title returns title string", async ({ page }) => {
+  test("33: sidepanel.title returns title string", async ({ page }) => {
     await setCellCode(
       page,
       0,
@@ -613,7 +614,7 @@ print(type(title))
     await expectCellOutputContains(page, 0, "string");
   });
 
-  test("33: sidepanel.wait completes", async ({ page }) => {
+  test("34: sidepanel.wait completes", async ({ page }) => {
     await setCellCode(
       page,
       0,
@@ -625,5 +626,54 @@ print(tostring(result))
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
     await expectCellOutputContains(page, 0, "true");
+  });
+
+  test("35: page.snapshot auto-prints without explicit print", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local text = page.snapshot()
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "URL:");
+    const outputLine = page.locator('[data-testid="cell-output-line"]').filter({ hasText: "URL:" });
+    await expect(outputLine).toHaveClass(/output-auto/);
+  });
+
+  test("36: page.find returns full text without truncation", async ({ page }) => {
+    await page.evaluate(() => {
+      const el = document.createElement("div");
+      el.id = "e2e-long-text";
+      el.textContent = "a".repeat(200);
+      document.body.appendChild(el);
+    });
+    await setCellCode(
+      page,
+      0,
+      `
+local items = page.find({selector = "#e2e-long-text"})
+print(#items[1].text > 100)
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "true");
+  });
+
+  test("37: unknown API error includes Did you mean hint", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local ok, err = pcall(page.snapsot)
+print(err)
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "Did you mean: page.snapshot?");
   });
 });

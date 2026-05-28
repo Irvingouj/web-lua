@@ -19,7 +19,7 @@ test.describe("dom.snapshot", () => {
       0,
       `
 local snap = dom.snapshot()
-print(type(snap.data))
+print(type(snap.nodes))
 print(type(snap.text))
     `.trim(),
     );
@@ -35,8 +35,8 @@ print(type(snap.text))
       0,
       `
 local snap = dom.snapshot()
-print(type(snap.data.nodes))
-print(#snap.data.nodes > 0)
+print(type(snap.nodes))
+print(#snap.nodes > 0)
     `.trim(),
     );
     await runCell(page, 0);
@@ -51,7 +51,7 @@ print(#snap.data.nodes > 0)
       0,
       `
 local snap = dom.snapshot()
-local node = snap.data.nodes[1]
+local node = snap.nodes[1]
 print(type(node.role))
 print(node.role ~= "")
     `.trim(),
@@ -68,7 +68,7 @@ print(node.role ~= "")
       0,
       `
 local snap = dom.snapshot({ interactive_only = true, max_nodes = 50 })
-print(#snap.data.nodes <= 50)
+print(#snap.nodes <= 50)
     `.trim(),
     );
     await runCell(page, 0);
@@ -115,7 +115,7 @@ print(string.sub(text, 1, 2))
       0,
       `
 local snap = dom.snapshot()
-local node = snap.data.nodes[1]
+local node = snap.nodes[1]
 print(type(node.refId) == "string")
 print(type(node.role) == "string")
 print(type(node.tag) == "string")
@@ -132,9 +132,9 @@ print(type(node.tag) == "string")
       0,
       `
 local snap = dom.snapshot()
-if snap.data.viewport then
-  print(type(snap.data.viewport.width) == "number")
-  print(type(snap.data.viewport.height) == "number")
+if snap.viewport then
+  print(type(snap.viewport.width) == "number")
+  print(type(snap.viewport.height) == "number")
 else
   print(true)
 end
@@ -151,8 +151,8 @@ end
       0,
       `
 local snap = dom.snapshot()
-print(snap.data.version ~= nil)
-print(type(snap.data.version) == "string")
+print(snap.version ~= nil)
+print(type(snap.version) == "string")
     `.trim(),
     );
     await runCell(page, 0);

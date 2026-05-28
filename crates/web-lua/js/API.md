@@ -634,7 +634,7 @@ Take a DOM snapshot and return structured data.
 
 - `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
 
-**Returns** `table`: Structured snapshot with nodes, url, title, viewport
+**Returns** `table`: { text, nodes, url, title, viewport, version }
 
 ### `page.snapshot_text _(action: `page_snapshot_text`)_`
 
@@ -744,6 +744,7 @@ Scroll the page by direction and amount.
 
 - `direction` (`string`, optional): up, down, left, right (default down)
 - `amount` (`number`, optional): Pixels to scroll (default 300)
+- `ref_id` (`string`, optional): Element refId to scroll within its overflow container
 
 **Returns** `nil`: None
 
@@ -883,6 +884,7 @@ Extract structured data from the page.
 **Parameters**
 
 - `fields` (`table`, required): Array of field names: title, url, headings, links, etc.
+- `opts` (`table | nil`, optional): Options: max_text, max_headings, max_links
 
 **Returns** `table`: Extracted data object
 
@@ -1176,6 +1178,17 @@ Perform an HTTP fetch request.
 - `opts` (`table | nil`, optional): Options: method, body, headers, timeout
 
 **Returns** `table`: { status, ok, body, headers }
+
+### `web.fetch_dom _(action: `fetch_dom`)_`
+
+Fetch a URL and parse the HTML into a queryable DOM.
+
+**Parameters**
+
+- `url` (`string`, required): URL to fetch
+- `selector` (`string | nil`, optional): CSS selector to extract matching elements
+
+**Returns** `table`: { status, ok, body, headers, matches }
 
 ### `web.log _(action: `web_log`)_`
 
@@ -1477,7 +1490,7 @@ Take a DOM snapshot and return structured data. Defaults to active tab.
 
 - `tab_id` (`number`, optional): Target tab ID (defaults to active tab)
 
-**Returns** `table`: Structured snapshot with nodes, url, title, viewport
+**Returns** `table`: { text, nodes, url, title, viewport, version }
 
 ### `web.tab.scroll_to _(action: `tab_scroll_to`)_`
 

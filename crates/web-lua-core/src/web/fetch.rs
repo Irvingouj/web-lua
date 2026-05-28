@@ -387,4 +387,81 @@ pub(crate) fn register<'a>(
     ],
     returns: "nil" => "None",
     );
+
+    // web.fetch_dom(url, selector?) — async HTTP request + DOM parsing
+    let hs_fetch_dom = host_state.clone();
+    let fetch_dom_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let url = if !stack.is_empty() {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => format_value(ctx, other),
+            }
+        } else {
+            let msg = "web.fetch_dom requires at least a URL argument".to_string();
+            return Err(msg.into_value(ctx).into());
+        };
+
+        let selector = if stack.len() > 1 {
+            match stack.get(1) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                _ => "".to_string(),
+            }
+        } else {
+            "".to_string()
+        };
+
+        let max_text = if stack.len() > 2 {
+            match stack.get(2) {
+                Value::Integer(i) => i as u64,
+                Value::Number(f) => f as u64,
+                _ => 500,
+            }
+        } else {
+            500
+        };
+
+        let params = serde_json::json!({
+            "url": url,
+            "selector": selector,
+            "max_text": max_text,
+        });
+        let _validated: crate::command_params::FetchDomParams =
+            match serde_json::from_value(params.clone()) {
+                Ok(v) => v,
+                Err(e) => {
+                    let msg = crate::utils::format_param_error("web", "fetch_dom", &e);
+                    return Err(msg.into_value(ctx).into());
+                }
+            };
+
+        let mut hs = hs_fetch_dom.borrow_mut();
+        hs.async_call_counter += 1;
+        let call_id = hs.async_call_counter;
+        let command = AsyncCommand {
+            call_id,
+            action: crate::action::Action::FetchDom,
+            params,
+        };
+        hs.pending_async_command = Some(command);
+
+        stack.clear();
+        Ok(CallbackReturn::Yield {
+            to_thread: None,
+            then: None,
+        })
+    });
+
+    web_table.set_field(ctx, "fetch_dom", fetch_dom_cb);
+
+    crate::lua_api_doc!(
+        namespace: "web",
+        name: "fetch_dom",
+        action: "fetch_dom",
+        doc: "Fetch a URL and parse the HTML into a queryable DOM.",
+        params: [
+            url: "string", required, "URL to fetch",
+            selector: "string | nil", optional, "CSS selector to extract matching elements",
+        ],
+        returns: "table" => "{ status, ok, body, headers, matches }",
+    );
 }

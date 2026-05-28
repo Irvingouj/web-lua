@@ -6,7 +6,7 @@ export interface Cell {
   id: string;
   kind: CellKind;
   source: string;
-  outputs: string[];
+  outputs: Array<{ type: string; line: string }>;
   errors: string[];
   result: string | null;
   executionCount: number | null;
@@ -57,6 +57,18 @@ export function deserializeNotebook(json: string): Notebook | null {
       // Ensure every cell has a kind field (backwards compat)
       for (const cell of obj.cells) {
         if (!cell.kind) cell.kind = "code";
+        // Old notebooks stored outputs as plain strings
+        if (
+          cell.outputs &&
+          Array.isArray(cell.outputs) &&
+          cell.outputs.length > 0 &&
+          typeof cell.outputs[0] === "string"
+        ) {
+          cell.outputs = cell.outputs.map((line: string) => ({
+            type: "stdout",
+            line,
+          }));
+        }
       }
       return obj as Notebook;
     }

@@ -283,6 +283,10 @@ pub fn load_string<'gc>(ctx: Context<'gc>) {
     );
 
     ctx.set_global("string", string);
+
+    let mt = Table::new(&ctx);
+    mt.set_field(ctx, "__index", string);
+    ctx.set_string_metatable(mt);
 }
 
 fn compute_start_index(len: usize, init: i64) -> usize {
@@ -486,5 +490,27 @@ mod tests {
         let values = eval("return string.match('hello world', '%a+', 7)").unwrap();
         assert_eq!(values.len(), 1);
         assert_eq!(values[0], "world");
+    }
+
+    #[test]
+    fn test_string_metatable_upper() {
+        let values = eval("return ('hello'):upper()").unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0], "HELLO");
+    }
+
+    #[test]
+    fn test_string_metatable_find() {
+        let values = eval("return ('hello'):find('ell')").unwrap();
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0], "2");
+        assert_eq!(values[1], "4");
+    }
+
+    #[test]
+    fn test_string_metatable_sub() {
+        let values = eval("return ('hello'):sub(2, 4)").unwrap();
+        assert_eq!(values.len(), 1);
+        assert_eq!(values[0], "ell");
     }
 }

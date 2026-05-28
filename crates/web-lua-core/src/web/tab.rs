@@ -119,7 +119,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         params: [
             tab_id: "number", optional, "Target tab ID (defaults to active tab)",
         ],
-        returns: "table" => "Structured snapshot with nodes, url, title, viewport",
+        returns: "table" => "{ text, nodes, url, title, viewport, version }",
     );
     lua_api!(ctx, tab_table,
     name: "scroll_to",

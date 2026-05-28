@@ -100,7 +100,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         params: [
         opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
         ],
-        returns: "table" => "Structured snapshot with nodes, url, title, viewport",
+        returns: "table" => "{ text, nodes, url, title, viewport, version }",
         );
     }
 
@@ -647,7 +647,19 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             } else {
                 300.0
             };
-            let params = serde_json::json!({ "direction": direction, "amount": amount });
+            let ref_id = if stack.len() > 2 {
+                match stack.get(2) {
+                    Value::String(s) => Some(String::from_utf8_lossy(s.as_bytes()).to_string()),
+                    Value::Nil => None,
+                    other => {
+                        let v = format_value(ctx, other);
+                        if v.is_empty() { None } else { Some(v) }
+                    }
+                }
+            } else {
+                None
+            };
+            let params = serde_json::json!({ "direction": direction, "amount": amount, "refId": ref_id });
             let _validated: crate::command_params::PageScrollParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
@@ -680,6 +692,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         params: [
         direction: "string", optional, "up, down, left, right (default down)",
         amount: "number", optional, "Pixels to scroll (default 300)",
+        ref_id: "string", optional, "Element refId to scroll within its overflow container",
         ],
         returns: "nil" => "None",
         );
@@ -1323,7 +1336,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         );
     }
 
-    // page.extract(fields) — async
+    // page.extract(fields, opts?) — async
     {
         let hs_page = host_state.clone();
         let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
@@ -1343,7 +1356,20 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             } else {
                 Vec::new()
             };
-            let params = serde_json::json!({ "fields": fields });
+            let opts = if stack.len() >= 2 {
+                match stack.get(1) {
+                    Value::Table(_) => lua_value_to_json(ctx, stack.get(1)).ok(),
+                    _ => Some(serde_json::json!({})),
+                }
+            } else {
+                Some(serde_json::json!({}))
+            };
+            let params = serde_json::json!({
+                "fields": fields,
+                "max_text": opts.as_ref().and_then(|o| o.get("max_text").and_then(|v| v.as_u64())).unwrap_or(500),
+                "max_headings": opts.as_ref().and_then(|o| o.get("max_headings").and_then(|v| v.as_u64())).unwrap_or(200),
+                "max_links": opts.as_ref().and_then(|o| o.get("max_links").and_then(|v| v.as_u64())).unwrap_or(100),
+            });
             let _validated: crate::command_params::PageExtractParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,
@@ -1375,6 +1401,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             doc: "Extract structured data from the page.",
             params: [
                 fields: "table", required, "Array of field names: title, url, headings, links, etc.",
+                opts: "table | nil", optional, "Options: max_text, max_headings, max_links",
             ],
             returns: "table" => "Extracted data object",
         );

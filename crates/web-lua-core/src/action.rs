@@ -7,6 +7,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     Fetch,
+    FetchDom,
     Sleep,
     MockAsync,
     DomSnapshot,
@@ -163,6 +164,7 @@ impl Action {
     pub fn as_str(&self) -> Cow<'_, str> {
         match self {
             Action::Fetch => Cow::Borrowed("fetch"),
+            Action::FetchDom => Cow::Borrowed("fetch_dom"),
             Action::Sleep => Cow::Borrowed("sleep"),
             Action::MockAsync => Cow::Borrowed("mock_async"),
             Action::DomSnapshot => Cow::Borrowed("dom_snapshot"),
@@ -345,6 +347,7 @@ impl<'de> Deserialize<'de> for Action {
         let s = String::deserialize(deserializer)?;
         Ok(match s.as_str() {
             "fetch" => Action::Fetch,
+            "fetch_dom" => Action::FetchDom,
             "sleep" => Action::Sleep,
             "mock_async" => Action::MockAsync,
             "dom_snapshot" => Action::DomSnapshot,
@@ -501,6 +504,7 @@ impl From<&str> for Action {
     fn from(s: &str) -> Self {
         match s {
             "fetch" => Action::Fetch,
+            "fetch_dom" => Action::FetchDom,
             "sleep" => Action::Sleep,
             "mock_async" => Action::MockAsync,
             "dom_snapshot" => Action::DomSnapshot,

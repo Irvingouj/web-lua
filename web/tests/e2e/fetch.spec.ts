@@ -111,3 +111,72 @@ end`,
     await waitForCellStatus(page, 0, "success");
   });
 });
+
+test.describe("web.fetch_dom", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await waitForKernelReady(page);
+  });
+
+  test("1: web.fetch_dom returns matches from HTML", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `local ok, result = pcall(function()
+  return web.fetch_dom("https://httpbin.org/html", "h1")
+end)
+if ok then
+  print("Status: " .. result.status)
+  print("Matches: " .. #result.matches)
+  if #result.matches > 0 then
+    print("Tag: " .. result.matches[1].tag)
+    print("Has text: " .. tostring(result.matches[1].text ~= nil))
+  end
+else
+  print("Error: " .. tostring(result))
+end`,
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "Matches:");
+  });
+
+  test("2: web.fetch_dom with no selector returns empty matches", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `local ok, result = pcall(function()
+  return web.fetch_dom("https://httpbin.org/html")
+end)
+if ok then
+  print("Status: " .. result.status)
+  print("Matches: " .. #result.matches)
+else
+  print("Error: " .. tostring(result))
+end`,
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "Matches: 0");
+  });
+
+  test("3: web.fetch_dom with max_text truncates", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `local ok, result = pcall(function()
+  return web.fetch_dom("https://httpbin.org/html", "h1", 5)
+end)
+if ok then
+  if #result.matches > 0 then
+    print("Text length: " .. string.len(result.matches[1].text))
+  end
+else
+  print("Error: " .. tostring(result))
+end`,
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "Text length: 5");
+  });
+});

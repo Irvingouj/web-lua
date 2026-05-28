@@ -41,6 +41,7 @@ function throwIfAborted(): void {
 
 import type {
   DomSnapshotParams,
+  FetchDomParams,
   FetchParams,
   PageCheckParams,
   PageExtractParams,
@@ -91,6 +92,14 @@ type FetchValue = {
   ok: boolean;
   headers: Record<string, string>;
   body: string;
+};
+
+type FetchDomValue = {
+  status: number;
+  ok: boolean;
+  headers: Record<string, string>;
+  body: string;
+  matches: Array<{ tag: string; text: string }>;
 };
 
 type DomSnapshotValue = {
@@ -305,6 +314,9 @@ export async function executeMainThreadCommand(
     }
     case "fetch": {
       return handleFetch(expectParams<FetchParams>(params));
+    }
+    case "fetch_dom": {
+      return handleFetchDom(expectParams<FetchDomParams>(params));
     }
     case "sleep": {
       const { duration } = expectParams<SleepParams>(params);
@@ -636,11 +648,26 @@ export async function executeMainThreadCommand(
           error: { message: "No active tab", code: "E_NO_TAB" },
         };
       }
-      const { fields } = expectParams<PageExtractParams>(params);
+      const { fields, max_text, max_headings, max_links } =
+        expectParams<PageExtractParams>(params);
+      const maxTextNum = Number(max_text ?? 500);
+      const maxHeadingsNum = Number(max_headings ?? 200);
+      const maxLinksNum = Number(max_links ?? 100);
       return executeInTab(
         activeTab,
-        (fieldsArg: unknown) => {
+        (
+          fieldsArg: unknown,
+          maxTextArg: unknown,
+          maxHeadingsArg: unknown,
+          maxLinksArg: unknown,
+        ) => {
           const fieldList = Array.isArray(fieldsArg) ? fieldsArg : [];
+          const maxText =
+            typeof maxTextArg === "number" ? maxTextArg : 500;
+          const maxHeadings =
+            typeof maxHeadingsArg === "number" ? maxHeadingsArg : 200;
+          const maxLinks =
+            typeof maxLinksArg === "number" ? maxLinksArg : 100;
           const result: Record<string, unknown> = {};
           for (const field of fieldList) {
             switch (field) {
@@ -656,7 +683,7 @@ export async function executeMainThreadCommand(
                 );
                 result.headings = headings.map((el) => ({
                   tag: el.tagName,
-                  text: el.textContent?.trim().slice(0, 200) || "",
+                  text: el.textContent?.trim().slice(0, maxHeadings) || "",
                 }));
                 break;
               }
@@ -664,19 +691,19 @@ export async function executeMainThreadCommand(
                 const links = Array.from(document.querySelectorAll("a[href]"));
                 result.links = links.map((el) => ({
                   href: el.getAttribute("href"),
-                  text: el.textContent?.trim().slice(0, 100) || "",
+                  text: el.textContent?.trim().slice(0, maxLinks) || "",
                 }));
                 break;
               }
               case "text":
                 result.text =
-                  document.body?.textContent?.trim().slice(0, 500) || "";
+                  document.body?.textContent?.trim().slice(0, maxText) || "";
                 break;
             }
           }
           return result;
         },
-        [fields],
+        [fields, maxTextNum, maxHeadingsNum, maxLinksNum],
       );
     }
     case "sidepanel_click":
@@ -2042,6 +2069,47 @@ export async function executeMainThreadCommand(
   }
 }
 
+// ─── Fetch helpers ───────────────────────────────────────────────
+
+function formatFetchError(err: unknown, timeoutMs: number): AsyncResponse<never> {
+  if (err instanceof Error && err.name === "AbortError") {
+    return {
+      ok: false,
+      error: {
+        message: `Request timed out after ${timeoutMs}ms`,
+        code: "ETIMEDOUT",
+        category: "timeout",
+      },
+    };
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    ok: false,
+    error: {
+      message: message || String(err),
+      code: "EUNKNOWN",
+      category: "network",
+    },
+  };
+}
+
+async function performFetch(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<{ response: Response; body: string; headers: Record<string, string> }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const response = await fetch(url, { ...init, signal: controller.signal });
+  clearTimeout(timeoutId);
+  const body = await response.text();
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  return { response, body, headers };
+}
+
 // ─── Fetch handler ───────────────────────────────────────────────
 
 async function handleFetch(
@@ -2049,31 +2117,25 @@ async function handleFetch(
 ): Promise<AsyncResponse<FetchValue>> {
   throwIfAborted();
   const { url, method, headers, body, timeout } = params;
-
+  const timeoutMs = Number(timeout) || 30_000;
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      Number(timeout) ?? 30_000,
+    const { response, body: responseBody, headers: responseHeaders } = await performFetch(
+      url,
+      {
+        method: method || "GET",
+        headers:
+          typeof headers === "object" && headers !== null
+            ? (headers as Record<string, string>)
+            : {},
+        body:
+          body !== null && body !== undefined
+            ? typeof body === "string"
+              ? body
+              : String(body)
+            : undefined,
+      },
+      timeoutMs,
     );
-    const fetchOpts: RequestInit = {
-      method: method || "GET",
-      headers:
-        typeof headers === "object" && headers !== null
-          ? (headers as Record<string, string>)
-          : {},
-      signal: controller.signal,
-    };
-    if (body !== null && body !== undefined) {
-      fetchOpts.body = typeof body === "string" ? body : String(body);
-    }
-    const response = await fetch(url, fetchOpts);
-    clearTimeout(timeoutId);
-    const responseBody = await response.text();
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
     return {
       ok: true,
       value: {
@@ -2083,26 +2145,45 @@ async function handleFetch(
         body: responseBody,
       },
     };
-  } catch (err: unknown) {
-    if (err instanceof Error && err.name === "AbortError") {
-      return {
-        ok: false,
-        error: {
-          message: `Request timed out after ${timeout || 30_000}ms`,
-          code: "ETIMEDOUT",
-          category: "timeout",
-        },
-      };
+  } catch (err) {
+    return formatFetchError(err, timeoutMs);
+  }
+}
+
+async function handleFetchDom(
+  params: FetchDomParams,
+): Promise<AsyncResponse<FetchDomValue>> {
+  throwIfAborted();
+  const { url, selector, max_text } = params;
+  const maxTextNum = Number(max_text ?? 500);
+  try {
+    const { response, body: responseBody, headers: responseHeaders } = await performFetch(
+      url,
+      {},
+      30_000,
+    );
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(responseBody, "text/html");
+    const matches: Array<{ tag: string; text: string }> = [];
+    if (selector) {
+      const elements = doc.querySelectorAll(selector);
+      elements.forEach((el) => {
+        const text = el.textContent?.trim().slice(0, maxTextNum) || "";
+        matches.push({ tag: el.tagName.toLowerCase(), text });
+      });
     }
-    const message = err instanceof Error ? err.message : String(err);
     return {
-      ok: false,
-      error: {
-        message: message || String(err),
-        code: "EUNKNOWN",
-        category: "network",
+      ok: true,
+      value: {
+        status: response.status,
+        ok: response.ok,
+        headers: responseHeaders,
+        body: responseBody,
+        matches,
       },
     };
+  } catch (err) {
+    return formatFetchError(err, 30_000);
   }
 }
 

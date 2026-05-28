@@ -446,8 +446,12 @@ pub fn execute_dom_snapshot(params: DomSnapshotParams) -> WasmAsyncResponse {
     };
 
     let result = serde_json::json!({
-        "data": data,
         "text": text,
+        "nodes": data["nodes"],
+        "url": data["url"],
+        "title": data["title"],
+        "viewport": data["viewport"],
+        "version": "1.0",
     });
 
     WasmAsyncResponse {

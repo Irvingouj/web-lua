@@ -161,10 +161,11 @@ pub enum MetaOperatorError {
 #[error("could not call a {} value", .0)]
 pub struct MetaCallError(&'static str);
 
-fn get_metatable<'gc>(val: Value<'gc>) -> Option<Table<'gc>> {
+fn get_metatable<'gc>(ctx: Context<'gc>, val: Value<'gc>) -> Option<Table<'gc>> {
     match val {
         Value::Table(t) => t.metatable(),
         Value::UserData(u) => u.metatable(),
+        Value::String(_) => ctx.string_metatable(),
         _ => None,
     }
 }
@@ -174,7 +175,7 @@ fn get_metamethod<'gc>(
     val: Value<'gc>,
     method: MetaMethod,
 ) -> Option<Value<'gc>> {
-    get_metatable(val)
+    get_metatable(ctx, val)
         .map(|mt| mt.get_value(ctx, method))
         .filter(|v| !v.is_nil())
 }
@@ -205,6 +206,22 @@ pub fn index<'gc>(
         }
         Value::UserData(u) if u.metatable().is_some() => {
             let idx = if let Some(mt) = u.metatable() {
+                mt.get_value(ctx, MetaMethod::Index)
+            } else {
+                Value::Nil
+            };
+
+            if idx.is_nil() {
+                return Err(MetaOperatorError::Unary(
+                    MetaMethod::Index,
+                    table.type_name(),
+                ));
+            }
+
+            idx
+        }
+        Value::String(_) if ctx.string_metatable().is_some() => {
+            let idx = if let Some(mt) = ctx.string_metatable() {
                 mt.get_value(ctx, MetaMethod::Index)
             } else {
                 Value::Nil

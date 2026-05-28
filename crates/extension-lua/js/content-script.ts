@@ -35,8 +35,14 @@ if (window.__luaNotebookContentScriptInjected) {
 }
 window.__luaNotebookContentScriptInjected = true;
 
-function getElementByRefId(refId: string | number): Element | null {
-  return document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
+function getElementByRefId(refId: string | number): Element {
+  const el = document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
+  if (!el) {
+    throw new Error(
+      `Element with refId=${refId} not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.`,
+    );
+  }
+  return el;
 }
 
 function findElementByLabel(query: string): Element | null {
@@ -442,6 +448,49 @@ const handlers: Record<string, Handler> = {
     const obj = asRecord(params);
     const direction = (obj.direction as string) ?? "down";
     const amount = typeof obj.amount === "number" ? obj.amount : 300;
+    const refId = (obj.refId as string) ?? "";
+    if (refId) {
+      const el = getElementByRefId(refId);
+      let scrollable: HTMLElement | null = el as HTMLElement;
+      while (scrollable && scrollable !== document.body) {
+        const style = window.getComputedStyle(scrollable);
+        if (
+          style.overflow === "auto" ||
+          style.overflow === "scroll" ||
+          style.overflow === "overlay" ||
+          style.overflowY === "auto" ||
+          style.overflowY === "scroll" ||
+          style.overflowY === "overlay"
+        ) {
+          break;
+        }
+        scrollable = scrollable.parentElement;
+      }
+      if (scrollable && scrollable !== document.body) {
+        scrollable.scrollBy({
+          top: direction === "down" ? amount : -amount,
+          behavior: "smooth",
+        });
+        return true;
+      }
+      if (scrollable === document.body) {
+        const style = window.getComputedStyle(document.body);
+        if (
+          style.overflow === "auto" ||
+          style.overflow === "scroll" ||
+          style.overflow === "overlay" ||
+          style.overflowY === "auto" ||
+          style.overflowY === "scroll" ||
+          style.overflowY === "overlay"
+        ) {
+          document.body.scrollBy({
+            top: direction === "down" ? amount : -amount,
+            behavior: "smooth",
+          });
+          return true;
+        }
+      }
+    }
     window.scrollBy({
       top: direction === "down" ? amount : -amount,
       behavior: "smooth",
@@ -474,11 +523,8 @@ const handlers: Record<string, Handler> = {
     const y = getNumberParam(params, "y", 0);
     if (refId) {
       const el = getElementByRefId(refId);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
-        return true;
-      }
-      throw new Error(`Element ${refId} not found`);
+      el.scrollIntoView({ behavior: "smooth" });
+      return true;
     }
     window.scrollTo({ top: y, left: x, behavior: "smooth" });
     return true;

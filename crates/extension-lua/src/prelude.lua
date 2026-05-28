@@ -64,7 +64,6 @@ runtime = {
 }
 page.go = page["goto"]
 page.open = page.new_tab
-page.type = page.fill
 page.see = page.snapshot
 page.enter = function() return page.press("Enter") end
 page.wait_for_load = function(timeout)

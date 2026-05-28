@@ -2,8 +2,9 @@ use std::ops;
 
 use gc_arena::{
     arena::{CollectionPhase, Root},
+    lock::Lock,
     metrics::Metrics,
-    Arena, Collect, Mutation, Rootable,
+    Arena, Collect, Gc, Mutation, Rootable,
 };
 
 use crate::{
@@ -70,6 +71,14 @@ impl<'gc> Context<'gc> {
 
     pub fn finalizers(self) -> Finalizers<'gc> {
         self.state.finalizers
+    }
+
+    pub fn set_string_metatable(self, mt: Table<'gc>) {
+        self.state.string_metatable.set(self.mutation, Some(mt));
+    }
+
+    pub fn string_metatable(self) -> Option<Table<'gc>> {
+        self.state.string_metatable.get()
     }
 
     // Calls `ctx.globals().get(key)`
@@ -298,6 +307,7 @@ struct State<'gc> {
     registry: Registry<'gc>,
     strings: InternedStringSet<'gc>,
     finalizers: Finalizers<'gc>,
+    string_metatable: Gc<'gc, Lock<Option<Table<'gc>>>>,
 }
 
 impl<'gc> State<'gc> {
@@ -307,6 +317,7 @@ impl<'gc> State<'gc> {
             registry: Registry::new(mc),
             strings: InternedStringSet::new(mc),
             finalizers: Finalizers::new(mc),
+            string_metatable: Gc::new(mc, Lock::new(None)),
         }
     }
 

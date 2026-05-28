@@ -429,15 +429,7 @@ impl WebSession {
                 let params = cmd
                     .parse_params::<DomSnapshotParams>()
                     .map_err(|e| format!("Invalid snapshot params: {}", e))?;
-                let mut resp = execute_dom_snapshot(params);
-                if let Some(ref mut value) = resp.value {
-                    if let Some(serde_json::Value::Object(ref mut map)) = value.get_mut("data") {
-                        if let Some(nodes) = map.get("nodes").cloned() {
-                            map.insert("elements".to_string(), nodes);
-                        }
-                    }
-                }
-                Ok(resp)
+                Ok(execute_dom_snapshot(params))
             }
             Action::DomFormat => {
                 let params = cmd
@@ -735,15 +727,7 @@ impl WebSession {
                 let params = cmd
                     .parse_params::<DomSnapshotParams>()
                     .map_err(|e| format!("Invalid sidepanel_snapshot_data params: {}", e))?;
-                let mut resp = execute_dom_snapshot(params);
-                if let Some(ref mut value) = resp.value {
-                    if let Some(serde_json::Value::Object(ref mut map)) = value.get_mut("data") {
-                        if let Some(nodes) = map.get("nodes").cloned() {
-                            map.insert("elements".to_string(), nodes);
-                        }
-                    }
-                }
-                Ok(resp)
+                Ok(execute_dom_snapshot(params))
             }
             Action::SidepanelClick => {
                 let params = cmd
@@ -1131,6 +1115,10 @@ impl WebSession {
                 cmd.action
             )),
             Action::WebLog => Err(format!(
+                "{} is not available in web-lua context",
+                cmd.action
+            )),
+            Action::FetchDom => Err(format!(
                 "{} is not available in web-lua context",
                 cmd.action
             )),

@@ -27,7 +27,9 @@ const App: FunctionalComponent = () => {
       const cells = prev.cells.map(c => {
         if (c.id !== cellId) return c;
         const updated = { ...c };
-        updated.outputs = data.stdout || [];
+        updated.outputs = (data.stdout || []).map((o: any) =>
+          typeof o === "string" ? { type: "stdout", line: o } : o,
+        );
         updated.errors = data.stderr || [];
         updated.result = data.result || null;
         if (data.error) {

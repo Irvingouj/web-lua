@@ -298,7 +298,20 @@ impl ExtensionSession {
         )
         .await;
 
-        result.into()
+        let mut cell_result: CellResult = result.into();
+        if let CellResult::Ok {
+            ref mut stdout,
+            ref result,
+            ..
+        } = cell_result
+        {
+            if stdout.is_empty() && result.is_some() {
+                stdout.push(StdOutOrAuto::Auto {
+                    line: result.clone().unwrap(),
+                });
+            }
+        }
+        cell_result
     }
 }
 

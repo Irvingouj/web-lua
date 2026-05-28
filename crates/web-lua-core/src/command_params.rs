@@ -37,6 +37,18 @@ fn default_max_nodes() -> u64 {
     500
 }
 
+fn default_max_text() -> u64 {
+    500
+}
+
+fn default_max_headings() -> u64 {
+    200
+}
+
+fn default_max_links() -> u64 {
+    100
+}
+
 // ─── Normalization helpers ─────────────────────────────────────
 /// Convert an array of positional args into a named object so serde
 /// can deserialize it into a typed struct.
@@ -186,6 +198,22 @@ pub struct PageWaitForParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct PageExtractParams {
     pub fields: Vec<String>,
+    #[serde(default = "default_max_text")]
+    pub max_text: u64,
+    #[serde(default = "default_max_headings")]
+    pub max_headings: u64,
+    #[serde(default = "default_max_links")]
+    pub max_links: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export_to = "web/src/types/generated.ts")]
+pub struct FetchDomParams {
+    pub url: String,
+    #[serde(default)]
+    pub selector: String,
+    #[serde(default = "default_max_text")]
+    pub max_text: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

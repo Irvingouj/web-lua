@@ -1,7 +1,7 @@
 import { FunctionalComponent } from 'preact';
 
 interface Props {
-  outputs: string[];
+  outputs: Array<{ type: string; line: string }>;
   errors: string[];
   result: string | null;
 }
@@ -19,8 +19,8 @@ const CellOutput: FunctionalComponent<Props> = ({ outputs, errors, result }) => 
       hidden={empty}
     >
       {outputs.map((o, i) => (
-        <div class="output-line" data-testid="cell-output-line" key={i}>
-          {escapeHtml(o)}
+        <div class={`output-line ${o.type === "auto" ? "output-auto" : ""}`} data-testid="cell-output-line" key={i}>
+          {escapeHtml(o.line)}
         </div>
       ))}
       {result && (

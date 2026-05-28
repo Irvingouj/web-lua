@@ -112,6 +112,36 @@ pub(crate) fn scan_namespace(namespace: &str) -> (Vec<String>, Vec<String>) {
     (apis, children)
 }
 
+/// Compute the Levenshtein distance between two strings using a standard
+/// 2-row dynamic programming approach (O(min(n,m)) memory).
+fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let (a, b) = if a.len() < b.len() { (a, b) } else { (b, a) };
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let m = a_bytes.len();
+    let n = b_bytes.len();
+
+    let mut prev: Vec<usize> = (0..=m).collect();
+    let mut curr = vec![0; m + 1];
+
+    for j in 1..=n {
+        curr[0] = j;
+        for i in 1..=m {
+            let cost = if a_bytes[i - 1] == b_bytes[j - 1] {
+                0
+            } else {
+                1
+            };
+            curr[i] = (prev[i - 1] + cost)
+                .min(prev[i] + 1)
+                .min(curr[i - 1] + 1);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[m]
+}
+
 /// Build the "unknown API" help message for a given namespace and name.
 /// Returns the full formatted string used by the protector sentinel.
 pub(crate) fn format_unknown_api_error(namespace: &str, name: &str) -> String {
@@ -138,6 +168,24 @@ pub(crate) fn format_unknown_api_error(namespace: &str, name: &str) -> String {
 
     if apis.is_empty() && children.is_empty() {
         msg.push_str("(no APIs registered in this namespace)");
+    }
+
+    // Suggest the closest matching API if distance is within threshold
+    if !apis.is_empty() {
+        let mut min_dist = usize::MAX;
+        let mut closest: Option<&str> = None;
+        for api in &apis {
+            let dist = levenshtein_distance(name, api);
+            if dist < min_dist {
+                min_dist = dist;
+                closest = Some(api);
+            }
+        }
+        if let Some(closest_api) = closest {
+            if min_dist <= 2 {
+                msg.push_str(&format!("\nDid you mean: {}.{}?\n", namespace, closest_api));
+            }
+        }
     }
 
     msg
@@ -268,6 +316,8 @@ mod tests {
 
     #[test]
     fn test_format_unknown_api_error_lists_children() {
+        // Populate the registry so chrome sub-namespaces are registered
+        let _session = crate::session::NotebookSession::new();
         let msg = format_unknown_api_error("chrome", "nope");
         assert!(
             msg.contains("chrome.nope"),
@@ -293,6 +343,55 @@ mod tests {
         assert!(
             !msg.contains("Expected signature"),
             "Should omit signature when doc is missing, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_levenshtein_distance() {
+        assert_eq!(levenshtein_distance("", ""), 0);
+        assert_eq!(levenshtein_distance("a", ""), 1);
+        assert_eq!(levenshtein_distance("", "b"), 1);
+        assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
+        assert_eq!(levenshtein_distance("flaw", "lawn"), 2);
+        assert_eq!(levenshtein_distance("snapsot", "snapshot"), 1);
+        assert_eq!(levenshtein_distance("navigate", "goto"), 6);
+    }
+
+    #[test]
+    fn test_did_you_mean_suggests_close_match() {
+        // Populate the registry by creating a session so page.* APIs are registered
+        let _session = crate::session::NotebookSession::new();
+        let msg = format_unknown_api_error("page", "snapsot");
+        assert!(
+            msg.contains("Did you mean: page.snapshot?"),
+            "Should suggest close match for 'snapsot', got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_did_you_mean_no_suggestion_when_distance_too_large() {
+        // Populate the registry by creating a session so page.* APIs are registered
+        let _session = crate::session::NotebookSession::new();
+        let msg = format_unknown_api_error("page", "xyzabc");
+        assert!(
+            !msg.contains("Did you mean"),
+            "Should not suggest when distance is too large, got: {}",
+            msg
+        );
+    }
+
+    #[test]
+    fn test_did_you_mean_no_suggestion_for_navigate() {
+        // Populate the registry by creating a session so page.* APIs are registered
+        let _session = crate::session::NotebookSession::new();
+        // 'navigate' vs 'goto' has Levenshtein distance 6 (> 2), so it
+        // should NOT trigger the "Did you mean" hint.
+        let msg = format_unknown_api_error("page", "navigate");
+        assert!(
+            !msg.contains("Did you mean"),
+            "Should not suggest for 'navigate' (distance too large), got: {}",
             msg
         );
     }

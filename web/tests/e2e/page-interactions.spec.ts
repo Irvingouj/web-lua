@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   expectCellOutputContains,
   runCell,
@@ -37,7 +37,7 @@ test.describe("page interactions", () => {
       `
 local snap = page.snapshot_data({ interactive_only = true })
 local btn_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "button" then
     btn_ref = node.refId
     break
@@ -63,7 +63,7 @@ end
       `
 local snap = page.snapshot_data({ interactive_only = true })
 local btn_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "button" then
     btn_ref = node.refId
     break
@@ -89,7 +89,7 @@ end
       `
 local snap = page.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -115,7 +115,7 @@ end
       `
 local snap = page.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -141,7 +141,7 @@ end
       `
 local snap = page.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -168,7 +168,7 @@ end
       `
 local snap = page.snapshot_data()
 local select_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "select" or node.role == "combobox" then
     select_ref = node.refId
     break
@@ -194,7 +194,7 @@ end
       `
 local snap = page.snapshot_data()
 local check_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.role == "checkbox" then
     check_ref = node.refId
     break
@@ -220,7 +220,7 @@ end
       `
 local snap = page.snapshot_data()
 local tall_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "div" and node.refId then
     -- The tall div is near the end of the snapshot
     tall_ref = node.refId
@@ -284,7 +284,7 @@ print("went forward")
       `
 local snap = page.snapshot_data()
 local input_ref = nil
-for _, node in ipairs(snap.data.nodes) do
+for _, node in ipairs(snap.nodes) do
   if node.tag == "input" and node.role == "textbox" then
     input_ref = node.refId
     break
@@ -302,5 +302,84 @@ end
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
     await expectCellOutputContains(page, 0, "appended");
+  });
+
+  test("12: page.scroll with ref_id scrolls overflow container", async ({ page }) => {
+    await page.evaluate(() => {
+      const fixture = document.getElementById("e2e-test-fixture");
+      const container = document.createElement("div");
+      container.id = "e2e-scrollable";
+      container.style.cssText = "overflow-y: auto; height: 100px; width: 100px;";
+      const inner = document.createElement("div");
+      inner.style.cssText = "height: 500px; width: 100px; background: #ccc;";
+      container.appendChild(inner);
+      fixture?.appendChild(container);
+    });
+    await setCellCode(
+      page,
+      0,
+      `
+local snap = page.snapshot_data()
+local ref = nil
+for _, node in ipairs(snap.nodes) do
+  if node.tag == "div" and node.refId then
+    ref = node.refId
+    break
+  end
+end
+if ref then
+  page.scroll("down", 50, ref)
+  print("scrolled")
+else
+  print("no ref")
+end
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "scrolled");
+  });
+
+  test("13: page.type appends text to input", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local snap = page.snapshot_data()
+local input_ref = nil
+for _, node in ipairs(snap.nodes) do
+  if node.tag == "input" and node.role == "textbox" then
+    input_ref = node.refId
+    break
+  end
+end
+if input_ref then
+  page.fill(input_ref, "hello")
+  page.type(input_ref, " world")
+  print("typed")
+else
+  print("no input")
+end
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "typed");
+    const value = await page.locator("#e2e-input").inputValue();
+    expect(value).toBe("hello world");
+  });
+
+  test("14: invalid refId error mentions snapshot scope", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+local ok, err = pcall(page.click, "e99999")
+print(err)
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "Handles are scoped to a single snapshot");
   });
 });

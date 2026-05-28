@@ -63,6 +63,14 @@ pub struct WasmGlobalsSnapshot {
     pub execution_count: u32,
 }
 
+/// A single stdout line, either from an explicit print or auto-printed.
+#[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum StdOutOrAuto {
+    Stdout { line: String },
+    Auto { line: String },
+}
+
 /// An async command yielded from Lua, waiting for external resolution.
 #[derive(Debug, Clone, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi)]
@@ -88,13 +96,13 @@ impl WasmAsyncCommand {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum CellResult {
     Ok {
-        stdout: Vec<String>,
+        stdout: Vec<StdOutOrAuto>,
         stderr: Vec<String>,
         result: Option<String>,
         execution_count: u32,
     },
     Err {
-        stdout: Vec<String>,
+        stdout: Vec<StdOutOrAuto>,
         stderr: Vec<String>,
         error: WasmCellError,
         execution_count: u32,
@@ -108,7 +116,7 @@ pub enum CellResult {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum WasmRunResult {
     Pending {
-        stdout: Vec<String>,
+        stdout: Vec<StdOutOrAuto>,
         stderr: Vec<String>,
         #[tsify(type = "unknown[]")]
         commands: Vec<serde_json::Value>,
@@ -117,13 +125,13 @@ pub enum WasmRunResult {
         pending_command: WasmAsyncCommand,
     },
     Ok {
-        stdout: Vec<String>,
+        stdout: Vec<StdOutOrAuto>,
         stderr: Vec<String>,
         result: Option<String>,
         execution_count: u32,
     },
     Err {
-        stdout: Vec<String>,
+        stdout: Vec<StdOutOrAuto>,
         stderr: Vec<String>,
         error: WasmCellError,
         execution_count: u32,
@@ -182,16 +190,17 @@ impl From<web_lua_core::AsyncCommand> for WasmAsyncCommand {
 
 impl From<web_lua_core::RunResult> for CellResult {
     fn from(r: web_lua_core::RunResult) -> Self {
+        let stdout = r.stdout.into_iter().map(|s| StdOutOrAuto::Stdout { line: s }).collect();
         if let Some(error) = r.error {
             CellResult::Err {
-                stdout: r.stdout,
+                stdout,
                 stderr: r.stderr,
                 error: error.into(),
                 execution_count: r.execution_count,
             }
         } else {
             CellResult::Ok {
-                stdout: r.stdout,
+                stdout,
                 stderr: r.stderr,
                 result: r.result,
                 execution_count: r.execution_count,
@@ -202,9 +211,10 @@ impl From<web_lua_core::RunResult> for CellResult {
 
 impl From<web_lua_core::RunResult> for WasmRunResult {
     fn from(r: web_lua_core::RunResult) -> Self {
+        let stdout = r.stdout.into_iter().map(|s| StdOutOrAuto::Stdout { line: s }).collect();
         match r.status {
             web_lua_core::CellStatus::AsyncPending => WasmRunResult::Pending {
-                stdout: r.stdout,
+                stdout,
                 stderr: r.stderr,
                 commands: r.commands,
                 fuel_exhausted: r.fuel_exhausted,
@@ -217,14 +227,14 @@ impl From<web_lua_core::RunResult> for WasmRunResult {
             web_lua_core::CellStatus::Done => {
                 if let Some(error) = r.error {
                     WasmRunResult::Err {
-                        stdout: r.stdout,
+                        stdout,
                         stderr: r.stderr,
                         error: error.into(),
                         execution_count: r.execution_count,
                     }
                 } else {
                     WasmRunResult::Ok {
-                        stdout: r.stdout,
+                        stdout,
                         stderr: r.stderr,
                         result: r.result,
                         execution_count: r.execution_count,

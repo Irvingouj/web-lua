@@ -404,7 +404,7 @@
     ],
     "returns": {
       "lua_type": "table",
-      "description": "Structured snapshot with nodes, url, title, viewport"
+      "description": "{ text, nodes, url, title, viewport, version }"
     },
     "source": "rust_core"
   },
@@ -2195,7 +2195,7 @@
     ],
     "returns": {
       "lua_type": "table",
-      "description": "Structured snapshot with nodes, url, title, viewport"
+      "description": "{ text, nodes, url, title, viewport, version }"
     },
     "source": "rust_core"
   },
@@ -2423,6 +2423,12 @@
         "lua_type": "number",
         "required": false,
         "description": "Pixels to scroll (default 300)"
+      },
+      {
+        "name": "ref_id",
+        "lua_type": "string",
+        "required": false,
+        "description": "Element refId to scroll within its overflow container"
       }
     ],
     "returns": {
