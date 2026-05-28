@@ -5,6 +5,15 @@ use web_lua_base::types::WasmAsyncError;
 use web_lua_base::types::WasmAsyncResponse;
 use web_lua_core::command_params::*;
 
+#[wasm_bindgen]
+extern "C" {
+    type DOMParser;
+    #[wasm_bindgen(constructor)]
+    fn new() -> DOMParser;
+    #[wasm_bindgen(method, js_name = parseFromString)]
+    fn parse_from_string(this: &DOMParser, html: &str, type_: &str) -> web_sys::Document;
+}
+
 fn no_window_response() -> WasmAsyncResponse {
     WasmAsyncResponse {
         ok: false,
@@ -495,7 +504,7 @@ fn get_element_by_ref_id(ref_id: &str) -> Result<web_sys::Element, String> {
     document
         .query_selector(&format!("[data-ref-id='{}']", ref_id))
         .map_err(|e| format!("{:?}", e))?
-        .ok_or_else(|| format!("Element with ref_id '{}' not found", ref_id))
+        .ok_or_else(|| format!("Element with ref_id={} not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", ref_id))
 }
 
 pub async fn execute_page_hover(params: PageHoverParams) -> WasmAsyncResponse {
@@ -586,10 +595,159 @@ pub async fn execute_page_scroll(params: PageScrollParams) -> WasmAsyncResponse 
         "right" => (params.amount, 0.0),
         _ => (0.0, params.amount),
     };
+
+    if let Some(ref_id) = &params.ref_id {
+        match get_element_by_ref_id(ref_id) {
+            Ok(element) => {
+                let mut current = Some(element);
+                while let Some(el) = current {
+                    let style = window.get_computed_style(&el).ok().flatten();
+                    let overflow = style.as_ref().and_then(|s| {
+                        js_sys::Reflect::get(s, &"overflow".into())
+                            .ok()
+                            .and_then(|v| v.as_string())
+                    });
+                    let overflow_y = style.as_ref().and_then(|s| {
+                        js_sys::Reflect::get(s, &"overflowY".into())
+                            .ok()
+                            .and_then(|v| v.as_string())
+                    });
+                    let is_scrollable = overflow.as_ref().map(|v| v.contains("auto") || v.contains("scroll") || v.contains("overlay")).unwrap_or(false)
+                        || overflow_y.as_ref().map(|v| v.contains("auto") || v.contains("scroll") || v.contains("overlay")).unwrap_or(false);
+                    if is_scrollable {
+                        let current_top = el.scroll_top() as f64;
+                        let current_left = el.scroll_left() as f64;
+                        let _ = js_sys::Reflect::set(&el, &"scrollTop".into(), &JsValue::from_f64(current_top + dy));
+                        let _ = js_sys::Reflect::set(&el, &"scrollLeft".into(), &JsValue::from_f64(current_left + dx));
+                        return WasmAsyncResponse {
+                            ok: true,
+                            value: Some(serde_json::Value::Bool(true)),
+                            error: None,
+                        };
+                    }
+                    current = el.parent_element();
+                }
+                // No scrollable ancestor found — fall back to window scroll
+            }
+            Err(e) => {
+                return WasmAsyncResponse {
+                    ok: false,
+                    value: None,
+                    error: Some(WasmAsyncError {
+                        message: e,
+                        code: "E_NOT_FOUND".into(),
+                    }),
+                };
+            }
+        }
+    }
+
     window.scroll_by_with_x_and_y(dx, dy);
     WasmAsyncResponse {
         ok: true,
         value: Some(serde_json::Value::Bool(true)),
+        error: None,
+    }
+}
+
+pub async fn execute_fetch_dom(params: FetchDomParams) -> WasmAsyncResponse {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return no_window_response(),
+    };
+
+    let request = match web_sys::Request::new_with_str(&params.url) {
+        Ok(r) => r,
+        Err(e) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("Invalid request: {:?}", e),
+                    code: "E_BAD_REQUEST".into(),
+                }),
+            };
+        }
+    };
+
+    let resp = match JsFuture::from(window.fetch_with_request(&request)).await {
+        Ok(r) => r,
+        Err(e) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("Network error: {:?}", e),
+                    code: "ENETWORK".into(),
+                }),
+            };
+        }
+    };
+
+    let response = match resp.dyn_into::<web_sys::Response>() {
+        Ok(r) => r,
+        Err(_) => {
+            return WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: "Invalid response from fetch".into(),
+                    code: "E_RESPONSE".into(),
+                }),
+            };
+        }
+    };
+
+    let status = response.status();
+    let ok = response.ok();
+
+    let body = match response.text() {
+        Ok(p) => match JsFuture::from(p).await {
+            Ok(b) => b.as_string().unwrap_or_default(),
+            Err(_) => String::new(),
+        },
+        Err(_) => String::new(),
+    };
+
+    let parser = DOMParser::new();
+    let doc = parser.parse_from_string(&body, "text/html");
+
+    let mut matches = Vec::new();
+    if !params.selector.is_empty() {
+        match doc.query_selector_all(&params.selector) {
+            Ok(elements) => {
+                let len = elements.length();
+                for i in 0..len {
+                    if let Some(node) = elements.item(i) {
+                        if let Ok(el) = node.dyn_into::<web_sys::Element>() {
+                            let text = el.text_content().unwrap_or_default().trim().to_string();
+                            let text = if text.len() > params.max_text as usize {
+                                text[..params.max_text as usize].to_string()
+                            } else {
+                                text
+                            };
+                            matches.push(serde_json::json!({
+                                "tag": el.tag_name().to_lowercase(),
+                                "text": text,
+                            }));
+                        }
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+    }
+
+    let value = serde_json::json!({
+        "status": status,
+        "ok": ok,
+        "body": body,
+        "matches": matches,
+    });
+
+    WasmAsyncResponse {
+        ok: true,
+        value: Some(value),
         error: None,
     }
 }

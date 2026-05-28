@@ -28,7 +28,11 @@ if (window.__luaNotebookContentScriptInjected) {
 }
 window.__luaNotebookContentScriptInjected = true;
 function getElementByRefId(refId) {
-    return document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
+    const el = document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
+    if (!el) {
+        throw new Error(`Element with refId=${refId} not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.`);
+    }
+    return el;
 }
 function findElementByLabel(query) {
     const lowerQuery = query.toLowerCase().trim();
@@ -310,7 +314,7 @@ const handlers = {
             throw new Error(`Element not found${query ? ` by label: "${query}"` : ""}. Candidates: ${candidates.join(", ") || "none"}`);
         }
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-            el.value = text;
+            el.value = el.value + text;
             const ev = new InputEvent("input", { bubbles: true });
             el.dispatchEvent(ev);
             return null;
@@ -391,6 +395,45 @@ const handlers = {
         const obj = asRecord(params);
         const direction = obj.direction ?? "down";
         const amount = typeof obj.amount === "number" ? obj.amount : 300;
+        const refId = obj.refId ?? "";
+        if (refId) {
+            const el = getElementByRefId(refId);
+            let scrollable = el;
+            while (scrollable && scrollable !== document.body) {
+                const style = window.getComputedStyle(scrollable);
+                if (style.overflow === "auto" ||
+                    style.overflow === "scroll" ||
+                    style.overflow === "overlay" ||
+                    style.overflowY === "auto" ||
+                    style.overflowY === "scroll" ||
+                    style.overflowY === "overlay") {
+                    break;
+                }
+                scrollable = scrollable.parentElement;
+            }
+            if (scrollable && scrollable !== document.body) {
+                scrollable.scrollBy({
+                    top: direction === "down" ? amount : -amount,
+                    behavior: "smooth",
+                });
+                return true;
+            }
+            if (scrollable === document.body) {
+                const style = window.getComputedStyle(document.body);
+                if (style.overflow === "auto" ||
+                    style.overflow === "scroll" ||
+                    style.overflow === "overlay" ||
+                    style.overflowY === "auto" ||
+                    style.overflowY === "scroll" ||
+                    style.overflowY === "overlay") {
+                    document.body.scrollBy({
+                        top: direction === "down" ? amount : -amount,
+                        behavior: "smooth",
+                    });
+                    return true;
+                }
+            }
+        }
         window.scrollBy({
             top: direction === "down" ? amount : -amount,
             behavior: "smooth",
@@ -420,11 +463,8 @@ const handlers = {
         const y = getNumberParam(params, "y", 0);
         if (refId) {
             const el = getElementByRefId(refId);
-            if (el) {
-                el.scrollIntoView({ behavior: "smooth" });
-                return true;
-            }
-            throw new Error(`Element ${refId} not found`);
+            el.scrollIntoView({ behavior: "smooth" });
+            return true;
         }
         window.scrollTo({ top: y, left: x, behavior: "smooth" });
         return true;

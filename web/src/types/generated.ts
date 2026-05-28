@@ -53,7 +53,7 @@ export type PageHoverParams = { refId: string, };
 
 export type PagePressParams = { key: string, };
 
-export type PageScrollParams = { direction: string, amount: number, };
+export type PageScrollParams = { direction: string, amount: number, refId: string | null, };
 
 export type PageScrollToParams = { refId: string, };
 

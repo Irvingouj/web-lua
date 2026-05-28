@@ -8,6 +8,7 @@ use crate::browser_api::{
     execute_page_hover, execute_page_press, execute_page_scroll, execute_page_scroll_to,
     execute_page_select, execute_page_type, execute_page_unhover, execute_page_wait, execute_sleep,
     execute_storage_delete, execute_storage_get, execute_storage_list, execute_storage_set,
+    execute_fetch_dom,
 };
 use std::cell::Cell;
 use wasm_bindgen::prelude::*;
@@ -269,9 +270,6 @@ impl WebSession {
                     .map_err(|e| format!("Invalid fetch params: {}", e))?;
                 Ok(execute_fetch(params).await)
             }
-            Action::FetchDom => {
-                Err(format!("{} is not available in web-lua context", cmd.action))
-            }
             Action::Sleep => {
                 let params = cmd
                     .parse_params::<SleepParams>()
@@ -318,7 +316,7 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 element
                     .dyn_ref::<web_sys::HtmlElement>()
                     .ok_or("Element is not clickable")?
@@ -341,7 +339,7 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
                     input.set_value(&params.value);
                 } else {
@@ -460,9 +458,10 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
-                    input.set_value(&params.text);
+                    let current = input.value();
+                    input.set_value(&format!("{}{}", current, params.text));
                 } else {
                     return Err("Element is not an input".into());
                 }
@@ -486,7 +485,7 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
                     let current = input.value();
                     input.set_value(&format!("{}{}", current, params.text));
@@ -561,12 +560,7 @@ impl WebSession {
                         if let Some(el) = el.dyn_ref::<web_sys::Element>() {
                             let tag = el.tag_name();
                             let ref_id = el.get_attribute("data-ref-id").unwrap_or_default();
-                            let text = el
-                                .text_content()
-                                .unwrap_or_default()
-                                .chars()
-                                .take(100)
-                                .collect::<String>();
+                            let text = el.text_content().unwrap_or_default();
                             results.push(serde_json::json!({
                                 "tag": tag,
                                 "refId": ref_id,
@@ -759,7 +753,7 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 element
                     .dyn_ref::<web_sys::HtmlElement>()
                     .ok_or("Element is not clickable")?
@@ -788,7 +782,7 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
                     input.set_value(&params.value);
                 } else {
@@ -820,7 +814,7 @@ impl WebSession {
                     .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
                     .map_err(|e| format!("{:?}", e))?
                     .or_else(|| find_element_by_label(&document, &params.label))
-                    .ok_or_else(|| format!("Element with ref_id '{}' not found", params.ref_id))?;
+                    .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
                 if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
                     let current = input.value();
                     input.set_value(&format!("{}{}", current, params.text));
@@ -1136,10 +1130,12 @@ impl WebSession {
                 "{} is not available in web-lua context",
                 cmd.action
             )),
-            Action::FetchDom => Err(format!(
-                "{} is not available in web-lua context",
-                cmd.action
-            )),
+            Action::FetchDom => {
+                let params = cmd
+                    .parse_params::<FetchDomParams>()
+                    .map_err(|e| format!("Invalid fetch_dom params: {}", e))?;
+                Ok(execute_fetch_dom(params).await)
+            }
         }
     }
 }

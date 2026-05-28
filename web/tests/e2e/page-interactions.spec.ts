@@ -315,6 +315,12 @@ end
       container.appendChild(inner);
       fixture?.appendChild(container);
     });
+    const scrollTopBefore = await page.evaluate(() => {
+      const el = document.getElementById("e2e-scrollable");
+      return el?.scrollTop ?? 0;
+    });
+    const consoleLogs: string[] = [];
+    page.on("console", msg => consoleLogs.push(msg.text()));
     await setCellCode(
       page,
       0,
@@ -322,7 +328,7 @@ end
 local snap = page.snapshot_data()
 local ref = nil
 for _, node in ipairs(snap.nodes) do
-  if node.tag == "div" and node.refId then
+  if node.id == "e2e-scrollable" then
     ref = node.refId
     break
   end
@@ -338,6 +344,13 @@ end
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
     await expectCellOutputContains(page, 0, "scrolled");
+    const scrollTopAfter = await page.evaluate(() => {
+      const el = document.getElementById("e2e-scrollable");
+      return el?.scrollTop ?? 0;
+    });
+    console.log("console logs:", consoleLogs);
+    console.log("scrollTopBefore:", scrollTopBefore, "scrollTopAfter:", scrollTopAfter);
+    expect(scrollTopAfter).toBeGreaterThan(scrollTopBefore);
   });
 
   test("13: page.type appends text to input", async ({ page }) => {

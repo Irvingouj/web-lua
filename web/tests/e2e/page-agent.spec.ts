@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   expectCellOutputContains,
   runCell,
@@ -632,14 +632,12 @@ print(tostring(result))
     await setCellCode(
       page,
       0,
-      `
-local text = page.snapshot()
-      `.trim(),
+      `return page.snapshot()`,
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "URL:");
-    const outputLine = page.locator('[data-testid="cell-output-line"]').filter({ hasText: "URL:" });
+    await expectCellOutputContains(page, 0, "Lua Notebook");
+    const outputLine = page.locator('[data-testid="cell-output-line"]').filter({ hasText: "Lua Notebook" });
     await expect(outputLine).toHaveClass(/output-auto/);
   });
 
@@ -675,5 +673,19 @@ print(err)
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
     await expectCellOutputContains(page, 0, "Did you mean: page.snapshot?");
+  });
+
+  test("38: page.go alias is a callable function", async ({ page }) => {
+    await setCellCode(
+      page,
+      0,
+      `
+print(type(page.go))
+print(type(page["goto"]))
+      `.trim(),
+    );
+    await runCell(page, 0);
+    await waitForCellStatus(page, 0, "success");
+    await expectCellOutputContains(page, 0, "function");
   });
 });

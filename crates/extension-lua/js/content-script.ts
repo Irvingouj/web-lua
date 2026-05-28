@@ -361,7 +361,7 @@ const handlers: Record<string, Handler> = {
       );
     }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      el.value = text;
+      el.value = el.value + text;
       const ev = new InputEvent("input", { bubbles: true });
       el.dispatchEvent(ev);
       return null;

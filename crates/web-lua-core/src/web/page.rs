@@ -876,11 +876,22 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             })
         });
         page_table.set_field(ctx, "goto", cb);
+        page_table.set_field(ctx, "go", cb);
         crate::lua_api_doc!(
         namespace: "page",
         name: "goto",
         action: "page_goto",
         doc: "Navigate to a URL.",
+        params: [
+        url: "string", required, "URL to navigate to",
+        ],
+        returns: "nil" => "None",
+        );
+        crate::lua_api_doc!(
+        namespace: "page",
+        name: "go",
+        action: "page_goto",
+        doc: "Navigate to a URL (alias for page.goto).",
         params: [
         url: "string", required, "URL to navigate to",
         ],
@@ -1231,6 +1242,15 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let selector = if !stack.is_empty() {
                 match stack.get(0) {
                     Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                    Value::Table(t) => match t.get(ctx, "selector") {
+                        Ok(Value::String(s)) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                        Ok(other) => format_value(ctx, other),
+                        Err(_) => {
+                            return Err("page.find: table must have a 'selector' field"
+                                .into_value(ctx)
+                                .into())
+                        }
+                    },
                     other => format_value(ctx, other),
                 }
             } else {

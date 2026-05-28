@@ -120,6 +120,31 @@
     "source": "rust_core"
   },
   {
+    "namespace": "web",
+    "name": "fetch_dom",
+    "action": "fetch_dom",
+    "description": "Fetch a URL and parse the HTML into a queryable DOM.",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to fetch"
+      },
+      {
+        "name": "selector",
+        "lua_type": "string | nil",
+        "required": false,
+        "description": "CSS selector to extract matching elements"
+      }
+    ],
+    "returns": {
+      "lua_type": "table",
+      "description": "{ status, ok, body, headers, matches }"
+    },
+    "source": "rust_core"
+  },
+  {
     "namespace": "web.storage",
     "name": "get",
     "action": "storage_get",
@@ -2513,6 +2538,25 @@
   },
   {
     "namespace": "page",
+    "name": "go",
+    "action": "page_goto",
+    "description": "Navigate to a URL (alias for page.goto).",
+    "params": [
+      {
+        "name": "url",
+        "lua_type": "string",
+        "required": true,
+        "description": "URL to navigate to"
+      }
+    ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
     "name": "back",
     "action": "page_back",
     "description": "Navigate back in history.",
@@ -2702,6 +2746,12 @@
         "lua_type": "table",
         "required": true,
         "description": "Array of field names: title, url, headings, links, etc."
+      },
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_text, max_headings, max_links"
       }
     ],
     "returns": {
@@ -3109,25 +3159,6 @@
       "description": "Array of global variable descriptors: name, type, keys, value"
     },
     "source": "rust_core"
-  },
-  {
-    "namespace": "page",
-    "name": "go",
-    "action": "",
-    "description": "Navigate to a URL (alias for page.goto).",
-    "params": [
-      {
-        "name": "url",
-        "lua_type": "string",
-        "required": true,
-        "description": "URL to navigate to"
-      }
-    ],
-    "returns": {
-      "lua_type": "nil",
-      "description": "None"
-    },
-    "source": "injected_lua"
   },
   {
     "namespace": "page",

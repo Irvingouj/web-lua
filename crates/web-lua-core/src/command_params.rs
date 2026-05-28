@@ -165,6 +165,8 @@ pub struct PageScrollParams {
     pub direction: String,
     #[serde(default = "default_scroll_amount")]
     pub amount: f64,
+    #[serde(default, rename = "refId")]
+    pub ref_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

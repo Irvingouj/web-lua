@@ -62,7 +62,6 @@ runtime = {
   clipboard = web.clipboard,
   notifications = web.notifications,
 }
-page.go = page["goto"]
 page.open = page.new_tab
 page.see = page.snapshot
 page.enter = function() return page.press("Enter") end

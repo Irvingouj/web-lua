@@ -249,16 +249,26 @@ impl From<WasmRunResult> for CellResult {
     fn from(r: WasmRunResult) -> Self {
         match r {
             WasmRunResult::Ok {
-                stdout,
+                mut stdout,
                 stderr,
                 result,
                 execution_count,
-            } => CellResult::Ok {
-                stdout,
-                stderr,
-                result,
-                execution_count,
-            },
+            } => {
+                // Auto-print the result when no explicit print() was used
+                if stdout.is_empty() {
+                    if let Some(ref line) = result {
+                        if !line.is_empty() {
+                            stdout.push(StdOutOrAuto::Auto { line: line.clone() });
+                        }
+                    }
+                }
+                CellResult::Ok {
+                    stdout,
+                    stderr,
+                    result,
+                    execution_count,
+                }
+            }
             WasmRunResult::Err {
                 stdout,
                 stderr,

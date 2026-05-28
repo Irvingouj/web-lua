@@ -774,6 +774,16 @@ Navigate to a URL.
 
 **Returns** `nil`: None
 
+### `page.go _(action: `page_goto`)_`
+
+Navigate to a URL (alias for page.goto).
+
+**Parameters**
+
+- `url` (`string`, required): URL to navigate to
+
+**Returns** `nil`: None
+
 ### `page.back _(action: `page_back`)_`
 
 Navigate back in history.
@@ -884,16 +894,6 @@ Append text to an input element by refId.
 
 - `ref_id` (`string`, required): Element refId from snapshot
 - `text` (`string`, required): Text to append
-
-**Returns** `nil`: None
-
-### `page.go`
-
-Navigate to a URL (alias for page.goto).
-
-**Parameters**
-
-- `url` (`string`, required): URL to navigate to
 
 **Returns** `nil`: None
 
@@ -1432,17 +1432,6 @@ Perform an HTTP fetch request.
 
 **Returns** `table`: { status, ok, body, headers }
 
-### `web.fetch_dom _(action: `fetch_dom`)_`
-
-Fetch a URL and parse the HTML into a queryable DOM.
-
-**Parameters**
-
-- `url` (`string`, required): URL to fetch
-- `selector` (`string | nil`, optional): CSS selector to extract matching elements
-
-**Returns** `table`: { status, ok, body, headers, matches }
-
 ### `web.log _(action: `web_log`)_`
 
 Log a message to the browser console.
@@ -1462,6 +1451,17 @@ Pause execution for a duration.
 - `ms` (`number`, optional): Milliseconds to sleep (default 1000)
 
 **Returns** `nil`: None
+
+### `web.fetch_dom _(action: `fetch_dom`)_`
+
+Fetch a URL and parse the HTML into a queryable DOM.
+
+**Parameters**
+
+- `url` (`string`, required): URL to fetch
+- `selector` (`string | nil`, optional): CSS selector to extract matching elements
+
+**Returns** `table`: { status, ok, body, headers, matches }
 
 ## `web.bookmarks` module
 
