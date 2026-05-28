@@ -36,7 +36,9 @@ if (window.__luaNotebookContentScriptInjected) {
 window.__luaNotebookContentScriptInjected = true;
 
 function getElementByRefId(refId: string | number): Element {
-  const el = document.querySelector(`[data-ref-id='${CSS.escape(String(refId))}']`);
+  const el = document.querySelector(
+    `[data-ref-id='${CSS.escape(String(refId))}']`,
+  );
   if (!el) {
     throw new Error(
       `Element with refId=${refId} not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.`,

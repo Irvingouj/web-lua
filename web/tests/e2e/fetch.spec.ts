@@ -141,7 +141,9 @@ end`,
     await expectCellOutputContains(page, 0, "Matches:");
   });
 
-  test("2: web.fetch_dom with no selector returns empty matches", async ({ page }) => {
+  test("2: web.fetch_dom with no selector returns empty matches", async ({
+    page,
+  }) => {
     await setCellCode(
       page,
       0,

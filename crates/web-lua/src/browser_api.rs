@@ -612,13 +612,31 @@ pub async fn execute_page_scroll(params: PageScrollParams) -> WasmAsyncResponse 
                             .ok()
                             .and_then(|v| v.as_string())
                     });
-                    let is_scrollable = overflow.as_ref().map(|v| v.contains("auto") || v.contains("scroll") || v.contains("overlay")).unwrap_or(false)
-                        || overflow_y.as_ref().map(|v| v.contains("auto") || v.contains("scroll") || v.contains("overlay")).unwrap_or(false);
+                    let is_scrollable = overflow
+                        .as_ref()
+                        .map(|v| {
+                            v.contains("auto") || v.contains("scroll") || v.contains("overlay")
+                        })
+                        .unwrap_or(false)
+                        || overflow_y
+                            .as_ref()
+                            .map(|v| {
+                                v.contains("auto") || v.contains("scroll") || v.contains("overlay")
+                            })
+                            .unwrap_or(false);
                     if is_scrollable {
                         let current_top = el.scroll_top() as f64;
                         let current_left = el.scroll_left() as f64;
-                        let _ = js_sys::Reflect::set(&el, &"scrollTop".into(), &JsValue::from_f64(current_top + dy));
-                        let _ = js_sys::Reflect::set(&el, &"scrollLeft".into(), &JsValue::from_f64(current_left + dx));
+                        let _ = js_sys::Reflect::set(
+                            &el,
+                            &"scrollTop".into(),
+                            &JsValue::from_f64(current_top + dy),
+                        );
+                        let _ = js_sys::Reflect::set(
+                            &el,
+                            &"scrollLeft".into(),
+                            &JsValue::from_f64(current_left + dx),
+                        );
                         return WasmAsyncResponse {
                             ok: true,
                             value: Some(serde_json::Value::Bool(true)),

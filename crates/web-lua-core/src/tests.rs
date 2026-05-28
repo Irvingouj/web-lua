@@ -2640,7 +2640,10 @@ mod tests {
         let cmd = result.pending_command.unwrap();
         assert_eq!(cmd.action.as_str(), "fetch_dom");
         let params = cmd.params.as_object().unwrap();
-        assert_eq!(params.get("url").unwrap().as_str().unwrap(), "https://example.com");
+        assert_eq!(
+            params.get("url").unwrap().as_str().unwrap(),
+            "https://example.com"
+        );
         assert_eq!(params.get("selector").unwrap().as_str().unwrap(), "p");
         assert_eq!(params.get("max_text").unwrap().as_u64().unwrap(), 500);
     }

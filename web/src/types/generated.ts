@@ -3,105 +3,151 @@
 /**
  * An async command yielded from Lua, waiting for external resolution.
  */
-export type AsyncCommand = { call_id: number, action: string, params: unknown, };
+export type AsyncCommand = { call_id: number; action: string; params: unknown };
 
 /**
  * Structured error from running a cell.
  */
-export type CellError = { "kind": "compile", message: string, line: number | null, } | { "kind": "runtime", message: string, line: number | null, } | { "kind": "strict_mode", variable: string, } | { "kind": "fuel_exhausted" } | { "kind": "internal", message: string, };
+export type CellError =
+  | { kind: "compile"; message: string; line: number | null }
+  | { kind: "runtime"; message: string; line: number | null }
+  | { kind: "strict_mode"; variable: string }
+  | { kind: "fuel_exhausted" }
+  | { kind: "internal"; message: string };
 
 /**
  * Status of a cell execution.
  */
 export type CellStatus = "done" | "async_pending";
 
-export type DomSnapshotParams = { interactive_only: boolean, max_nodes: bigint, };
+export type DomSnapshotParams = {
+  interactive_only: boolean;
+  max_nodes: bigint;
+};
 
-export type FetchDomParams = { url: string, selector: string, max_text: bigint, };
+export type FetchDomParams = {
+  url: string;
+  selector: string;
+  max_text: bigint;
+};
 
-export type FetchParams = { url: string, method: string, headers: { [key in string]: string }, body: string | null, timeout: bigint, };
+export type FetchParams = {
+  url: string;
+  method: string;
+  headers: { [key in string]: string };
+  body: string | null;
+  timeout: bigint;
+};
 
-export type FsCopyParams = { from: string, to: string, };
+export type FsCopyParams = { from: string; to: string };
 
-export type FsHashParams = { path: string, algo: string, };
+export type FsHashParams = { path: string; algo: string };
 
-export type FsPathParams = { path: string, };
+export type FsPathParams = { path: string };
 
-export type FsReadRangeParams = { path: string, offset: bigint, len: number, };
+export type FsReadRangeParams = { path: string; offset: bigint; len: number };
 
-export type FsUpdateParams = { path: string, offset: bigint, data: string, };
+export type FsUpdateParams = { path: string; offset: bigint; data: string };
 
-export type FsWriteParams = { path: string, data: string, };
+export type FsWriteParams = { path: string; data: string };
 
-export type PageAppendParams = { refId: string, label: string, text: string, };
+export type PageAppendParams = { refId: string; label: string; text: string };
 
-export type PageCheckParams = { refId: string, checked: boolean, };
+export type PageCheckParams = { refId: string; checked: boolean };
 
-export type PageClickParams = { refId: string, label: string, };
+export type PageClickParams = { refId: string; label: string };
 
-export type PageDblClickParams = { refId: string, label: string, };
+export type PageDblClickParams = { refId: string; label: string };
 
-export type PageExtractParams = { fields: Array<string>, max_text: bigint, max_headings: bigint, max_links: bigint, };
+export type PageExtractParams = {
+  fields: Array<string>;
+  max_text: bigint;
+  max_headings: bigint;
+  max_links: bigint;
+};
 
-export type PageFillParams = { refId: string, label: string, value: string, };
+export type PageFillParams = { refId: string; label: string; value: string };
 
-export type PageFindParams = { selector: string, };
+export type PageFindParams = { selector: string };
 
-export type PageGotoParams = { url: string, };
+export type PageGotoParams = { url: string };
 
-export type PageHoverParams = { refId: string, };
+export type PageHoverParams = { refId: string };
 
-export type PagePressParams = { key: string, };
+export type PagePressParams = { key: string };
 
-export type PageScrollParams = { direction: string, amount: number, refId: string | null, };
+export type PageScrollParams = {
+  direction: string;
+  amount: number;
+  refId: string | null;
+};
 
-export type PageScrollToParams = { refId: string, };
+export type PageScrollToParams = { refId: string };
 
-export type PageSelectParams = { refId: string, value: string, };
+export type PageSelectParams = { refId: string; value: string };
 
-export type PageTypeParams = { refId: string, label: string, text: string, };
+export type PageTypeParams = { refId: string; label: string; text: string };
 
-export type PageWaitForParams = { selector: string, timeout: bigint, };
+export type PageWaitForParams = { selector: string; timeout: bigint };
 
-export type PageWaitParams = { duration: bigint, };
+export type PageWaitParams = { duration: bigint };
 
 /**
  * Result of running a single cell.
  */
-export type RunResult = { stdout: Array<string>, stderr: Array<string>, result: string | null, error: CellError | null, commands: unknown[], fuel_exhausted: boolean, execution_count: number, status: CellStatus, pending_command: AsyncCommand | null, };
+export type RunResult = {
+  stdout: Array<string>;
+  stderr: Array<string>;
+  result: string | null;
+  error: CellError | null;
+  commands: unknown[];
+  fuel_exhausted: boolean;
+  execution_count: number;
+  status: CellStatus;
+  pending_command: AsyncCommand | null;
+};
 
-export type SleepParams = { duration: bigint, };
+export type SleepParams = { duration: bigint };
 
-export type StorageDeleteParams = { key: string, };
+export type StorageDeleteParams = { key: string };
 
-export type StorageGetParams = { key: string, };
+export type StorageGetParams = { key: string };
 
-export type StorageSetParams = { key: string, value: string, };
+export type StorageSetParams = { key: string; value: string };
 
-export type TabBackParams = { tabId: bigint, };
+export type TabBackParams = { tabId: bigint };
 
-export type TabCheckParams = { tabId: bigint, refId: string, checked: boolean, };
+export type TabCheckParams = { tabId: bigint; refId: string; checked: boolean };
 
-export type TabClickParams = { tabId: bigint, refId: string, };
+export type TabClickParams = { tabId: bigint; refId: string };
 
-export type TabDblClickParams = { tabId: bigint, refId: string, };
+export type TabDblClickParams = { tabId: bigint; refId: string };
 
-export type TabEvaluateParams = { tabId: bigint, script: string, };
+export type TabEvaluateParams = { tabId: bigint; script: string };
 
-export type TabFillParams = { tabId: bigint, refId: string, value: string, };
+export type TabFillParams = { tabId: bigint; refId: string; value: string };
 
-export type TabHoverParams = { tabId: bigint, refId: string, };
+export type TabHoverParams = { tabId: bigint; refId: string };
 
-export type TabPressParams = { tabId: bigint, key: string, };
+export type TabPressParams = { tabId: bigint; key: string };
 
-export type TabScrollParams = { tabId: bigint, direction: string, amount: number, };
+export type TabScrollParams = {
+  tabId: bigint;
+  direction: string;
+  amount: number;
+};
 
-export type TabScrollToParams = { tabId: bigint, x: number, y: number, refId: string | null, };
+export type TabScrollToParams = {
+  tabId: bigint;
+  x: number;
+  y: number;
+  refId: string | null;
+};
 
-export type TabSelectParams = { tabId: bigint, refId: string, value: string, };
+export type TabSelectParams = { tabId: bigint; refId: string; value: string };
 
-export type TabTypeParams = { tabId: bigint, refId: string, text: string, };
+export type TabTypeParams = { tabId: bigint; refId: string; text: string };
 
-export type TabUnhoverParams = { tabId: bigint, };
+export type TabUnhoverParams = { tabId: bigint };
 
-export type TabWaitForLoadParams = { tabId: bigint, timeout: bigint, };
+export type TabWaitForLoadParams = { tabId: bigint; timeout: bigint };

@@ -304,12 +304,15 @@ end
     await expectCellOutputContains(page, 0, "appended");
   });
 
-  test("12: page.scroll with ref_id scrolls overflow container", async ({ page }) => {
+  test("12: page.scroll with ref_id scrolls overflow container", async ({
+    page,
+  }) => {
     await page.evaluate(() => {
       const fixture = document.getElementById("e2e-test-fixture");
       const container = document.createElement("div");
       container.id = "e2e-scrollable";
-      container.style.cssText = "overflow-y: auto; height: 100px; width: 100px;";
+      container.style.cssText =
+        "overflow-y: auto; height: 100px; width: 100px;";
       const inner = document.createElement("div");
       inner.style.cssText = "height: 500px; width: 100px; background: #ccc;";
       container.appendChild(inner);
@@ -320,7 +323,7 @@ end
       return el?.scrollTop ?? 0;
     });
     const consoleLogs: string[] = [];
-    page.on("console", msg => consoleLogs.push(msg.text()));
+    page.on("console", (msg) => consoleLogs.push(msg.text()));
     await setCellCode(
       page,
       0,
@@ -349,7 +352,12 @@ end
       return el?.scrollTop ?? 0;
     });
     console.log("console logs:", consoleLogs);
-    console.log("scrollTopBefore:", scrollTopBefore, "scrollTopAfter:", scrollTopAfter);
+    console.log(
+      "scrollTopBefore:",
+      scrollTopBefore,
+      "scrollTopAfter:",
+      scrollTopAfter,
+    );
     expect(scrollTopAfter).toBeGreaterThan(scrollTopBefore);
   });
 
@@ -393,6 +401,10 @@ print(err)
     );
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
-    await expectCellOutputContains(page, 0, "Handles are scoped to a single snapshot");
+    await expectCellOutputContains(
+      page,
+      0,
+      "Handles are scoped to a single snapshot",
+    );
   });
 });

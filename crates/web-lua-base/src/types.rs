@@ -190,7 +190,11 @@ impl From<web_lua_core::AsyncCommand> for WasmAsyncCommand {
 
 impl From<web_lua_core::RunResult> for CellResult {
     fn from(r: web_lua_core::RunResult) -> Self {
-        let stdout = r.stdout.into_iter().map(|s| StdOutOrAuto::Stdout { line: s }).collect();
+        let stdout = r
+            .stdout
+            .into_iter()
+            .map(|s| StdOutOrAuto::Stdout { line: s })
+            .collect();
         if let Some(error) = r.error {
             CellResult::Err {
                 stdout,
@@ -211,7 +215,11 @@ impl From<web_lua_core::RunResult> for CellResult {
 
 impl From<web_lua_core::RunResult> for WasmRunResult {
     fn from(r: web_lua_core::RunResult) -> Self {
-        let stdout = r.stdout.into_iter().map(|s| StdOutOrAuto::Stdout { line: s }).collect();
+        let stdout = r
+            .stdout
+            .into_iter()
+            .map(|s| StdOutOrAuto::Stdout { line: s })
+            .collect();
         match r.status {
             web_lua_core::CellStatus::AsyncPending => WasmRunResult::Pending {
                 stdout,

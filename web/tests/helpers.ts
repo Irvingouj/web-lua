@@ -50,8 +50,12 @@ export function getCellRunButton(page: Page, index: number): Locator {
 export async function setCellCode(page: Page, index: number, code: string) {
   await page.evaluate(
     ({ idx, source }) => {
-      const notebookRef = (window as any).__notebookRef;
-      if (notebookRef && notebookRef.current) {
+      const notebookRef = (
+        window as {
+          __notebookRef?: { current?: { cells: { source: string }[] } };
+        }
+      ).__notebookRef;
+      if (notebookRef?.current) {
         const cell = notebookRef.current.cells[idx];
         if (cell) {
           cell.source = source;

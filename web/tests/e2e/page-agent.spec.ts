@@ -628,20 +628,22 @@ print(tostring(result))
     await expectCellOutputContains(page, 0, "true");
   });
 
-  test("35: page.snapshot auto-prints without explicit print", async ({ page }) => {
-    await setCellCode(
-      page,
-      0,
-      `return page.snapshot()`,
-    );
+  test("35: page.snapshot auto-prints without explicit print", async ({
+    page,
+  }) => {
+    await setCellCode(page, 0, `return page.snapshot()`);
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success");
     await expectCellOutputContains(page, 0, "Lua Notebook");
-    const outputLine = page.locator('[data-testid="cell-output-line"]').filter({ hasText: "Lua Notebook" });
+    const outputLine = page
+      .locator('[data-testid="cell-output-line"]')
+      .filter({ hasText: "Lua Notebook" });
     await expect(outputLine).toHaveClass(/output-auto/);
   });
 
-  test("36: page.find returns full text without truncation", async ({ page }) => {
+  test("36: page.find returns full text without truncation", async ({
+    page,
+  }) => {
     await page.evaluate(() => {
       const el = document.createElement("div");
       el.id = "e2e-long-text";

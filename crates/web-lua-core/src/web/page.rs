@@ -672,13 +672,18 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                     Value::Nil => None,
                     other => {
                         let v = format_value(ctx, other);
-                        if v.is_empty() { None } else { Some(v) }
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v)
+                        }
                     }
                 }
             } else {
                 None
             };
-            let params = serde_json::json!({ "direction": direction, "amount": amount, "refId": ref_id });
+            let params =
+                serde_json::json!({ "direction": direction, "amount": amount, "refId": ref_id });
             let _validated: crate::command_params::PageScrollParams =
                 match serde_json::from_value(params.clone()) {
                     Ok(v) => v,

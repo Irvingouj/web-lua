@@ -132,9 +132,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
             } else {
                 1
             };
-            curr[i] = (prev[i - 1] + cost)
-                .min(prev[i] + 1)
-                .min(curr[i - 1] + 1);
+            curr[i] = (prev[i - 1] + cost).min(prev[i] + 1).min(curr[i - 1] + 1);
         }
         std::mem::swap(&mut prev, &mut curr);
     }

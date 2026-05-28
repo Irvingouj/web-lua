@@ -1,14 +1,13 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import {
   expectCellOutputContains,
   runCell,
-  setCellCode,
   waitForCellStatus,
   waitForKernelReady,
 } from "../helpers";
-import * as fs from "fs";
-import * as path from "path";
-import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,8 +35,12 @@ test.describe("test_all_apis.lua smoke test", () => {
 
     // Set the cell source directly via the exposed notebookRef
     await page.evaluate((code) => {
-      const notebookRef = (window as any).__notebookRef;
-      if (notebookRef && notebookRef.current) {
+      const notebookRef = (
+        window as {
+          __notebookRef?: { current?: { cells: { source: string }[] } };
+        }
+      ).__notebookRef;
+      if (notebookRef?.current) {
         const cell = notebookRef.current.cells[0];
         if (cell) {
           cell.source = code;
@@ -47,7 +50,11 @@ test.describe("test_all_apis.lua smoke test", () => {
 
     // Debug: verify source was set before running
     const debugBefore = await page.evaluate(() => {
-      const notebookRef = (window as any).__notebookRef;
+      const notebookRef = (
+        window as {
+          __notebookRef?: { current?: { cells: { source: string }[] } };
+        }
+      ).__notebookRef;
       return {
         source: notebookRef?.current?.cells?.[0]?.source?.substring(0, 100),
       };
@@ -57,8 +64,13 @@ test.describe("test_all_apis.lua smoke test", () => {
     await runCell(page, 0);
     await waitForCellStatus(page, 0, "success", 30_000);
 
-    const output = await page.locator('[data-testid="cell-output"]').first().textContent();
-    const errorTexts = await page.locator('[data-testid="cell-error"]').allTextContents();
+    const output = await page
+      .locator('[data-testid="cell-output"]')
+      .first()
+      .textContent();
+    const errorTexts = await page
+      .locator('[data-testid="cell-error"]')
+      .allTextContents();
     console.log("Output length:", output?.length || 0);
     console.log("Output:", output?.substring(0, 1000));
     console.log("Errors:", errorTexts);

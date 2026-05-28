@@ -1,5 +1,5 @@
 use crate::browser_api::{
-    execute_dom_format, execute_dom_snapshot, execute_fetch, execute_fs_append,
+    execute_dom_format, execute_dom_snapshot, execute_fetch, execute_fetch_dom, execute_fs_append,
     execute_fs_append_base64, execute_fs_append_text, execute_fs_copy, execute_fs_delete,
     execute_fs_exists, execute_fs_hash, execute_fs_list, execute_fs_mkdir, execute_fs_move,
     execute_fs_read, execute_fs_read_base64, execute_fs_read_range, execute_fs_read_text,
@@ -8,7 +8,6 @@ use crate::browser_api::{
     execute_page_hover, execute_page_press, execute_page_scroll, execute_page_scroll_to,
     execute_page_select, execute_page_type, execute_page_unhover, execute_page_wait, execute_sleep,
     execute_storage_delete, execute_storage_get, execute_storage_list, execute_storage_set,
-    execute_fetch_dom,
 };
 use std::cell::Cell;
 use wasm_bindgen::prelude::*;
@@ -658,7 +657,11 @@ impl WebSession {
                             for i in 0..headings.length() {
                                 if let Some(el) = headings.item(i) {
                                     if let Some(el) = el.dyn_ref::<web_sys::Element>() {
-                                        let text = el.text_content().unwrap_or_default().trim().to_string();
+                                        let text = el
+                                            .text_content()
+                                            .unwrap_or_default()
+                                            .trim()
+                                            .to_string();
                                         let text = if text.len() > max_headings {
                                             text.chars().take(max_headings).collect::<String>()
                                         } else {
@@ -682,7 +685,11 @@ impl WebSession {
                             for i in 0..links.length() {
                                 if let Some(el) = links.item(i) {
                                     if let Some(el) = el.dyn_ref::<web_sys::Element>() {
-                                        let text = el.text_content().unwrap_or_default().trim().to_string();
+                                        let text = el
+                                            .text_content()
+                                            .unwrap_or_default()
+                                            .trim()
+                                            .to_string();
                                         let text = if text.len() > max_links {
                                             text.chars().take(max_links).collect::<String>()
                                         } else {

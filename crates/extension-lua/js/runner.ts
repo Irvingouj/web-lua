@@ -662,12 +662,10 @@ export async function executeMainThreadCommand(
           maxLinksArg: unknown,
         ) => {
           const fieldList = Array.isArray(fieldsArg) ? fieldsArg : [];
-          const maxText =
-            typeof maxTextArg === "number" ? maxTextArg : 500;
+          const maxText = typeof maxTextArg === "number" ? maxTextArg : 500;
           const maxHeadings =
             typeof maxHeadingsArg === "number" ? maxHeadingsArg : 200;
-          const maxLinks =
-            typeof maxLinksArg === "number" ? maxLinksArg : 100;
+          const maxLinks = typeof maxLinksArg === "number" ? maxLinksArg : 100;
           const result: Record<string, unknown> = {};
           for (const field of fieldList) {
             switch (field) {
@@ -1347,7 +1345,7 @@ export async function executeMainThreadCommand(
           world: "MAIN",
         });
         if (results?.[0]) {
-          const first = results[0] as typeof results[0] & { error?: unknown };
+          const first = results[0] as (typeof results)[0] & { error?: unknown };
           if (first.error) {
             return {
               ok: false,
@@ -2071,7 +2069,10 @@ export async function executeMainThreadCommand(
 
 // ─── Fetch helpers ───────────────────────────────────────────────
 
-function formatFetchError(err: unknown, timeoutMs: number): AsyncResponse<never> {
+function formatFetchError(
+  err: unknown,
+  timeoutMs: number,
+): AsyncResponse<never> {
   if (err instanceof Error && err.name === "AbortError") {
     return {
       ok: false,
@@ -2097,7 +2098,11 @@ async function performFetch(
   url: string,
   init: RequestInit,
   timeoutMs: number,
-): Promise<{ response: Response; body: string; headers: Record<string, string> }> {
+): Promise<{
+  response: Response;
+  body: string;
+  headers: Record<string, string>;
+}> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const response = await fetch(url, { ...init, signal: controller.signal });
@@ -2119,7 +2124,11 @@ async function handleFetch(
   const { url, method, headers, body, timeout } = params;
   const timeoutMs = Number(timeout) || 30_000;
   try {
-    const { response, body: responseBody, headers: responseHeaders } = await performFetch(
+    const {
+      response,
+      body: responseBody,
+      headers: responseHeaders,
+    } = await performFetch(
       url,
       {
         method: method || "GET",
@@ -2157,11 +2166,11 @@ async function handleFetchDom(
   const { url, selector, max_text } = params;
   const maxTextNum = Number(max_text ?? 500);
   try {
-    const { response, body: responseBody, headers: responseHeaders } = await performFetch(
-      url,
-      {},
-      30_000,
-    );
+    const {
+      response,
+      body: responseBody,
+      headers: responseHeaders,
+    } = await performFetch(url, {}, 30_000);
     const parser = new DOMParser();
     const doc = parser.parseFromString(responseBody, "text/html");
     const matches: Array<{ tag: string; text: string }> = [];
@@ -2225,7 +2234,7 @@ async function executeInTab(
       world: "MAIN",
     });
     if (results?.[0]) {
-      const first = results[0] as typeof results[0] & { error?: unknown };
+      const first = results[0] as (typeof results)[0] & { error?: unknown };
       if (first.error) {
         return {
           ok: false,
