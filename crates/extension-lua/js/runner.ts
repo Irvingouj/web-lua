@@ -1320,17 +1320,18 @@ export async function executeMainThreadCommand(
           world: "MAIN",
         });
         if (results?.[0]) {
-          if (results[0].error) {
+          const first = results[0] as typeof results[0] & { error?: unknown };
+          if (first.error) {
             return {
               ok: false,
               error: {
-                message: String(results[0].error),
+                message: String(first.error),
                 code: "E_SCRIPT_EXECUTION",
                 category: "script",
               },
             };
           }
-          return { ok: true, value: results[0].result };
+          return { ok: true, value: first.result };
         }
         return { ok: true, value: null };
       } catch (err: unknown) {
@@ -2143,17 +2144,18 @@ async function executeInTab(
       world: "MAIN",
     });
     if (results?.[0]) {
-      if (results[0].error) {
+      const first = results[0] as typeof results[0] & { error?: unknown };
+      if (first.error) {
         return {
           ok: false,
           error: {
-            message: String(results[0].error),
+            message: String(first.error),
             code: "E_SCRIPT_EXECUTION",
             category: "script",
           },
         };
       }
-      return { ok: true, value: results[0].result };
+      return { ok: true, value: first.result };
     }
     return { ok: true, value: null };
   } catch (err: unknown) {
