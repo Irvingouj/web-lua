@@ -1091,18 +1091,15 @@ export async function executeMainThreadCommand(
           ];
           const text = header.concat(lines).join("\n");
           return {
-            data: {
-              nodes,
-              elements: nodes,
-              url: window.location.href,
-              title: document.title,
-              viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-              },
-              version: "1.0",
-            },
             text,
+            nodes,
+            url: window.location.href,
+            title: document.title,
+            viewport: {
+              width: window.innerWidth,
+              height: window.innerHeight,
+            },
+            version: "1.0",
           };
         },
         [maxNodes],

@@ -646,6 +646,16 @@ Alias for page.snapshot — returns readable text.
 
 **Returns** `string`: Readable accessibility tree with refIds
 
+### `page.see _(action: `page_snapshot_text`)_`
+
+Alias for page.snapshot — returns readable text.
+
+**Parameters**
+
+- `opts` (`table | nil`, optional): Options: max_nodes, interactive_only, etc.
+
+**Returns** `string`: Readable accessibility tree with refIds
+
 ### `page.click _(action: `page_click`)_`
 
 Click an element by refId in the current page.
@@ -695,6 +705,12 @@ Press a keyboard key.
 **Parameters**
 
 - `key` (`string`, required): Key name: Enter, Escape, ArrowDown, etc.
+
+**Returns** `nil`: None
+
+### `page.enter _(action: `page_press`)_`
+
+Alias for page.press("Enter") — press the Enter key.
 
 **Returns** `nil`: None
 
@@ -823,6 +839,16 @@ Wait for a duration.
 - `ms` (`number`, optional): Milliseconds to wait (default 1000)
 
 **Returns** `nil`: None
+
+### `page.wait_for_load _(action: `tab_wait_for_load`)_`
+
+Wait for the current tab to finish loading.
+
+**Parameters**
+
+- `timeout` (`number`, optional): Timeout in milliseconds
+
+**Returns** `boolean`: true if loaded within timeout
 
 ### `page.tabs _(action: `page_tabs`)_`
 

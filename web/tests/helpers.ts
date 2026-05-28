@@ -143,7 +143,9 @@ export async function expectCellOutputContains(
     ({ idx, expected }) => {
       const cells = document.querySelectorAll('[data-testid="cell-output"]');
       const cell = cells[idx] as HTMLElement;
-      return cell?.textContent?.includes(expected);
+      if (!cell) return false;
+      const tc = cell.textContent || "";
+      return tc.includes(expected);
     },
     { idx: index, expected: text },
     { timeout: 10_000 },

@@ -2245,6 +2245,25 @@
   },
   {
     "namespace": "page",
+    "name": "see",
+    "action": "page_snapshot_text",
+    "description": "Alias for page.snapshot — returns readable text.",
+    "params": [
+      {
+        "name": "opts",
+        "lua_type": "table | nil",
+        "required": false,
+        "description": "Options: max_nodes, interactive_only, etc."
+      }
+    ],
+    "returns": {
+      "lua_type": "string",
+      "description": "Readable accessibility tree with refIds"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
     "name": "click",
     "action": "page_click",
     "description": "Click an element by refId in the current page.",
@@ -2344,6 +2363,18 @@
         "description": "Key name: Enter, Escape, ArrowDown, etc."
       }
     ],
+    "returns": {
+      "lua_type": "nil",
+      "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "enter",
+    "action": "page_press",
+    "description": "Alias for page.press(\"Enter\") — press the Enter key.",
+    "params": [],
     "returns": {
       "lua_type": "nil",
       "description": "None"
@@ -2607,6 +2638,25 @@
     "returns": {
       "lua_type": "nil",
       "description": "None"
+    },
+    "source": "rust_core"
+  },
+  {
+    "namespace": "page",
+    "name": "wait_for_load",
+    "action": "tab_wait_for_load",
+    "description": "Wait for the current tab to finish loading.",
+    "params": [
+      {
+        "name": "timeout",
+        "lua_type": "number",
+        "required": false,
+        "description": "Timeout in milliseconds"
+      }
+    ],
+    "returns": {
+      "lua_type": "boolean",
+      "description": "true if loaded within timeout"
     },
     "source": "rust_core"
   },
