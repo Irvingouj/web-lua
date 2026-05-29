@@ -12,7 +12,6 @@ import {
   registerHostHandler,
   registerHostHandlers,
   removeExtensionListeners,
-  setRunnerAbortController,
 } from "./runner.js";
 
 export type {
@@ -74,7 +73,6 @@ export class ExtensionSession {
   >();
   private disposed = false;
   private onCleanupComplete: (() => void) | null = null;
-  private abortController: AbortController | null = null;
 
   private constructor() {}
 
@@ -232,9 +230,17 @@ export class ExtensionSession {
     });
   }
 
-  async runCellAsync(code: string, stdin?: string): Promise<CellResult> {
+  async runCellAsync(code: string, stdin?: string, timeoutMs?: number): Promise<CellResult> {
     const id = this.generateId();
+    if (timeoutMs !== undefined && timeoutMs > 0) {
+      this.worker?.postMessage({ type: "setRelayTimeoutMs", ms: timeoutMs });
+    }
     return this.postAndWait({ type: "runCell", id, code, stdin: stdin || "" });
+  }
+
+  cancel(): void {
+    if (!this.worker || this.disposed) return;
+    this.worker.postMessage({ type: "stop" });
   }
 
   reset(): Promise<void> {
@@ -258,44 +264,52 @@ export class ExtensionSession {
   }
 
   /**
+   * Set the relay timeout for async commands.
+   */
+  setRelayTimeoutMs(ms: number): void {
+    if (!this.worker || this.disposed) return;
+    this.worker.postMessage({ type: "setRelayTimeoutMs", ms });
+  }
+
+  /**
    * Clean up the session, terminate the Worker, and release resources.
    * Accepts the runner Promise returned by init() so it can be awaited
    * for graceful shutdown.
    *
-   * Sends a reset message to the Worker, then waits only 50 ms before
-   * forcefully calling worker.terminate(). If WASM cleanup takes longer,
-   * the Worker is killed mid-operation. Pending async calls are rejected
-   * with "ExtensionSession stopped".
+   * Sends a stop message to the Worker so it cancels the session, then waits
+   * for pending calls to finish before terminating. Only falls back to
+   * forceful terminate() after a timeout.
    */
   async stopWith(runner: Promise<void>): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
 
-    // Signal abort to interrupt in-flight runner operations
-    this.abortController = new AbortController();
-    setRunnerAbortController(this.abortController);
-    this.abortController.abort();
-
-    // Send reset to the WASM session inside the Worker before terminating
+    // Send stop to the Worker so it cancels the session
     if (this.worker) {
-      this.worker.postMessage({ type: "reset" });
+      this.worker.postMessage({ type: "stop" });
     }
 
     // Remove Chrome listeners registered in runner.ts
     removeExtensionListeners();
 
-    // Terminate worker after a brief grace period for reset to process
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
+    // Wait for pending calls to finish (or timeout)
+    const pendingTimeout = 5000;
+    const start = Date.now();
+    while (this.pendingCalls.size > 0 && Date.now() - start < pendingTimeout) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    // Resolve any pending calls with errors
+    // Reject any remaining pending calls
     for (const [, pending] of this.pendingCalls) {
       pending.reject(new Error("ExtensionSession stopped"));
     }
     this.pendingCalls.clear();
+
+    // Terminate worker
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
 
     // Signal that cleanup is complete so the runner naturally resolves
     if (this.onCleanupComplete) {

@@ -7,7 +7,7 @@ use crate::types::{
 };
 use crate::utils::{classify_extern_error, clean_error_message, extract_line_number, format_value};
 use piccolo::{Closure, Executor, ExecutorMode, Fuel, IntoValue, Lua, StashedExecutor, Value};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 // ─── Session Builder ────────────────────────────────────────────
@@ -66,6 +66,7 @@ impl SessionBuilder {
         let fuel_limit = self.fuel_limit;
         let mut lua = Lua::core();
         let host_state = Rc::new(RefCell::new(HostState::default()));
+        let cancelled = Rc::new(Cell::new(false));
 
         lua.enter(|ctx| {
             register_host_globals(ctx, host_state.clone());
@@ -83,6 +84,7 @@ impl SessionBuilder {
             execution_count: 0,
             fuel_limit,
             host_state,
+            cancelled,
         };
 
         // Load Lua libraries (needs run_cell, so after session creation)
@@ -110,6 +112,7 @@ pub struct NotebookSession {
     execution_count: u32,
     fuel_limit: i32,
     host_state: Rc<RefCell<HostState>>,
+    cancelled: Rc<Cell<bool>>,
 }
 
 impl Default for NotebookSession {
@@ -137,6 +140,15 @@ impl NotebookSession {
     /// Set the fuel limit for execution.
     pub fn set_fuel_limit(&mut self, limit: i32) {
         self.fuel_limit = limit;
+    }
+
+    /// Cancel the current execution.
+    pub fn cancel(&mut self) {
+        self.cancelled.set(true);
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.get()
     }
 
     /// Inspect all global variables in the current Lua state.
@@ -253,6 +265,7 @@ impl NotebookSession {
         self.lua = Lua::core();
         self.executor = None;
         self.execution_count = 0;
+        self.cancelled.set(false);
         self.host_state = Rc::new(RefCell::new(HostState::default()));
 
         self.lua.enter(|ctx| {
@@ -348,6 +361,18 @@ impl NotebookSession {
                     );
                 }
             };
+
+            if self.is_cancelled() {
+                let hs = self.host_state.borrow();
+                return RunResult::with_partial_output(
+                    hs.stdout.clone(),
+                    hs.stderr.clone(),
+                    hs.commands.clone(),
+                    CellError::Cancelled,
+                    false,
+                    exec_count,
+                );
+            }
 
             if done {
                 // Check if this is a yield or real completion
@@ -544,6 +569,18 @@ impl NotebookSession {
                     );
                 }
             };
+
+            if self.is_cancelled() {
+                let hs = self.host_state.borrow();
+                return RunResult::with_partial_output(
+                    hs.stdout.clone(),
+                    hs.stderr.clone(),
+                    hs.commands.clone(),
+                    CellError::Cancelled,
+                    false,
+                    exec_count,
+                );
+            }
 
             if done {
                 // Check for pending async command (yield)

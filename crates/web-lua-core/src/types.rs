@@ -19,6 +19,8 @@ pub enum CellError {
     FuelExhausted,
     /// Internal error (Rust/WASM panic, unexpected state).
     Internal { message: String },
+    /// Execution was cancelled (e.g. timeout or explicit stop).
+    Cancelled,
 }
 
 impl fmt::Display for CellError {
@@ -43,6 +45,7 @@ impl fmt::Display for CellError {
             }
             CellError::FuelExhausted => write!(f, "Execution stopped: fuel limit reached"),
             CellError::Internal { message } => write!(f, "Internal error: {}", message),
+            CellError::Cancelled => write!(f, "Execution cancelled"),
         }
     }
 }

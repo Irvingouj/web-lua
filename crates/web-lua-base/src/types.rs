@@ -42,6 +42,7 @@ pub enum WasmCellError {
     StrictMode { variable: String },
     FuelExhausted,
     Internal { message: String },
+    Cancelled,
 }
 
 /// A single global variable observed by `inspect_globals`.
@@ -154,6 +155,7 @@ impl From<web_lua_core::CellError> for WasmCellError {
             }
             web_lua_core::CellError::FuelExhausted => WasmCellError::FuelExhausted,
             web_lua_core::CellError::Internal { message } => WasmCellError::Internal { message },
+            web_lua_core::CellError::Cancelled => WasmCellError::Cancelled,
         }
     }
 }

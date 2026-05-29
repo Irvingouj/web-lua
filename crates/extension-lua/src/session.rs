@@ -22,6 +22,7 @@ extern "C" {
 #[wasm_bindgen]
 pub struct ExtensionSession {
     base: BaseSession,
+    relay_timeout_ms: u32,
 }
 
 impl Default for ExtensionSession {
@@ -39,6 +40,7 @@ impl ExtensionSession {
     pub fn new() -> Self {
         let mut session = Self {
             base: BaseSession::new(),
+            relay_timeout_ms: 30_000,
         };
         // Inject Lua aliases so the Lua API surface matches the design
         let _ = session.base.load_library(include_str!("prelude.lua"));
@@ -256,6 +258,24 @@ impl ExtensionSession {
     /// Inspect all global variables in the current Lua state.
     pub fn inspect_globals(&mut self) -> WasmGlobalsSnapshot {
         self.base.inspect_globals()
+    }
+
+    /// Cancel the current execution.
+    #[wasm_bindgen(js_name = cancel)]
+    pub fn cancel(&mut self) {
+        self.base.cancel();
+    }
+
+    /// Set the relay timeout for async commands.
+    #[wasm_bindgen(js_name = setRelayTimeoutMs)]
+    pub fn set_relay_timeout_ms(&mut self, ms: u32) {
+        self.relay_timeout_ms = ms;
+    }
+
+    /// Get the relay timeout for async commands.
+    #[wasm_bindgen(js_name = getRelayTimeoutMs)]
+    pub fn get_relay_timeout_ms(&self) -> u32 {
+        self.relay_timeout_ms
     }
 
     /// Clean up the session and release resources.

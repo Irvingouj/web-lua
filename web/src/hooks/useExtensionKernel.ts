@@ -18,12 +18,15 @@ let globalSession: ExtensionSession | null = null;
 let globalRunner: Promise<void> | null = null;
 let initPromise: Promise<ExtensionSession> | null = null;
 
+const DEFAULT_CELL_TIMEOUT_MS = 30_000;
+
 async function ensureSession(): Promise<ExtensionSession> {
   if (globalSession) return globalSession;
   if (!initPromise) {
     initPromise = ExtensionSession.init().then(([session, runner]) => {
       globalSession = session;
       globalRunner = runner;
+      session.setRelayTimeoutMs(DEFAULT_CELL_TIMEOUT_MS);
       return session;
     });
   }
@@ -55,11 +58,8 @@ export function useExtensionKernel(
   }, []);
 
   const stopExecution = useCallback(() => {
-    if (globalSession && globalRunner) {
-      globalSession.stopWith(globalRunner);
-      globalSession = null;
-      globalRunner = null;
-      initPromise = null;
+    if (globalSession) {
+      globalSession.cancel();
     }
     setStatus("stopped");
   }, []);

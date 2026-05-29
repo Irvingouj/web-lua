@@ -53,6 +53,11 @@ impl BaseSession {
         self.inner.run_cell(source, "").into()
     }
 
+    /// Cancel the current execution.
+    pub fn cancel(&mut self) {
+        self.inner.cancel();
+    }
+
     /// Inspect all global variables in the current Lua state.
     pub fn inspect_globals(&mut self) -> WasmGlobalsSnapshot {
         self.inner.inspect_globals().into()

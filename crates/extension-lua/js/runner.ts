@@ -18,25 +18,6 @@ function ensureDomSnapshot(): Promise<void> {
   return domSnapshotReady;
 }
 
-// ─── Runner lifecycle abort signal ───────────────────────────────
-
-let runnerAbortController: AbortController | null = null;
-
-export function setRunnerAbortController(controller: AbortController | null) {
-  runnerAbortController = controller;
-}
-
-function getRunnerSignal(): AbortSignal | undefined {
-  return runnerAbortController?.signal;
-}
-
-function throwIfAborted(): void {
-  const signal = getRunnerSignal();
-  if (signal?.aborted) {
-    throw new Error("Runner aborted: ExtensionSession stopped");
-  }
-}
-
 // ─── Generated types from Rust ts-rs ───────────────────────────
 
 import type {
@@ -617,8 +598,7 @@ export async function executeMainThreadCommand(
       const start = Date.now();
       const timeoutMs = Number(timeout) || 30_000;
       while (true) {
-        throwIfAborted();
-        const result = await executeInTab(
+                const result = await executeInTab(
           activeTab,
           (sel: unknown) => !!document.querySelector(String(sel)),
           [selector],
@@ -2117,8 +2097,7 @@ async function performFetch(
 async function handleFetch(
   params: FetchParams,
 ): Promise<AsyncResponse<FetchValue>> {
-  throwIfAborted();
-  const { url, method, headers, body, timeout } = params;
+    const { url, method, headers, body, timeout } = params;
   const timeoutMs = Number(timeout) || 30_000;
   try {
     const {
@@ -2159,8 +2138,7 @@ async function handleFetch(
 async function handleFetchDom(
   params: FetchDomParams,
 ): Promise<AsyncResponse<FetchDomValue>> {
-  throwIfAborted();
-  const { url, selector, max_text } = params;
+    const { url, selector, max_text } = params;
   const maxTextNum = Number(max_text ?? 500);
   try {
     const {
@@ -2200,8 +2178,7 @@ async function executeInTab(
   func: (...args: unknown[]) => unknown,
   args: unknown[],
 ): Promise<AsyncResponse> {
-  throwIfAborted();
-  const chrome = window.chrome;
+    const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
     return {
       ok: false,
@@ -2254,8 +2231,7 @@ async function waitForTabLoad(
   tabId: number | null,
   timeoutMs: number = 30_000,
 ): Promise<AsyncResponse<boolean>> {
-  throwIfAborted();
-  const chrome = window.chrome;
+    const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
     return {
       ok: false,
@@ -2361,8 +2337,7 @@ async function sendMessageToTab(
   tabId: number | null,
   message: TabMessage,
 ): Promise<AsyncResponse> {
-  throwIfAborted();
-  const chrome = window.chrome;
+    const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
     return {
       ok: false,

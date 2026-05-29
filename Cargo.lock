@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "dom-semantic-tree"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "js-sys",
  "serde",
@@ -271,7 +271,7 @@ checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
 
 [[package]]
 name = "extension-lua"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1285,7 +1285,7 @@ checksum = "684365b586a9a6256c1cc3544eee8680de48d6041142f581776ec7b139622ae9"
 
 [[package]]
 name = "web-fs"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "data-encoding",
  "js-sys",
@@ -1300,7 +1300,7 @@ dependencies = [
 
 [[package]]
 name = "web-lua"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "data-encoding",
  "dom-semantic-tree",
@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "web-lua-base"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1332,7 +1332,7 @@ dependencies = [
 
 [[package]]
 name = "web-lua-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "data-encoding",
  "dom-semantic-tree",
@@ -1348,7 +1348,7 @@ dependencies = [
 
 [[package]]
 name = "web-lua-plugin-crypto"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hex",
  "hmac",

@@ -15,6 +15,16 @@ function generateId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function rejectPendingRelays(reason: string) {
+  for (const [relayId, resolve] of pendingRelays) {
+    resolve({
+      ok: false,
+      error: { message: reason, code: "E_STOPPED" },
+    });
+    pendingRelays.delete(relayId);
+  }
+}
+
 interface WorkerSelf extends WorkerGlobalScope {
   __extension_lua_relay?: (cmd: unknown) => Promise<unknown>;
 }
@@ -31,6 +41,17 @@ workerSelf.__extension_lua_relay = (cmd: unknown) => {
     const relayId = generateId();
     pendingRelays.set(relayId, resolve);
     self.postMessage({ type: "asyncRelay", id: relayId, command: cmd });
+
+    const timeoutMs = session?.getRelayTimeoutMs() ?? 30000;
+    setTimeout(() => {
+      if (pendingRelays.has(relayId)) {
+        resolve({
+          ok: false,
+          error: { message: "Relay timeout", code: "E_TIMEOUT" },
+        });
+        pendingRelays.delete(relayId);
+      }
+    }, timeoutMs);
   });
 };
 
@@ -59,6 +80,7 @@ export type WorkerMessage =
   | { type: "inspectGlobals"; id: string }
   | { type: "loadLibrary"; id: string; source: string }
   | { type: "setLogLevel"; level: number }
+  | { type: "setRelayTimeoutMs"; ms: number }
   | { type: "asyncRelayResult"; id: string; result: unknown };
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
@@ -88,6 +110,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         self.postMessage({ type: "result", id: msg.id, data: plain });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        rejectPendingRelays(message);
         self.postMessage({ type: "error", id: msg.id, error: message });
       }
       break;
@@ -103,15 +126,14 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
     }
     case "stop": {
-      // Reject all pending async relays so their Promises don't dangle
-      for (const [relayId, reject] of pendingRelays) {
-        reject({
-          ok: false,
-          error: { message: "Worker stopped", code: "E_STOPPED" },
-        });
-        pendingRelays.delete(relayId);
+      try {
+        session.cancel();
+        rejectPendingRelays("Worker stopped");
+        self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        self.postMessage({ type: "error", id: msg.id, error: message });
       }
-      self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
       break;
     }
     case "setFuelLimit": {
@@ -142,6 +164,16 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       try {
         const result = session.load_library(msg.source);
         self.postMessage({ type: "result", id: msg.id, data: result });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        self.postMessage({ type: "error", id: msg.id, error: message });
+      }
+      break;
+    }
+    case "setRelayTimeoutMs": {
+      try {
+        session.setRelayTimeoutMs(msg.ms);
+        self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         self.postMessage({ type: "error", id: msg.id, error: message });
