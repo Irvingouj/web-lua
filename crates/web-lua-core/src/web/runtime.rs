@@ -97,15 +97,20 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
         Ok(CallbackReturn::Return)
     });
 
-    runtime_table.set_field(ctx, "inspect", inspect_cb);
-    crate::lua_api_doc!(
-    namespace: "runtime",
-    name: "inspect",
-    action: "runtime_inspect",
-    doc: "Inspect all global variables in the Lua state.",
-    params: [
-    ],
-    returns: "table" => "Array of global variable descriptors: name, type, keys, value",
+    lua_api_custom!(ctx, runtime_table, name: "inspect", callback: inspect_cb,
+
+        namespace: "runtime",
+
+        action: "runtime_inspect",
+
+        doc: "Inspect all global variables in the Lua state.",
+
+        params: [
+
+        ],
+
+        returns: "table" => "Array of global variable descriptors: name, type, keys, value",
+
     );
     set_protected_global!(ctx, "runtime", runtime_table, "runtime");
 }

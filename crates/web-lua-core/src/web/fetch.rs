@@ -39,16 +39,22 @@ pub(crate) fn register<'a>(
         })
     });
 
-    web_table.set_field(ctx, "mock_async", mock_cb);
-    crate::lua_api_doc!(
-    namespace: "web",
-    name: "mock_async",
-    action: "mock_async",
-    doc: "Yield for testing, resumes with provided value.",
-    params: [
-    label: "string | nil", optional, "Test label",
-    ],
-    returns: "string" => "Test label echoed back",
+    lua_api_custom!(ctx, web_table, name: "mock_async", callback: mock_cb,
+
+        namespace: "web",
+
+        action: "mock_async",
+
+        doc: "Yield for testing, resumes with provided value.",
+
+        params: [
+
+        label: "string | nil", optional, "Test label",
+
+        ],
+
+        returns: "string" => "Test label echoed back",
+
     );
 
     // web.fetch(url [, opts]) — async HTTP request
@@ -141,18 +147,24 @@ pub(crate) fn register<'a>(
         })
     });
 
-    web_table.set_field(ctx, "fetch", fetch_cb);
+    lua_api_custom!(ctx, web_table, name: "fetch", callback: fetch_cb,
 
-    crate::lua_api_doc!(
         namespace: "web",
-        name: "fetch",
+
         action: "fetch",
+
         doc: "Perform an HTTP fetch request.",
+
         params: [
-            url: "string", required, "URL to fetch",
-            opts: "table | nil", optional, "Options: method, body, headers, timeout",
+
+        url: "string", required, "URL to fetch",
+
+        opts: "table | nil", optional, "Options: method, body, headers, timeout",
+
         ],
+
         returns: "table" => "{ status, ok, body, headers }",
+
     );
 
     // ── web.url.parse(url_string) → table ──
@@ -230,16 +242,22 @@ pub(crate) fn register<'a>(
         Ok(CallbackReturn::Return)
     });
 
-    url_table.set_field(ctx, "parse", url_parse_cb);
-    crate::lua_api_doc!(
-    namespace: "web.url",
-    name: "parse",
-    action: "url_parse",
-    doc: "Parse a URL string into components.",
-    params: [
-    url: "string", required, "URL string to parse",
-    ],
-    returns: "table" => "Parsed URL components: protocol, host, pathname, search, hash",
+    lua_api_custom!(ctx, url_table, name: "parse", callback: url_parse_cb,
+
+        namespace: "web.url",
+
+        action: "url_parse",
+
+        doc: "Parse a URL string into components.",
+
+        params: [
+
+        url: "string", required, "URL string to parse",
+
+        ],
+
+        returns: "table" => "Parsed URL components: protocol, host, pathname, search, hash",
+
     );
 
     // ── web.url.encode(params_table) → string ──
@@ -284,17 +302,24 @@ pub(crate) fn register<'a>(
         Ok(CallbackReturn::Return)
     });
 
-    url_table.set_field(ctx, "encode", url_encode_cb);
-    crate::lua_api_doc!(
-    namespace: "web.url",
-    name: "encode",
-    action: "url_encode",
-    doc: "Encode a table into a query string.",
-    params: [
-    params: "table", required, "Key-value pairs to encode",
-    ],
-    returns: "string" => "URL-encoded query string",
+    lua_api_custom!(ctx, url_table, name: "encode", callback: url_encode_cb,
+
+        namespace: "web.url",
+
+        action: "url_encode",
+
+        doc: "Encode a table into a query string.",
+
+        params: [
+
+        params: "table", required, "Key-value pairs to encode",
+
+        ],
+
+        returns: "string" => "URL-encoded query string",
+
     );
+    crate::web::protector::protect_api_table(ctx, url_table, "web.url");
     web_table.set_field(ctx, "url", url_table);
 
     // ── web.log(...) — sync, writes to stderr ──
@@ -317,16 +342,22 @@ pub(crate) fn register<'a>(
         Ok(CallbackReturn::Return)
     });
 
-    web_table.set_field(ctx, "log", web_log_cb);
-    crate::lua_api_doc!(
-    namespace: "web",
-    name: "log",
-    action: "web_log",
-    doc: "Log a message to the browser console.",
-    params: [
-    message: "any", required, "Value to log",
-    ],
-    returns: "nil" => "None",
+    lua_api_custom!(ctx, web_table, name: "log", callback: web_log_cb,
+
+        namespace: "web",
+
+        action: "web_log",
+
+        doc: "Log a message to the browser console.",
+
+        params: [
+
+        message: "any", required, "Value to log",
+
+        ],
+
+        returns: "nil" => "None",
+
     );
 
     // ── web.sleep(ms) — async, yields to worker ──
@@ -376,16 +407,22 @@ pub(crate) fn register<'a>(
         })
     });
 
-    web_table.set_field(ctx, "sleep", sleep_cb);
-    crate::lua_api_doc!(
-    namespace: "web",
-    name: "sleep",
-    action: "sleep",
-    doc: "Pause execution for a duration.",
-    params: [
-    ms: "number", optional, "Milliseconds to sleep (default 1000)",
-    ],
-    returns: "nil" => "None",
+    lua_api_custom!(ctx, web_table, name: "sleep", callback: sleep_cb,
+
+        namespace: "web",
+
+        action: "sleep",
+
+        doc: "Pause execution for a duration.",
+
+        params: [
+
+        ms: "number", optional, "Milliseconds to sleep (default 1000)",
+
+        ],
+
+        returns: "nil" => "None",
+
     );
 
     // web.fetch_dom(url, selector?) — async HTTP request + DOM parsing
@@ -451,17 +488,23 @@ pub(crate) fn register<'a>(
         })
     });
 
-    web_table.set_field(ctx, "fetch_dom", fetch_dom_cb);
+    lua_api_custom!(ctx, web_table, name: "fetch_dom", callback: fetch_dom_cb,
 
-    crate::lua_api_doc!(
         namespace: "web",
-        name: "fetch_dom",
+
         action: "fetch_dom",
+
         doc: "Fetch a URL and parse the HTML into a queryable DOM.",
+
         params: [
-            url: "string", required, "URL to fetch",
-            selector: "string | nil", optional, "CSS selector to extract matching elements",
+
+        url: "string", required, "URL to fetch",
+
+        selector: "string | nil", optional, "CSS selector to extract matching elements",
+
         ],
+
         returns: "table" => "{ status, ok, body, headers, matches }",
+
     );
 }

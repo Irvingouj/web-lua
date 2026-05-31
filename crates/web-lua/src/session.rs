@@ -9,6 +9,7 @@ use crate::browser_api::{
     execute_page_select, execute_page_type, execute_page_unhover, execute_page_wait, execute_sleep,
     execute_storage_delete, execute_storage_get, execute_storage_list, execute_storage_set,
 };
+use piccolo::Value;
 use std::cell::Cell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -44,132 +45,67 @@ impl WebSession {
             base: BaseSession::new(),
             aborted: Cell::new(false),
         };
-        // Inject Lua aliases for consistent API surface
-        let _ = session.base.load_library(
-            r#"
-page.go = page.goto
-page.fetch = web.fetch
-sleep = web.sleep
-"#,
-        );
-        let _ = session.base.load_library(web_lua_core::PATH_PRELUDE);
-
-        // Register injected alias metadata
-        web_lua_core::lua_api_doc!(
-            namespace: "page",
-            name: "go",
-            action: "",
-            doc: "Navigate to a URL (alias for page.goto).",
-            source: "injected_lua",
-            params: [
-                url: "string", required, "URL to navigate to",
-            ],
-            returns: "nil" => "None",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "page",
-            name: "fetch",
-            action: "",
-            doc: "Fetch a URL (alias for web.fetch).",
-            source: "injected_lua",
-            params: [
-                url: "string", required, "URL to fetch",
-                opts: "table | nil", optional, "Options: method, body, headers, timeout",
-            ],
-            returns: "table" => "{ status, ok, body, headers }",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "global",
-            name: "sleep",
-            action: "",
-            doc: "Pause execution (alias for web.sleep).",
-            source: "injected_lua",
-            params: [
-                ms: "number", optional, "Milliseconds to sleep (default 1000)",
-            ],
-            returns: "nil" => "None",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "path",
-            name: "join",
-            action: "",
-            doc: "Join path segments into an absolute VFS path.",
-            source: "injected_lua",
-            params: [
-                parts: "string", required, "Path segments to join",
-            ],
-            returns: "string" => "Joined absolute path",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "path",
-            name: "basename",
-            action: "",
-            doc: "Get the last component of a path.",
-            source: "injected_lua",
-            params: [
-                path: "string", required, "Absolute VFS path",
-            ],
-            returns: "string" => "File or directory name",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "path",
-            name: "dirname",
-            action: "",
-            doc: "Get the directory portion of a path.",
-            source: "injected_lua",
-            params: [
-                path: "string", required, "Absolute VFS path",
-            ],
-            returns: "string" => "Parent directory path",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "path",
-            name: "extname",
-            action: "",
-            doc: "Get the file extension including the leading dot.",
-            source: "injected_lua",
-            params: [
-                path: "string", required, "Absolute VFS path",
-            ],
-            returns: "string" => "Extension or empty string",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "path",
-            name: "normalize",
-            action: "",
-            doc: "Resolve . and .. segments in a path.",
-            source: "injected_lua",
-            params: [
-                path: "string", required, "Absolute VFS path",
-            ],
-            returns: "string" => "Normalized absolute path",
-        );
-        web_lua_core::lua_api_doc!(
-            namespace: "path",
-            name: "is_absolute",
-            action: "",
-            doc: "Check whether a path is absolute (starts with /).",
-            source: "injected_lua",
-            params: [
-                path: "string", required, "Path to check",
-            ],
-            returns: "boolean" => "true if absolute",
-        );
-
+        session.register_aliases();
         session
     }
 
     /// Reset the session, clearing all Lua state.
     pub fn reset(&mut self) {
         self.base.reset();
-        // Re-inject aliases after reset
-        let _ = self.base.load_library(
-            r#"
-page.fetch = web.fetch
-sleep = web.sleep
-"#,
-        );
-        let _ = self.base.load_library(web_lua_core::PATH_PRELUDE);
+        self.register_aliases();
+    }
+
+    /// Register Lua aliases as Rust callbacks (no Lua injection).
+    fn register_aliases(&mut self) {
+        self.base.with_lua(|ctx, _host_state| {
+            // page.go — alias for page.goto
+            let page_table = ctx.get_global("page").unwrap();
+            if let Value::Table(page) = page_table {
+                let goto_cb: Value = page.get(ctx, "goto").unwrap();
+                web_lua_core::lua_api_custom!(ctx, page, name: "go", callback: goto_cb,
+                    namespace: "page",
+                    action: "",
+                    doc: "Navigate to a URL (alias for page.goto).",
+                    params: [
+                        url: "string", required, "URL to navigate to",
+                    ],
+                    returns: "nil" => "None",
+                );
+            }
+
+            // page.fetch — alias for web.fetch
+            let web_table = ctx.get_global("web").unwrap();
+            let page_table = ctx.get_global("page").unwrap();
+            if let (Value::Table(web), Value::Table(page)) = (web_table, page_table) {
+                let fetch_cb: Value = web.get(ctx, "fetch").unwrap();
+                web_lua_core::lua_api_custom!(ctx, page, name: "fetch", callback: fetch_cb,
+                    namespace: "page",
+                    action: "",
+                    doc: "Fetch a URL (alias for web.fetch).",
+                    params: [
+                        url: "string", required, "URL to fetch",
+                        opts: "table | nil", optional, "Options: method, body, headers, timeout",
+                    ],
+                    returns: "table" => "{ status, ok, body, headers }",
+                );
+            }
+
+            // sleep — alias for web.sleep
+            let web_table = ctx.get_global("web").unwrap();
+            if let Value::Table(web) = web_table {
+                let sleep_cb: Value = web.get(ctx, "sleep").unwrap();
+                let globals = ctx.globals();
+                web_lua_core::lua_api_custom!(ctx, globals, name: "sleep", callback: sleep_cb,
+                    namespace: "global",
+                    action: "",
+                    doc: "Pause execution (alias for web.sleep).",
+                    params: [
+                        ms: "number", optional, "Milliseconds to sleep (default 1000)",
+                    ],
+                    returns: "nil" => "None",
+                );
+            }
+        });
     }
 
     /// Set the fuel limit for execution.
@@ -402,7 +338,7 @@ impl WebSession {
                     error: None,
                 })
             }
-            Action::DomSnapshot | Action::PageSnapshot => {
+            Action::DomSnapshot => {
                 let params = cmd
                     .parse_params::<DomSnapshotParams>()
                     .map_err(|e| format!("Invalid snapshot params: {}", e))?;

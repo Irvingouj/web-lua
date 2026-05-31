@@ -35,7 +35,7 @@ pub enum ApiDocFormat {
     Markdown,
 }
 
-pub(crate) static REGISTRY: Mutex<Vec<LuaApiDoc>> = Mutex::new(Vec::new());
+pub static REGISTRY: Mutex<Vec<LuaApiDoc>> = Mutex::new(Vec::new());
 
 pub fn register(doc: LuaApiDoc) {
     let mut registry = REGISTRY.lock().unwrap();

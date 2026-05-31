@@ -72,6 +72,38 @@ macro_rules! lua_api {
     };
 }
 
+/// Register a custom Lua callback and its API documentation in one call.
+///
+/// Use this when the callback is built manually (e.g. `Callback::from_fn` or
+/// a helper closure) rather than via the generic `lua_api!` async-yield
+/// pattern.
+#[macro_export]
+macro_rules! lua_api_custom {
+    (
+        $ctx:expr,
+        $table:expr,
+        name: $name:expr,
+        callback: $cb:expr,
+        namespace: $ns:expr,
+        action: $action:expr,
+        doc: $desc:expr,
+        params: [$($pname:ident: $ptype:expr, $preq:ident, $pdesc:expr),* $(,)?],
+        returns: $rtype:expr => $rdesc:expr $(,)?
+    ) => {
+        {
+            $table.set_field($ctx, $name, $cb);
+            $crate::lua_api_doc!(
+                namespace: $ns,
+                name: $name,
+                action: $action,
+                doc: $desc,
+                params: [$($pname: $ptype, $preq, $pdesc),*],
+                returns: $rtype => $rdesc,
+            );
+        }
+    };
+}
+
 /// Wrap `$table` with the API protector and attach it to `$parent` under `$name`.
 ///
 /// **Note:** The macro shadows `$table` — the original unprotected table is
@@ -121,20 +153,17 @@ mod host;
 mod log;
 mod notifications;
 mod page;
+mod path;
 mod protector;
 mod runtime;
 mod sidepanel;
 mod storage;
 mod tab;
-mod url;
 
 pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState>>) {
     let web_table = Table::new(&ctx);
 
     fetch::register(ctx, &web_table, host_state.clone());
-
-    let url_table = url::register(ctx);
-    set_protected!(ctx, web_table, "url", url_table, "web.url");
 
     log::register(ctx, &web_table, host_state.clone());
 
@@ -184,6 +213,7 @@ pub(crate) fn register_web_module(ctx: Context, host_state: Rc<RefCell<HostState
     chrome::register(ctx, host_state.clone());
     dom::register(ctx, host_state.clone());
     page::register(ctx, host_state.clone());
+    path::register(ctx);
     sidepanel::register(ctx, host_state.clone());
     host::register(ctx, host_state.clone());
     runtime::register(ctx, host_state.clone());

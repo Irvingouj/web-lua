@@ -29,15 +29,21 @@ pub(crate) fn register<'a>(
         Ok(CallbackReturn::Return)
     });
 
-    web_table.set_field(ctx, "log", web_log_cb);
-    crate::lua_api_doc!(
-    namespace: "web",
-    name: "log",
-    action: "web_log",
-    doc: "Log a message to the browser console.",
-    params: [
-    message: "any", required, "Value to log",
-    ],
-    returns: "nil" => "None",
+    lua_api_custom!(ctx, web_table, name: "log", callback: web_log_cb,
+
+        namespace: "web",
+
+        action: "web_log",
+
+        doc: "Log a message to the browser console.",
+
+        params: [
+
+        message: "any", required, "Value to log",
+
+        ],
+
+        returns: "nil" => "None",
+
     );
 }

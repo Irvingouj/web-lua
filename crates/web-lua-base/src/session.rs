@@ -1,4 +1,5 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use crate::types::*;
 use web_lua_core::NotebookSession;
@@ -73,6 +74,14 @@ impl BaseSession {
             params: cmd.params,
         };
         self.inner.restore_pending_command(core_cmd);
+    }
+
+    /// Execute a callback with access to the Lua context and host state.
+    pub fn with_lua<F>(&mut self, f: F)
+    where
+        F: FnOnce(piccolo::Context, Rc<RefCell<web_lua_core::HostState>>),
+    {
+        self.inner.with_lua(f);
     }
 }
 

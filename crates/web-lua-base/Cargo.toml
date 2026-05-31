@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 web-lua-core = { path = "../web-lua-core" }
+piccolo = { path = "../piccolo" }
 wasm-bindgen = "0.2"
 serde.workspace = true
 serde_json.workspace = true

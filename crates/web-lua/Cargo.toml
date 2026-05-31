@@ -12,6 +12,7 @@ web-lua-base = { path = "../web-lua-base" }
 web-lua-core = { path = "../web-lua-core" }
 dom-semantic-tree = { workspace = true }
 web-fs = { path = "../web-fs" }
+piccolo.workspace = true
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 serde.workspace = true

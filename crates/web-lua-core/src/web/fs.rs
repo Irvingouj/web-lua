@@ -120,14 +120,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.exists(path) ──
     {
         let cb = make_1str_cb("exists", "fs_exists", "path", host_state.clone());
-        fs_table.set_field(ctx, "exists", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "exists", callback: cb,
             namespace: "fs",
-            name: "exists",
             action: "fs_exists",
             doc: "Check whether a path exists in the virtual filesystem.",
             params: [
-                path: "string", required, "Absolute VFS path",
+            path: "string", required, "Absolute VFS path",
             ],
             returns: "boolean" => "true if the path exists",
         );
@@ -136,14 +134,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.stat(path) ──
     {
         let cb = make_1str_cb("stat", "fs_stat", "path", host_state.clone());
-        fs_table.set_field(ctx, "stat", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "stat", callback: cb,
             namespace: "fs",
-            name: "stat",
             action: "fs_stat",
             doc: "Get metadata for a path.",
             params: [
-                path: "string", required, "Absolute VFS path",
+            path: "string", required, "Absolute VFS path",
             ],
             returns: "table | nil" => "Metadata object or nil if not found",
         );
@@ -152,14 +148,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.list(path) ──
     {
         let cb = make_1str_cb("list", "fs_list", "path", host_state.clone());
-        fs_table.set_field(ctx, "list", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "list", callback: cb,
             namespace: "fs",
-            name: "list",
             action: "fs_list",
             doc: "List entries in a directory.",
             params: [
-                path: "string", required, "Absolute VFS directory path",
+            path: "string", required, "Absolute VFS directory path",
             ],
             returns: "table" => "Array of DirEntry tables",
         );
@@ -168,14 +162,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.mkdir(path) ──
     {
         let cb = make_1str_cb("mkdir", "fs_mkdir", "path", host_state.clone());
-        fs_table.set_field(ctx, "mkdir", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "mkdir", callback: cb,
             namespace: "fs",
-            name: "mkdir",
             action: "fs_mkdir",
             doc: "Create a directory (and parents if needed).",
             params: [
-                path: "string", required, "Absolute VFS directory path",
+            path: "string", required, "Absolute VFS directory path",
             ],
             returns: "boolean" => "true on success",
         );
@@ -184,14 +176,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.delete(path) ──
     {
         let cb = make_1str_cb("delete", "fs_delete", "path", host_state.clone());
-        fs_table.set_field(ctx, "delete", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "delete", callback: cb,
             namespace: "fs",
-            name: "delete",
             action: "fs_delete",
             doc: "Delete a file or directory (recursive for directories).",
             params: [
-                path: "string", required, "Absolute VFS path to delete",
+            path: "string", required, "Absolute VFS path to delete",
             ],
             returns: "boolean" => "true on success",
         );
@@ -200,15 +190,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.copy(from, to) ──
     {
         let cb = make_2str_cb("copy", "fs_copy", "from", "to", host_state.clone());
-        fs_table.set_field(ctx, "copy", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "copy", callback: cb,
             namespace: "fs",
-            name: "copy",
             action: "fs_copy",
             doc: "Copy a file from one path to another.",
             params: [
-                from: "string", required, "Source absolute VFS path",
-                to: "string", required, "Destination absolute VFS path",
+            from: "string", required, "Source absolute VFS path",
+            to: "string", required, "Destination absolute VFS path",
             ],
             returns: "boolean" => "true on success",
         );
@@ -217,15 +205,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.move(from, to) ──
     {
         let cb = make_2str_cb("move", "fs_move", "from", "to", host_state.clone());
-        fs_table.set_field(ctx, "move", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "move", callback: cb,
             namespace: "fs",
-            name: "move",
             action: "fs_move",
             doc: "Move (rename) a file from one path to another.",
             params: [
-                from: "string", required, "Source absolute VFS path",
-                to: "string", required, "Destination absolute VFS path",
+            from: "string", required, "Source absolute VFS path",
+            to: "string", required, "Destination absolute VFS path",
             ],
             returns: "boolean" => "true on success",
         );
@@ -234,14 +220,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.read(path) ── (returns base64 over the wire; executor decodes)
     {
         let cb = make_1str_cb("read", "fs_read", "path", host_state.clone());
-        fs_table.set_field(ctx, "read", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "read", callback: cb,
             namespace: "fs",
-            name: "read",
             action: "fs_read",
             doc: "Read raw bytes from a file. Returns base64-encoded string over the async wire.",
             params: [
-                path: "string", required, "Absolute VFS file path",
+            path: "string", required, "Absolute VFS file path",
             ],
             returns: "string" => "Base64-encoded file contents",
         );
@@ -250,14 +234,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.read_text(path) ──
     {
         let cb = make_1str_cb("read_text", "fs_read_text", "path", host_state.clone());
-        fs_table.set_field(ctx, "read_text", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "read_text", callback: cb,
             namespace: "fs",
-            name: "read_text",
             action: "fs_read_text",
             doc: "Read a file as UTF-8 text.",
             params: [
-                path: "string", required, "Absolute VFS file path",
+            path: "string", required, "Absolute VFS file path",
             ],
             returns: "string | nil" => "File contents or nil",
         );
@@ -266,14 +248,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     // ── fs.read_base64(path) ──
     {
         let cb = make_1str_cb("read_base64", "fs_read_base64", "path", host_state.clone());
-        fs_table.set_field(ctx, "read_base64", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "read_base64", callback: cb,
             namespace: "fs",
-            name: "read_base64",
             action: "fs_read_base64",
             doc: "Read a file and return its contents as base64.",
             params: [
-                path: "string", required, "Absolute VFS file path",
+            path: "string", required, "Absolute VFS file path",
             ],
             returns: "string | nil" => "Base64-encoded contents or nil",
         );
@@ -359,16 +339,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        fs_table.set_field(ctx, "read_range", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "read_range", callback: cb,
             namespace: "fs",
-            name: "read_range",
             action: "fs_read_range",
             doc: "Read a byte range from a file.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                offset: "number", required, "Byte offset to start reading",
-                len: "number", required, "Number of bytes to read",
+            path: "string", required, "Absolute VFS file path",
+            offset: "number", required, "Byte offset to start reading",
+            len: "number", required, "Number of bytes to read",
             ],
             returns: "string" => "Base64-encoded range contents",
         );
@@ -432,15 +410,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        fs_table.set_field(ctx, "write", write_cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "write", callback: write_cb,
             namespace: "fs",
-            name: "write",
             action: "fs_write",
             doc: "Write raw bytes to a file (overwrites existing). Data is base64-encoded over the wire.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                data: "string", required, "Raw byte string to write",
+            path: "string", required, "Absolute VFS file path",
+            data: "string", required, "Raw byte string to write",
             ],
             returns: "boolean" => "true on success",
         );
@@ -455,15 +431,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             "data",
             host_state.clone(),
         );
-        fs_table.set_field(ctx, "write_text", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "write_text", callback: cb,
             namespace: "fs",
-            name: "write_text",
             action: "fs_write_text",
             doc: "Write UTF-8 text to a file (overwrites existing).",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                text: "string", required, "Text to write",
+            path: "string", required, "Absolute VFS file path",
+            text: "string", required, "Text to write",
             ],
             returns: "boolean" => "true on success",
         );
@@ -478,15 +452,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             "data",
             host_state.clone(),
         );
-        fs_table.set_field(ctx, "write_base64", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "write_base64", callback: cb,
             namespace: "fs",
-            name: "write_base64",
             action: "fs_write_base64",
             doc: "Write base64-decoded bytes to a file (overwrites existing).",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                b64: "string", required, "Base64-encoded data",
+            path: "string", required, "Absolute VFS file path",
+            b64: "string", required, "Base64-encoded data",
             ],
             returns: "boolean" => "true on success",
         );
@@ -552,15 +524,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        fs_table.set_field(ctx, "append", append_cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "append", callback: append_cb,
             namespace: "fs",
-            name: "append",
             action: "fs_append",
             doc: "Append raw bytes to a file. Data is base64-encoded over the wire.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                data: "string", required, "Raw byte string to append",
+            path: "string", required, "Absolute VFS file path",
+            data: "string", required, "Raw byte string to append",
             ],
             returns: "boolean" => "true on success",
         );
@@ -575,15 +545,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             "data",
             host_state.clone(),
         );
-        fs_table.set_field(ctx, "append_text", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "append_text", callback: cb,
             namespace: "fs",
-            name: "append_text",
             action: "fs_append_text",
             doc: "Append UTF-8 text to a file.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                text: "string", required, "Text to append",
+            path: "string", required, "Absolute VFS file path",
+            text: "string", required, "Text to append",
             ],
             returns: "boolean" => "true on success",
         );
@@ -598,15 +566,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             "data",
             host_state.clone(),
         );
-        fs_table.set_field(ctx, "append_base64", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "append_base64", callback: cb,
             namespace: "fs",
-            name: "append_base64",
             action: "fs_append_base64",
             doc: "Append base64-decoded bytes to a file.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                b64: "string", required, "Base64-encoded data",
+            path: "string", required, "Absolute VFS file path",
+            b64: "string", required, "Base64-encoded data",
             ],
             returns: "boolean" => "true on success",
         );
@@ -689,16 +655,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        fs_table.set_field(ctx, "update", update_cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "update", callback: update_cb,
             namespace: "fs",
-            name: "update",
             action: "fs_update",
             doc: "Write raw bytes at a specific offset in a file. Data is base64-encoded over the wire.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                offset: "number", required, "Byte offset",
-                data: "string", required, "Raw byte string to write",
+            path: "string", required, "Absolute VFS file path",
+            offset: "number", required, "Byte offset",
+            data: "string", required, "Raw byte string to write",
             ],
             returns: "boolean" => "true on success",
         );
@@ -762,15 +726,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        fs_table.set_field(ctx, "hash", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, fs_table, name: "hash", callback: cb,
             namespace: "fs",
-            name: "hash",
             action: "fs_hash",
             doc: "Compute a hash of a file's contents.",
             params: [
-                path: "string", required, "Absolute VFS file path",
-                algo: "string", required, "Hash algorithm (sha256 or sha1)",
+            path: "string", required, "Absolute VFS file path",
+            algo: "string", required, "Hash algorithm (sha256 or sha1)",
             ],
             returns: "string | nil" => "Hex-encoded hash or nil",
         );

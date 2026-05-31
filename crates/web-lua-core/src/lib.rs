@@ -18,9 +18,6 @@ pub use session::*;
 pub use state::*;
 pub use types::*;
 
-/// Pure Lua prelude that injects `path.*` helpers into every session.
-pub const PATH_PRELUDE: &str = include_str!("path_prelude.lua");
-
 /// Register API metadata without generating a Lua callback.
 /// Use this for custom Callback::from_fn blocks or injected Lua aliases.
 #[macro_export]
@@ -84,3 +81,5 @@ macro_rules! lua_api_doc {
         });
     };
 }
+
+

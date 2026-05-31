@@ -51,17 +51,24 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         })
     });
 
-    host_table.set_field(ctx, "call", host_call_cb);
-    crate::lua_api_doc!(
-    namespace: "host",
-    name: "call",
-    action: "host_call",
-    doc: "Call a registered host handler by name.",
-    params: [
-    action: "string", required, "Handler action name",
-    params: "table | nil", optional, "Parameters to pass to handler",
-    ],
-    returns: "any" => "Handler response",
+    lua_api_custom!(ctx, host_table, name: "call", callback: host_call_cb,
+
+        namespace: "host",
+
+        action: "host_call",
+
+        doc: "Call a registered host handler by name.",
+
+        params: [
+
+        action: "string", required, "Handler action name",
+
+        params: "table | nil", optional, "Parameters to pass to handler",
+
+        ],
+
+        returns: "any" => "Handler response",
+
     );
     set_protected_global!(ctx, "host", host_table, "host");
 }

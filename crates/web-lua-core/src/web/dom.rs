@@ -46,15 +46,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        dom_table.set_field(ctx, "snapshot", dom_snapshot_cb);
-
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, dom_table, name: "snapshot", callback: dom_snapshot_cb,
             namespace: "dom",
-            name: "snapshot",
             action: "dom_snapshot",
             doc: "Take a semantic DOM snapshot of the current page.",
             params: [
-                opts: "table | nil", optional, "Options: max_depth, include_hidden, etc.",
+            opts: "table | nil", optional, "Options: max_depth, include_hidden, etc.",
             ],
             returns: "table" => "Semantic DOM tree snapshot",
         );
@@ -108,17 +105,15 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        dom_table.set_field(ctx, "format", dom_format_cb);
-        crate::lua_api_doc!(
-        namespace: "dom",
-        name: "format",
-        action: "dom_format",
-        doc: "Format a DOM snapshot into a text representation.",
-        params: [
-        snapshot: "table", required, "DOM snapshot object",
-        format: "string | nil", optional, "Output format: compact-text, markdown, etc.",
-        ],
-        returns: "string" => "Formatted text representation",
+        lua_api_custom!(ctx, dom_table, name: "format", callback: dom_format_cb,
+            namespace: "dom",
+            action: "dom_format",
+            doc: "Format a DOM snapshot into a text representation.",
+            params: [
+            snapshot: "table", required, "DOM snapshot object",
+            format: "string | nil", optional, "Output format: compact-text, markdown, etc.",
+            ],
+            returns: "string" => "Formatted text representation",
         );
     }
 

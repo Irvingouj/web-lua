@@ -273,8 +273,10 @@ checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
 name = "extension-lua"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "data-encoding",
  "js-sys",
+ "piccolo",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -1305,6 +1307,7 @@ dependencies = [
  "data-encoding",
  "dom-semantic-tree",
  "js-sys",
+ "piccolo",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -1322,6 +1325,7 @@ dependencies = [
 name = "web-lua-base"
 version = "0.2.0"
 dependencies = [
+ "piccolo",
  "serde",
  "serde_json",
  "tsify",

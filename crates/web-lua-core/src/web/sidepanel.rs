@@ -41,15 +41,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "snapshot", cb);
-
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "snapshot", callback: cb,
             namespace: "sidepanel",
-            name: "snapshot",
             action: "sidepanel_snapshot_text",
             doc: "Take a DOM snapshot of the sidepanel and return readable text.",
             params: [
-                opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
             ],
             returns: "string" => "Readable accessibility tree with refIds",
         );
@@ -88,15 +85,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "snapshot_data", cb);
-
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "snapshot_data", callback: cb,
             namespace: "sidepanel",
-            name: "snapshot_data",
             action: "sidepanel_snapshot_data",
             doc: "Take a DOM snapshot of the sidepanel and return structured data.",
             params: [
-                opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
             ],
             returns: "table" => "Structured snapshot with nodes, url, title, viewport",
         );
@@ -140,15 +134,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "click", cb);
-
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "click", callback: cb,
             namespace: "sidepanel",
-            name: "click",
             action: "sidepanel_click",
             doc: "Click an element by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
+            ref_id: "string", required, "Element refId from snapshot",
             ],
             returns: "nil" => "None",
         );
@@ -192,14 +183,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "dblclick", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "dblclick", callback: cb,
             namespace: "sidepanel",
-            name: "dblclick",
             action: "sidepanel_dblclick",
             doc: "Double-click an element by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
+            ref_id: "string", required, "Element refId from snapshot",
             ],
             returns: "nil" => "None",
         );
@@ -253,15 +242,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "fill", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "fill", callback: cb,
             namespace: "sidepanel",
-            name: "fill",
             action: "sidepanel_fill",
             doc: "Fill an input element by refId with a value in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
-                value: "string", required, "Text to fill",
+            ref_id: "string", required, "Element refId from snapshot",
+            value: "string", required, "Text to fill",
             ],
             returns: "nil" => "None",
         );
@@ -315,15 +302,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "type", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "type", callback: cb,
             namespace: "sidepanel",
-            name: "type",
             action: "sidepanel_type",
             doc: "Append text to an input element by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
-                text: "string", required, "Text to append",
+            ref_id: "string", required, "Element refId from snapshot",
+            text: "string", required, "Text to append",
             ],
             returns: "nil" => "None",
         );
@@ -367,14 +352,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "press", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "press", callback: cb,
             namespace: "sidepanel",
-            name: "press",
             action: "sidepanel_press",
             doc: "Press a keyboard key in the sidepanel.",
             params: [
-                key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
+            key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
             ],
             returns: "nil" => "None",
         );
@@ -428,15 +411,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "select", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "select", callback: cb,
             namespace: "sidepanel",
-            name: "select",
             action: "sidepanel_select",
             doc: "Select an option in a dropdown by refId and value in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
-                value: "string", required, "Option value to select",
+            ref_id: "string", required, "Element refId from snapshot",
+            value: "string", required, "Option value to select",
             ],
             returns: "nil" => "None",
         );
@@ -489,15 +470,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "check", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "check", callback: cb,
             namespace: "sidepanel",
-            name: "check",
             action: "sidepanel_check",
             doc: "Check or uncheck a checkbox by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
-                checked: "boolean", optional, "Checked state (default true)",
+            ref_id: "string", required, "Element refId from snapshot",
+            checked: "boolean", optional, "Checked state (default true)",
             ],
             returns: "nil" => "None",
         );
@@ -541,14 +520,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "hover", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "hover", callback: cb,
             namespace: "sidepanel",
-            name: "hover",
             action: "sidepanel_hover",
             doc: "Hover over an element by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
+            ref_id: "string", required, "Element refId from snapshot",
             ],
             returns: "nil" => "None",
         );
@@ -572,10 +549,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "unhover", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "unhover", callback: cb,
             namespace: "sidepanel",
-            name: "unhover",
             action: "sidepanel_unhover",
             doc: "Move mouse away from any hovered element in the sidepanel.",
             params: [
@@ -629,15 +604,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "scroll", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "scroll", callback: cb,
             namespace: "sidepanel",
-            name: "scroll",
             action: "sidepanel_scroll",
             doc: "Scroll the sidepanel by direction and amount.",
             params: [
-                direction: "string", optional, "up, down, left, right (default down)",
-                amount: "number", optional, "Pixels to scroll (default 300)",
+            direction: "string", optional, "up, down, left, right (default down)",
+            amount: "number", optional, "Pixels to scroll (default 300)",
             ],
             returns: "nil" => "None",
         );
@@ -681,14 +654,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "scroll_to", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "scroll_to", callback: cb,
             namespace: "sidepanel",
-            name: "scroll_to",
             action: "sidepanel_scroll_to",
             doc: "Scroll to an element by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
+            ref_id: "string", required, "Element refId from snapshot",
             ],
             returns: "nil" => "None",
         );
@@ -712,10 +683,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "url", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "url", callback: cb,
             namespace: "sidepanel",
-            name: "url",
             action: "sidepanel_url",
             doc: "Get the sidepanel URL.",
             params: [
@@ -742,10 +711,8 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "title", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "title", callback: cb,
             namespace: "sidepanel",
-            name: "title",
             action: "sidepanel_title",
             doc: "Get the sidepanel document title.",
             params: [
@@ -791,14 +758,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "wait", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "wait", callback: cb,
             namespace: "sidepanel",
-            name: "wait",
             action: "sidepanel_wait",
             doc: "Wait for a duration.",
             params: [
-                ms: "number", optional, "Milliseconds to wait (default 1000)",
+            ms: "number", optional, "Milliseconds to wait (default 1000)",
             ],
             returns: "nil" => "None",
         );
@@ -852,15 +817,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        sidepanel_table.set_field(ctx, "append", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, sidepanel_table, name: "append", callback: cb,
             namespace: "sidepanel",
-            name: "append",
             action: "sidepanel_append",
             doc: "Append text to an input element by refId in the sidepanel.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
-                text: "string", required, "Text to append",
+            ref_id: "string", required, "Element refId from snapshot",
+            text: "string", required, "Text to append",
             ],
             returns: "nil" => "None",
         );

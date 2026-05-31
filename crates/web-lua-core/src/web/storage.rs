@@ -130,55 +130,47 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
     };
 
     let storage_get_cb = make_storage_cb("storage_get", host_state.clone());
-    storage_table.set_field(ctx, "get", storage_get_cb);
-    crate::lua_api_doc!(
-    namespace: "web.storage",
-    name: "get",
-    action: "storage_get",
-    doc: "Get a value from web storage.",
-    params: [
-    key: "string", required, "Storage key",
-    ],
-    returns: "string | nil" => "Stored value or nil",
+    lua_api_custom!(ctx, storage_table, name: "get", callback: storage_get_cb,
+        namespace: "web.storage",
+        action: "storage_get",
+        doc: "Get a value from web storage.",
+        params: [
+        key: "string", required, "Storage key",
+        ],
+        returns: "string | nil" => "Stored value or nil",
     );
 
     let storage_set_cb = make_storage_cb("storage_set", host_state.clone());
-    storage_table.set_field(ctx, "set", storage_set_cb);
-    crate::lua_api_doc!(
-    namespace: "web.storage",
-    name: "set",
-    action: "storage_set",
-    doc: "Set a value in web storage.",
-    params: [
-    key: "string", required, "Storage key",
-    value: "string", required, "Value to store",
-    ],
-    returns: "boolean" => "Whether set succeeded",
+    lua_api_custom!(ctx, storage_table, name: "set", callback: storage_set_cb,
+        namespace: "web.storage",
+        action: "storage_set",
+        doc: "Set a value in web storage.",
+        params: [
+        key: "string", required, "Storage key",
+        value: "string", required, "Value to store",
+        ],
+        returns: "boolean" => "Whether set succeeded",
     );
 
     let storage_delete_cb = make_storage_cb("storage_delete", host_state.clone());
-    storage_table.set_field(ctx, "delete", storage_delete_cb);
-    crate::lua_api_doc!(
-    namespace: "web.storage",
-    name: "delete",
-    action: "storage_delete",
-    doc: "Remove a key from web storage.",
-    params: [
-    key: "string", required, "Storage key to remove",
-    ],
-    returns: "boolean" => "Whether deletion succeeded",
+    lua_api_custom!(ctx, storage_table, name: "delete", callback: storage_delete_cb,
+        namespace: "web.storage",
+        action: "storage_delete",
+        doc: "Remove a key from web storage.",
+        params: [
+        key: "string", required, "Storage key to remove",
+        ],
+        returns: "boolean" => "Whether deletion succeeded",
     );
 
     let storage_list_cb = make_storage_cb("storage_list", host_state.clone());
-    storage_table.set_field(ctx, "list", storage_list_cb);
-    crate::lua_api_doc!(
-    namespace: "web.storage",
-    name: "list",
-    action: "storage_list",
-    doc: "List all keys in web storage.",
-    params: [
-    ],
-    returns: "table" => "Array of key strings",
+    lua_api_custom!(ctx, storage_table, name: "list", callback: storage_list_cb,
+        namespace: "web.storage",
+        action: "storage_list",
+        doc: "List all keys in web storage.",
+        params: [
+        ],
+        returns: "table" => "Array of key strings",
     );
 
     storage_table

@@ -658,4 +658,15 @@ impl NotebookSession {
     pub fn execution_count(&self) -> u32 {
         self.execution_count
     }
+
+    /// Execute a callback with access to the Lua context and host state.
+    pub fn with_lua<F>(&mut self, f: F)
+    where
+        F: FnOnce(piccolo::Context, Rc<RefCell<HostState>>),
+    {
+        let host_state = self.host_state.clone();
+        self.lua.enter(|ctx| {
+            f(ctx, host_state);
+        });
+    }
 }

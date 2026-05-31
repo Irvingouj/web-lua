@@ -44,17 +44,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "snapshot", cb);
-
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "snapshot",
-        action: "page_snapshot_text",
-        doc: "Take a DOM snapshot and return readable text.",
-        params: [
-        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
-        ],
-        returns: "string" => "Readable accessibility tree with refIds",
+        lua_api_custom!(ctx, page_table, name: "snapshot", callback: cb,
+            namespace: "page",
+            action: "page_snapshot_text",
+            doc: "Take a DOM snapshot and return readable text.",
+            params: [
+            opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            ],
+            returns: "string" => "Readable accessibility tree with refIds",
         );
     }
 
@@ -90,17 +87,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "snapshot_data", cb);
-
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "snapshot_data",
-        action: "page_snapshot_data",
-        doc: "Take a DOM snapshot and return structured data.",
-        params: [
-        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
-        ],
-        returns: "table" => "{ text, nodes, url, title, viewport, version }",
+        lua_api_custom!(ctx, page_table, name: "snapshot_data", callback: cb,
+            namespace: "page",
+            action: "page_snapshot_data",
+            doc: "Take a DOM snapshot and return structured data.",
+            params: [
+            opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            ],
+            returns: "table" => "{ text, nodes, url, title, viewport, version }",
         );
     }
 
@@ -136,28 +130,23 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "snapshot_text", cb);
-        page_table.set_field(ctx, "see", cb);
-
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "snapshot_text",
-        action: "page_snapshot_text",
-        doc: "Alias for page.snapshot — returns readable text.",
-        params: [
-        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
-        ],
-        returns: "string" => "Readable accessibility tree with refIds",
+        lua_api_custom!(ctx, page_table, name: "snapshot_text", callback: cb,
+            namespace: "page",
+            action: "page_snapshot_text",
+            doc: "Alias for page.snapshot — returns readable text.",
+            params: [
+            opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            ],
+            returns: "string" => "Readable accessibility tree with refIds",
         );
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "see",
-        action: "page_snapshot_text",
-        doc: "Alias for page.snapshot — returns readable text.",
-        params: [
-        opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
-        ],
-        returns: "string" => "Readable accessibility tree with refIds",
+        lua_api_custom!(ctx, page_table, name: "see", callback: cb,
+            namespace: "page",
+            action: "page_snapshot_text",
+            doc: "Alias for page.snapshot — returns readable text.",
+            params: [
+            opts: "table | nil", optional, "Options: max_nodes, interactive_only, etc.",
+            ],
+            returns: "string" => "Readable accessibility tree with refIds",
         );
     }
 
@@ -199,15 +188,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "click", cb);
-
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, page_table, name: "click", callback: cb,
             namespace: "page",
-            name: "click",
             action: "page_click",
             doc: "Click an element by refId in the current page.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
+            ref_id: "string", required, "Element refId from snapshot",
             ],
             returns: "nil" => "None",
         );
@@ -251,16 +237,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "dblclick", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "dblclick",
-        action: "page_dblclick",
-        doc: "Double-click an element by refId.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "dblclick", callback: cb,
+            namespace: "page",
+            action: "page_dblclick",
+            doc: "Double-click an element by refId.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -310,17 +294,15 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "fill", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "fill",
-        action: "page_fill",
-        doc: "Fill an input element by refId with a value.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        value: "string", required, "Text to fill",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "fill", callback: cb,
+            namespace: "page",
+            action: "page_fill",
+            doc: "Fill an input element by refId with a value.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            value: "string", required, "Text to fill",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -370,17 +352,15 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "type", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "type",
-        action: "page_type",
-        doc: "Append text to an input element by refId.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        text: "string", required, "Text to append",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "type", callback: cb,
+            namespace: "page",
+            action: "page_type",
+            doc: "Append text to an input element by refId.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            text: "string", required, "Text to append",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -420,25 +400,28 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "press", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "press",
-        action: "page_press",
-        doc: "Press a keyboard key.",
-        params: [
-        key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "press", callback: cb,
+            namespace: "page",
+            action: "page_press",
+            doc: "Press a keyboard key.",
+            params: [
+            key: "string", required, "Key name: Enter, Escape, ArrowDown, etc.",
+            ],
+            returns: "nil" => "None",
         );
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "enter",
-        action: "page_press",
-        doc: "Alias for page.press(\"Enter\") — press the Enter key.",
-        params: [],
-        returns: "nil" => "None",
-        );
+        page_table.set_field(ctx, "enter", cb);
+        crate::api_docs::register(crate::api_docs::LuaApiDoc {
+            namespace: "page".to_string(),
+            name: "enter".to_string(),
+            action: Some("page_press".to_string()),
+            description: "Alias for page.press(\"Enter\") — press the Enter key.".to_string(),
+            params: vec![],
+            returns: crate::api_docs::ReturnDoc {
+                lua_type: "nil".to_string(),
+                description: "None".to_string(),
+            },
+            source: "rust_core".to_string(),
+        });
     }
 
     // page.select(ref_id, value) — async
@@ -489,17 +472,15 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "select", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "select",
-        action: "page_select",
-        doc: "Select an option in a dropdown by refId and value.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        value: "string", required, "Option value to select",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "select", callback: cb,
+            namespace: "page",
+            action: "page_select",
+            doc: "Select an option in a dropdown by refId and value.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            value: "string", required, "Option value to select",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -550,17 +531,15 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "check", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "check",
-        action: "page_check",
-        doc: "Check or uncheck a checkbox by refId.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        checked: "boolean", optional, "Checked state (default true)",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "check", callback: cb,
+            namespace: "page",
+            action: "page_check",
+            doc: "Check or uncheck a checkbox by refId.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            checked: "boolean", optional, "Checked state (default true)",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -602,16 +581,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "hover", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "hover",
-        action: "page_hover",
-        doc: "Hover over an element by refId.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "hover", callback: cb,
+            namespace: "page",
+            action: "page_hover",
+            doc: "Hover over an element by refId.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -633,15 +610,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "unhover", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "unhover",
-        action: "page_unhover",
-        doc: "Move mouse away from any hovered element.",
-        params: [
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "unhover", callback: cb,
+            namespace: "page",
+            action: "page_unhover",
+            doc: "Move mouse away from any hovered element.",
+            params: [
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -707,18 +682,16 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "scroll", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "scroll",
-        action: "page_scroll",
-        doc: "Scroll the page by direction and amount.",
-        params: [
-        direction: "string", optional, "up, down, left, right (default down)",
-        amount: "number", optional, "Pixels to scroll (default 300)",
-        ref_id: "string", optional, "Element refId to scroll within its overflow container",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "scroll", callback: cb,
+            namespace: "page",
+            action: "page_scroll",
+            doc: "Scroll the page by direction and amount.",
+            params: [
+            direction: "string", optional, "up, down, left, right (default down)",
+            amount: "number", optional, "Pixels to scroll (default 300)",
+            ref_id: "string", optional, "Element refId to scroll within its overflow container",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -760,16 +733,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "scroll_to", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "scroll_to",
-        action: "page_scroll_to",
-        doc: "Scroll to an element by refId.",
-        params: [
-        ref_id: "string", required, "Element refId from snapshot",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "scroll_to", callback: cb,
+            namespace: "page",
+            action: "page_scroll_to",
+            doc: "Scroll to an element by refId.",
+            params: [
+            ref_id: "string", required, "Element refId from snapshot",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -791,15 +762,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "url", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "url",
-        action: "page_url",
-        doc: "Get the current page URL.",
-        params: [
-        ],
-        returns: "string" => "Current URL",
+        lua_api_custom!(ctx, page_table, name: "url", callback: cb,
+            namespace: "page",
+            action: "page_url",
+            doc: "Get the current page URL.",
+            params: [
+            ],
+            returns: "string" => "Current URL",
         );
     }
 
@@ -821,15 +790,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "title", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "title",
-        action: "page_title",
-        doc: "Get the current page title.",
-        params: [
-        ],
-        returns: "string" => "Current page title",
+        lua_api_custom!(ctx, page_table, name: "title", callback: cb,
+            namespace: "page",
+            action: "page_title",
+            doc: "Get the current page title.",
+            params: [
+            ],
+            returns: "string" => "Current page title",
         );
     }
 
@@ -851,15 +818,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "screenshot", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "screenshot",
-        action: "page_screenshot",
-        doc: "Take a screenshot of the current page.",
-        params: [
-        ],
-        returns: "string" => "Base64-encoded screenshot image",
+        lua_api_custom!(ctx, page_table, name: "screenshot", callback: cb,
+            namespace: "page",
+            action: "page_screenshot",
+            doc: "Take a screenshot of the current page.",
+            params: [
+            ],
+            returns: "string" => "Base64-encoded screenshot image",
         );
     }
 
@@ -899,27 +864,23 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "goto", cb);
-        page_table.set_field(ctx, "go", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "goto",
-        action: "page_goto",
-        doc: "Navigate to a URL.",
-        params: [
-        url: "string", required, "URL to navigate to",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "goto", callback: cb,
+            namespace: "page",
+            action: "page_goto",
+            doc: "Navigate to a URL.",
+            params: [
+            url: "string", required, "URL to navigate to",
+            ],
+            returns: "nil" => "None",
         );
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "go",
-        action: "page_goto",
-        doc: "Navigate to a URL (alias for page.goto).",
-        params: [
-        url: "string", required, "URL to navigate to",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "go", callback: cb,
+            namespace: "page",
+            action: "page_goto",
+            doc: "Navigate to a URL (alias for page.goto).",
+            params: [
+            url: "string", required, "URL to navigate to",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -941,15 +902,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "back", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "back",
-        action: "page_back",
-        doc: "Navigate back in history.",
-        params: [
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "back", callback: cb,
+            namespace: "page",
+            action: "page_back",
+            doc: "Navigate back in history.",
+            params: [
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -971,15 +930,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "forward", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "forward",
-        action: "page_forward",
-        doc: "Navigate forward in history.",
-        params: [
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "forward", callback: cb,
+            namespace: "page",
+            action: "page_forward",
+            doc: "Navigate forward in history.",
+            params: [
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -1001,15 +958,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "reload", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "reload",
-        action: "page_reload",
-        doc: "Reload the current page.",
-        params: [
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "reload", callback: cb,
+            namespace: "page",
+            action: "page_reload",
+            doc: "Reload the current page.",
+            params: [
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -1050,27 +1005,34 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "wait", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "wait",
-        action: "page_wait",
-        doc: "Wait for a duration.",
-        params: [
-        ms: "number", optional, "Milliseconds to wait (default 1000)",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "wait", callback: cb,
+            namespace: "page",
+            action: "page_wait",
+            doc: "Wait for a duration.",
+            params: [
+            ms: "number", optional, "Milliseconds to wait (default 1000)",
+            ],
+            returns: "nil" => "None",
         );
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "wait_for_load",
-        action: "tab_wait_for_load",
-        doc: "Wait for the current tab to finish loading.",
-        params: [
-        timeout: "number", optional, "Timeout in milliseconds",
-        ],
-        returns: "boolean" => "true if loaded within timeout",
-        );
+        crate::api_docs::register(crate::api_docs::LuaApiDoc {
+            namespace: "page".to_string(),
+            name: "wait_for_load".to_string(),
+            action: Some("tab_wait_for_load".to_string()),
+            description: "Wait for the current tab to finish loading.".to_string(),
+            params: vec![
+                crate::api_docs::ParamDoc {
+                    name: "timeout".to_string(),
+                    lua_type: "number".to_string(),
+                    required: false,
+                    description: "Timeout in milliseconds".to_string(),
+                },
+            ],
+            returns: crate::api_docs::ReturnDoc {
+                lua_type: "boolean".to_string(),
+                description: "true if loaded within timeout".to_string(),
+            },
+            source: "rust_core".to_string(),
+        });
     }
 
     // page.tabs() — async (extension mode)
@@ -1091,15 +1053,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "tabs", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "tabs",
-        action: "page_tabs",
-        doc: "Get all tabs in the current window (extension mode).",
-        params: [
-        ],
-        returns: "table" => "Array of tab objects",
+        lua_api_custom!(ctx, page_table, name: "tabs", callback: cb,
+            namespace: "page",
+            action: "page_tabs",
+            doc: "Get all tabs in the current window (extension mode).",
+            params: [
+            ],
+            returns: "table" => "Array of tab objects",
         );
     }
 
@@ -1138,16 +1098,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "switch", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "switch",
-        action: "page_switch",
-        doc: "Switch to a tab by ID.",
-        params: [
-        tab_id: "number", required, "Tab ID to switch to",
-        ],
-        returns: "nil" => "None",
+        lua_api_custom!(ctx, page_table, name: "switch", callback: cb,
+            namespace: "page",
+            action: "page_switch",
+            doc: "Switch to a tab by ID.",
+            params: [
+            tab_id: "number", required, "Tab ID to switch to",
+            ],
+            returns: "nil" => "None",
         );
     }
 
@@ -1178,16 +1136,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "new_tab", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "new_tab",
-        action: "page_new_tab",
-        doc: "Open a new tab (optionally with a URL).",
-        params: [
-        url: "string | nil", optional, "URL to open in the new tab",
-        ],
-        returns: "table" => "Created tab object",
+        lua_api_custom!(ctx, page_table, name: "new_tab", callback: cb,
+            namespace: "page",
+            action: "page_new_tab",
+            doc: "Open a new tab (optionally with a URL).",
+            params: [
+            url: "string | nil", optional, "URL to open in the new tab",
+            ],
+            returns: "table" => "Created tab object",
         );
     }
 
@@ -1226,16 +1182,14 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "close", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "close",
-        action: "page_close",
-        doc: "Close a tab by ID.",
-        params: [
-        tab_id: "number", required, "Tab ID to close",
-        ],
-        returns: "boolean" => "Whether close succeeded",
+        lua_api_custom!(ctx, page_table, name: "close", callback: cb,
+            namespace: "page",
+            action: "page_close",
+            doc: "Close a tab by ID.",
+            params: [
+            tab_id: "number", required, "Tab ID to close",
+            ],
+            returns: "boolean" => "Whether close succeeded",
         );
     }
 
@@ -1257,15 +1211,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "active_tab", cb);
-        crate::lua_api_doc!(
-        namespace: "page",
-        name: "active_tab",
-        action: "page_active_tab",
-        doc: "Get the currently active tab ID.",
-        params: [
-        ],
-        returns: "number | nil" => "Active tab ID or nil",
+        lua_api_custom!(ctx, page_table, name: "active_tab", callback: cb,
+            namespace: "page",
+            action: "page_active_tab",
+            doc: "Get the currently active tab ID.",
+            params: [
+            ],
+            returns: "number | nil" => "Active tab ID or nil",
         );
     }
 
@@ -1316,14 +1268,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "find", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, page_table, name: "find", callback: cb,
             namespace: "page",
-            name: "find",
             action: "page_find",
             doc: "Find elements matching a CSS selector.",
             params: [
-                selector: "string", required, "CSS selector",
+            selector: "string", required, "CSS selector",
             ],
             returns: "table" => "Array of element objects { tag, refId, text }",
         );
@@ -1376,15 +1326,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "wait_for", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, page_table, name: "wait_for", callback: cb,
             namespace: "page",
-            name: "wait_for",
             action: "page_wait_for",
             doc: "Wait for an element matching a CSS selector to appear.",
             params: [
-                selector: "string", required, "CSS selector",
-                timeout: "number", optional, "Timeout in milliseconds (default 30000)",
+            selector: "string", required, "CSS selector",
+            timeout: "number", optional, "Timeout in milliseconds (default 30000)",
             ],
             returns: "boolean" => "True if element found, false if timeout",
         );
@@ -1447,15 +1395,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "extract", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, page_table, name: "extract", callback: cb,
             namespace: "page",
-            name: "extract",
             action: "page_extract",
             doc: "Extract structured data from the page.",
             params: [
-                fields: "table", required, "Array of field names: title, url, headings, links, etc.",
-                opts: "table | nil", optional, "Options: max_text, max_headings, max_links",
+            fields: "table", required, "Array of field names: title, url, headings, links, etc.",
+            opts: "table | nil", optional, "Options: max_text, max_headings, max_links",
             ],
             returns: "table" => "Extracted data object",
         );
@@ -1509,15 +1455,13 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 then: None,
             })
         });
-        page_table.set_field(ctx, "append", cb);
-        crate::lua_api_doc!(
+        lua_api_custom!(ctx, page_table, name: "append", callback: cb,
             namespace: "page",
-            name: "append",
             action: "page_append",
             doc: "Append text to an input element by refId.",
             params: [
-                ref_id: "string", required, "Element refId from snapshot",
-                text: "string", required, "Text to append",
+            ref_id: "string", required, "Element refId from snapshot",
+            text: "string", required, "Text to append",
             ],
             returns: "nil" => "None",
         );

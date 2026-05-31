@@ -93,9 +93,11 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
   }
 
   if (!initialized || !session) {
+    // FIXME: pre-existing type error — msg.id does not exist on all WorkerMessage variants.
+    // This should be fixed by making id required on all variants or using a type guard.
     self.postMessage({
       type: "error",
-      id: msg.id,
+      id: (msg as any).id,
       error: "WASM not initialized",
     });
     return;
@@ -173,10 +175,13 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     case "setRelayTimeoutMs": {
       try {
         session.setRelayTimeoutMs(msg.ms);
-        self.postMessage({ type: "result", id: msg.id, data: { ok: true } });
+        // FIXME: pre-existing type error — setRelayTimeoutMs message has no id field.
+        // The caller should include an id, or the worker should not send a result.
+        self.postMessage({ type: "result", id: (msg as any).id, data: { ok: true } });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        self.postMessage({ type: "error", id: msg.id, error: message });
+        // FIXME: same pre-existing id issue as above.
+        self.postMessage({ type: "error", id: (msg as any).id, error: message });
       }
       break;
     }

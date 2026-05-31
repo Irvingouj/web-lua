@@ -1,3 +1,5 @@
+use crate::action::Action;
+use crate::api_docs;
 use crate::globals::{disable_dangerous_globals, register_host_globals, setup_strict_mode};
 use crate::json::{json_value_to_lua, lua_value_to_json, register_json_module};
 use crate::plugin::LuaPlugin;
@@ -2727,6 +2729,119 @@ mod tests {
             "Expected error or async pending, got: {:?}",
             result
         );
+    }
+
+    // ── Registry completeness tests ───────────────────────────────
+
+    #[test]
+    fn test_all_rust_core_apis_with_action_have_non_empty_action() {
+        let _session = NotebookSession::new();
+        let registry = api_docs::REGISTRY.lock().unwrap();
+        for doc in registry.iter().filter(|d| d.source == "rust_core") {
+            // Only skip sync helpers that legitimately have no action
+            if doc.namespace == "path" || (doc.namespace == "runtime" && doc.name == "inspect") {
+                continue;
+            }
+            assert!(
+                doc.action.as_ref().map_or(false, |a| !a.is_empty()),
+                "API {}.{} has no action string",
+                doc.namespace,
+                doc.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_action_variants_have_docs() {
+        let _session = NotebookSession::new();
+        let registry = api_docs::REGISTRY.lock().unwrap();
+        let action_strings: Vec<String> = registry
+            .iter()
+            .filter_map(|d| d.action.clone())
+            .filter(|a| !a.is_empty())
+            .collect();
+
+        for variant in Action::all_variants() {
+            let s = variant.as_str().to_string();
+            if matches!(variant, Action::Host(_) | Action::Other(_)) {
+                continue;
+            }
+            assert!(
+                action_strings.contains(&s),
+                "Action variant {} has no corresponding doc entry",
+                s
+            );
+        }
+    }
+
+    // ── Path function tests ─────────────────────────────────────
+
+    #[test]
+    fn test_path_join() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(path.join("a", "b"))"#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["/a/b"]);
+    }
+
+    #[test]
+    fn test_path_sep() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(path.sep)"#, "");
+        assert_eq!(result.stdout, vec!["/"]);
+    }
+
+    #[test]
+    fn test_path_extname_dotfile() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(path.extname(".gitignore"))"#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec![""]);
+    }
+
+    #[test]
+    fn test_path_extname_normal() {
+        let mut session = NotebookSession::new();
+        let r1 = session.run_cell(r#"print(path.extname("/foo/bar.txt"))"#, "");
+        assert_eq!(r1.stdout, vec![".txt"]);
+        let r2 = session.run_cell(r#"print(path.extname("/foo/bar"))"#, "");
+        assert_eq!(r2.stdout, vec![""]);
+    }
+
+    #[test]
+    fn test_path_basename() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(path.basename("/foo/bar.txt"))"#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["bar.txt"]);
+    }
+
+    #[test]
+    fn test_path_dirname() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(path.dirname("/foo/bar.txt"))"#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["/foo"]);
+    }
+
+    #[test]
+    fn test_path_normalize() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(path.normalize("/foo/../bar"))"#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["/bar"]);
+    }
+
+    #[test]
+    fn test_path_is_absolute() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(r#"print(tostring(path.is_absolute("/foo")))"#, "");
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert_eq!(result.stdout, vec!["true"]);
+
+        let result2 = session.run_cell(r#"print(tostring(path.is_absolute("foo")))"#, "");
+        assert!(result2.error.is_none(), "got error: {:?}", result2.error);
+        assert_eq!(result2.stdout, vec!["false"]);
     }
 }
 
