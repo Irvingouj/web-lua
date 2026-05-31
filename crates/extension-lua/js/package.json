@@ -13,13 +13,16 @@
   ],
   "scripts": {
     "build": "node ../../../scripts/build-npm.js extension",
-    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js extension"
+    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js extension",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@pi-oxide/dom-semantic-tree": "^0.1.0"
+    "@pi-oxide/dom-semantic-tree": "^0.1.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.268"
+    "@types/chrome": "^0.0.268",
+    "vitest": "^1.6.0"
   },
   "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0"
 }

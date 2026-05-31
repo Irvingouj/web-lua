@@ -1,3 +1,4 @@
+use crate::json::json_value_to_lua;
 use crate::state::HostState;
 use piccolo::{Callback, CallbackReturn, Context, String as LuaString, Table, Value};
 use std::cell::RefCell;
@@ -110,6 +111,76 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
         ],
 
         returns: "table" => "Array of global variable descriptors: name, type, keys, value",
+
+    );
+
+    let docs_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let docs = crate::api_docs::all_as_json_value();
+        stack.clear();
+        stack.push_back(json_value_to_lua(ctx, &docs));
+        Ok(CallbackReturn::Return)
+    });
+
+    lua_api_custom!(ctx, runtime_table, name: "docs", callback: docs_cb,
+
+        namespace: "runtime",
+
+        action: "runtime_docs",
+
+        doc: "Return documentation for all registered Lua APIs.",
+
+        params: [
+
+        ],
+
+        returns: "table" => "Array of API documentation records",
+
+    );
+
+    let get_doc_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let query = if !stack.is_empty() {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => {
+                    let msg = format!(
+                        "runtime.get_doc expects an API name or action string, got {}",
+                        other.type_name()
+                    );
+                    return Err(piccolo::IntoValue::into_value(msg, ctx).into());
+                }
+            }
+        } else {
+            return Err(piccolo::IntoValue::into_value(
+                "runtime.get_doc requires an API name or action string",
+                ctx,
+            )
+            .into());
+        };
+
+        stack.clear();
+        if let Some(doc) = crate::api_docs::find_as_json_value(&query) {
+            stack.push_back(json_value_to_lua(ctx, &doc));
+        } else {
+            stack.push_back(Value::Nil);
+        }
+        Ok(CallbackReturn::Return)
+    });
+
+    lua_api_custom!(ctx, runtime_table, name: "get_doc", callback: get_doc_cb,
+
+        namespace: "runtime",
+
+        action: "runtime_get_doc",
+
+        doc: "Return documentation for one API by `namespace.name` or action string.",
+
+        params: [
+
+        query: "string", required, "API name such as `page.click` or action such as `page_click`",
+
+        ],
+
+        returns: "table | nil" => "API documentation record, or nil when not found",
 
     );
     set_protected_global!(ctx, "runtime", runtime_table, "runtime");

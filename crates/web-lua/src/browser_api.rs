@@ -732,27 +732,24 @@ pub async fn execute_fetch_dom(params: FetchDomParams) -> WasmAsyncResponse {
 
     let mut matches = Vec::new();
     if !params.selector.is_empty() {
-        match doc.query_selector_all(&params.selector) {
-            Ok(elements) => {
-                let len = elements.length();
-                for i in 0..len {
-                    if let Some(node) = elements.item(i) {
-                        if let Ok(el) = node.dyn_into::<web_sys::Element>() {
-                            let text = el.text_content().unwrap_or_default().trim().to_string();
-                            let text = if text.len() > params.max_text as usize {
-                                text[..params.max_text as usize].to_string()
-                            } else {
-                                text
-                            };
-                            matches.push(serde_json::json!({
-                                "tag": el.tag_name().to_lowercase(),
-                                "text": text,
-                            }));
-                        }
+        if let Ok(elements) = doc.query_selector_all(&params.selector) {
+            let len = elements.length();
+            for i in 0..len {
+                if let Some(node) = elements.item(i) {
+                    if let Ok(el) = node.dyn_into::<web_sys::Element>() {
+                        let text = el.text_content().unwrap_or_default().trim().to_string();
+                        let text = if text.len() > params.max_text as usize {
+                            text[..params.max_text as usize].to_string()
+                        } else {
+                            text
+                        };
+                        matches.push(serde_json::json!({
+                            "tag": el.tag_name().to_lowercase(),
+                            "text": text,
+                        }));
                     }
                 }
             }
-            Err(_) => {}
         }
     }
 

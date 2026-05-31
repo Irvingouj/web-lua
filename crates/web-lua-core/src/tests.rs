@@ -1,29 +1,20 @@
 use crate::action::Action;
 use crate::api_docs;
-use crate::globals::{disable_dangerous_globals, register_host_globals, setup_strict_mode};
-use crate::json::{json_value_to_lua, lua_value_to_json, register_json_module};
 use crate::plugin::LuaPlugin;
-use crate::session::{NotebookSession, SessionBuilder};
+use crate::session::NotebookSession;
 use crate::state::HostState;
-use crate::types::{
-    AsyncCommand, CellError, CellStatus, GlobalVariable, GlobalsSnapshot, RunResult,
-};
-use crate::utils::{classify_extern_error, format_value};
-use crate::web::register_web_module;
-use piccolo::{
-    Callback, CallbackReturn, Closure, Context, Executor, ExecutorMode, Fuel, IntoValue, Lua,
-    StashedExecutor, String as LuaString, Table, Value,
-};
-use serde_json;
+use crate::types::{AsyncCommand, CellError, CellStatus, GlobalVariable, RunResult};
+use piccolo::{Callback, CallbackReturn, Context, IntoValue, Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
-use ts_rs::TS;
 
 // ─── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use super::*;
+    use ts_rs::TS;
 
     #[test]
     fn test_export_types() {
@@ -1225,6 +1216,33 @@ mod tests {
     }
 
     #[test]
+    fn test_runtime_docs_lua_api() {
+        let mut session = NotebookSession::new();
+        let result = session.run_cell(
+            r#"
+            local doc = runtime.get_doc("runtime.inspect")
+            print(doc.namespace .. "." .. doc.name)
+            local docs = runtime.docs()
+            print(type(docs[1]))
+            "#,
+            "",
+        );
+
+        assert_eq!(result.status, CellStatus::Done);
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(
+            result.stdout.iter().any(|s| s.contains("runtime.inspect")),
+            "got: {:?}",
+            result.stdout
+        );
+        assert!(
+            result.stdout.iter().any(|s| s.contains("table")),
+            "got: {:?}",
+            result.stdout
+        );
+    }
+
+    #[test]
     fn test_async_pending_status() {
         let mut session = NotebookSession::new();
         let result = session.run_cell("local x = web.mock_async(\"test\")\nprint(x)", "");
@@ -1912,7 +1930,7 @@ mod tests {
         let cmd = result.pending_command.unwrap();
         assert_eq!(cmd.action.as_str(), "fs_write");
         assert_eq!(cmd.params["path"], "/test.txt");
-        assert!(cmd.params["data"].as_str().unwrap().len() > 0);
+        assert!(!cmd.params["data"].as_str().unwrap().is_empty());
     }
 
     #[test]
@@ -2266,7 +2284,7 @@ mod tests {
             fn register(&self, ctx: Context, _hs: Rc<RefCell<HostState>>) {
                 let t = Table::new(&ctx);
                 let cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-                    let val = if stack.len() > 0 {
+                    let val = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::Integer(i) => i * 2,
                             other => {
@@ -2308,7 +2326,7 @@ mod tests {
             fn register(&self, ctx: Context, hs: Rc<RefCell<HostState>>) {
                 let hs_async = hs.clone();
                 let cb = Callback::from_fn(&ctx, move |_ctx, _exec, mut stack| {
-                    let label = if stack.len() > 0 {
+                    let label = if !stack.is_empty() {
                         match stack.get(0) {
                             Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
                             _ => "default".to_string(),
@@ -2743,7 +2761,7 @@ mod tests {
                 continue;
             }
             assert!(
-                doc.action.as_ref().map_or(false, |a| !a.is_empty()),
+                doc.action.as_ref().is_some_and(|a| !a.is_empty()),
                 "API {}.{} has no action string",
                 doc.namespace,
                 doc.name
@@ -2846,6 +2864,4 @@ mod tests {
 }
 
 #[cfg(test)]
-mod debug_tests {
-    use ts_rs::TS;
-}
+mod debug_tests {}

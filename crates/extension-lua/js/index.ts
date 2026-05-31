@@ -6,19 +6,26 @@
 import type { CellResult, WasmGlobalsSnapshot } from "./extension_lua.js";
 import { generateApiDocs } from "./extension_lua.js";
 import { logger } from "./logger.js";
-import type { Command } from "./runner.js";
 import {
   executeMainThreadCommand,
   registerHostHandler,
   registerHostHandlers,
   removeExtensionListeners,
 } from "./runner.js";
+import type { Command } from "./tool-registry.js";
+import { listTools, registerTool } from "./tool-registry.js";
 
 export type {
   CellResult as LuaRunResult,
   WasmGlobalsSnapshot as LuaGlobalsSnapshot,
 };
-export { generateApiDocs, registerHostHandler, registerHostHandlers };
+export {
+  generateApiDocs,
+  listTools,
+  registerHostHandler,
+  registerHostHandlers,
+  registerTool,
+};
 
 export interface LuaApiDoc {
   namespace: string;
@@ -230,7 +237,11 @@ export class ExtensionSession {
     });
   }
 
-  async runCellAsync(code: string, stdin?: string, timeoutMs?: number): Promise<CellResult> {
+  async runCellAsync(
+    code: string,
+    stdin?: string,
+    timeoutMs?: number,
+  ): Promise<CellResult> {
     const id = this.generateId();
     if (timeoutMs !== undefined && timeoutMs > 0) {
       this.worker?.postMessage({ type: "setRelayTimeoutMs", ms: timeoutMs });

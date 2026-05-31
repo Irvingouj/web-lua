@@ -40,8 +40,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>) {
                 Value::String(s) => {
                     let p = String::from_utf8_lossy(s.as_bytes());
                     p.split('/')
-                        .filter(|s| !s.is_empty())
-                        .last()
+                        .rfind(|s| !s.is_empty())
                         .unwrap_or("")
                         .to_string()
                 }
@@ -111,9 +110,10 @@ pub(crate) fn register<'a>(ctx: Context<'a>) {
                 Value::String(s) => {
                     let p = String::from_utf8_lossy(s.as_bytes());
                     let base = p.rsplit('/').next().unwrap_or("");
-                    if base == "." || base == ".." {
-                        "".to_string()
-                    } else if base.starts_with('.') && base[1..].find('.').is_none() {
+                    if base == "."
+                        || base == ".."
+                        || (base.starts_with('.') && base[1..].find('.').is_none())
+                    {
                         "".to_string()
                     } else if let Some(dot_pos) = base.rfind('.') {
                         base[dot_pos..].to_string()

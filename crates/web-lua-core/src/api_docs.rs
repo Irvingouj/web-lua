@@ -102,6 +102,26 @@ pub fn generate(format: ApiDocFormat) -> String {
     }
 }
 
+pub fn all_as_json_value() -> serde_json::Value {
+    let docs = REGISTRY.lock().unwrap().clone();
+    serde_json::to_value(docs).unwrap_or_else(|_| serde_json::Value::Array(Vec::new()))
+}
+
+pub fn find_as_json_value(query: &str) -> Option<serde_json::Value> {
+    let (namespace, name) = query
+        .split_once('.')
+        .map(|(ns, name)| (Some(ns), name))
+        .unwrap_or((None, query));
+
+    let docs = REGISTRY.lock().unwrap();
+    docs.iter()
+        .find(|doc| {
+            doc.name == name && namespace.is_none_or(|ns| doc.namespace == ns)
+                || doc.action.as_deref() == Some(query)
+        })
+        .and_then(|doc| serde_json::to_value(doc).ok())
+}
+
 /// Deduplicated boilerplate macro: injects a `generate_api_docs` WASM export
 /// that first creates a temporary session to populate the API registry.
 #[macro_export]

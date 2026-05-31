@@ -1,5 +1,6 @@
 // Content script for Lua Notebook extension
 // Runs in isolated world, handles tab.* operations via chrome.runtime.onMessage.
+import { z } from "zod";
 const __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 };
 let __logLevel = 3; // default "error"
 const logger = {
@@ -80,19 +81,6 @@ function findCandidateLabels(query) {
     return Array.from(candidates)
         .filter((c) => c.toLowerCase().includes(lowerQuery))
         .slice(0, 5);
-}
-function asRecord(obj) {
-    return typeof obj === "object" && obj !== null && !Array.isArray(obj)
-        ? obj
-        : {};
-}
-function getStringParam(params, key) {
-    const val = asRecord(params)[key];
-    return typeof val === "string" ? val : "";
-}
-function getNumberParam(params, key, fallback) {
-    const val = asRecord(params)[key];
-    return typeof val === "number" ? val : fallback;
 }
 function getAccessibleRole(el) {
     const tag = el.tagName.toLowerCase();
@@ -263,10 +251,20 @@ function inlineSnapshot(maxNodes) {
         },
     };
 }
-const handlers = {
-    click: (params) => {
-        const refId = getStringParam(params, "refId");
-        const label = getStringParam(params, "label");
+export const csRegistry = new Map();
+export function registerContentScriptTool(tool) {
+    csRegistry.set(tool.action, tool);
+}
+// ─── Register all handlers ───────────────────────────────────────
+registerContentScriptTool({
+    action: "click",
+    description: "Click a DOM element",
+    params: z.object({
+        refId: z.string().optional(),
+        label: z.string().optional(),
+    }),
+    handler: (params) => {
+        const { refId, label } = params;
         let el = refId ? getElementByRefId(refId) : null;
         if (!el && label) {
             el = findElementByLabel(label);
@@ -279,10 +277,17 @@ const handlers = {
         el.click();
         return null;
     },
-    fill: (params) => {
-        const refId = getStringParam(params, "refId");
-        const label = getStringParam(params, "label");
-        const value = getStringParam(params, "value");
+});
+registerContentScriptTool({
+    action: "fill",
+    description: "Fill a DOM input",
+    params: z.object({
+        refId: z.string().optional(),
+        label: z.string().optional(),
+        value: z.string().optional(),
+    }),
+    handler: (params) => {
+        const { refId, label, value = "" } = params;
         let el = refId ? getElementByRefId(refId) : null;
         if (!el && label) {
             el = findElementByLabel(label);
@@ -300,10 +305,17 @@ const handlers = {
         }
         throw new Error("Element is not an input");
     },
-    type: (params) => {
-        const refId = getStringParam(params, "refId");
-        const label = getStringParam(params, "label");
-        const text = getStringParam(params, "text");
+});
+registerContentScriptTool({
+    action: "type",
+    description: "Type text into a DOM input",
+    params: z.object({
+        refId: z.string().optional(),
+        label: z.string().optional(),
+        text: z.string().optional(),
+    }),
+    handler: (params) => {
+        const { refId, label, text = "" } = params;
         let el = refId ? getElementByRefId(refId) : null;
         if (!el && label) {
             el = findElementByLabel(label);
@@ -321,10 +333,17 @@ const handlers = {
         }
         throw new Error("Element is not an input");
     },
-    append: (params) => {
-        const refId = getStringParam(params, "refId");
-        const label = getStringParam(params, "label");
-        const text = getStringParam(params, "text");
+});
+registerContentScriptTool({
+    action: "append",
+    description: "Append text to a DOM input",
+    params: z.object({
+        refId: z.string().optional(),
+        label: z.string().optional(),
+        text: z.string().optional(),
+    }),
+    handler: (params) => {
+        const { refId, label, text = "" } = params;
         let el = refId ? getElementByRefId(refId) : null;
         if (!el && label) {
             el = findElementByLabel(label);
@@ -342,17 +361,29 @@ const handlers = {
         }
         throw new Error("Element is not an input");
     },
-    press: (params) => {
-        const key = getStringParam(params, "key");
+});
+registerContentScriptTool({
+    action: "press",
+    description: "Press a keyboard key",
+    params: z.object({ key: z.string() }),
+    handler: (params) => {
+        const { key = "" } = params;
         const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
         document.dispatchEvent(evDown);
         const evUp = new KeyboardEvent("keyup", { key, bubbles: true });
         document.dispatchEvent(evUp);
         return null;
     },
-    select: (params) => {
-        const refId = getStringParam(params, "refId");
-        const value = getStringParam(params, "value");
+});
+registerContentScriptTool({
+    action: "select",
+    description: "Select an option in a DOM select",
+    params: z.object({
+        refId: z.string().optional(),
+        value: z.string().optional(),
+    }),
+    handler: (params) => {
+        const { refId, value = "" } = params;
         const el = refId ? getElementByRefId(refId) : null;
         if (!el)
             throw new Error(`Element ${refId} not found`);
@@ -362,12 +393,16 @@ const handlers = {
         }
         throw new Error("Element is not a select");
     },
-    check: (params) => {
-        const refId = getStringParam(params, "refId");
-        const checked = (() => {
-            const obj = asRecord(params);
-            return typeof obj.checked === "boolean" ? obj.checked : true;
-        })();
+});
+registerContentScriptTool({
+    action: "check",
+    description: "Check or uncheck a checkbox",
+    params: z.object({
+        refId: z.string().optional(),
+        checked: z.boolean().optional(),
+    }),
+    handler: (params) => {
+        const { refId, checked = true } = params;
         const el = refId ? getElementByRefId(refId) : null;
         if (!el)
             throw new Error(`Element ${refId} not found`);
@@ -377,8 +412,13 @@ const handlers = {
         }
         throw new Error("Element is not a checkbox");
     },
-    hover: (params) => {
-        const refId = getStringParam(params, "refId");
+});
+registerContentScriptTool({
+    action: "hover",
+    description: "Hover over a DOM element",
+    params: z.object({ refId: z.string().optional() }),
+    handler: (params) => {
+        const { refId } = params;
         const el = refId ? getElementByRefId(refId) : null;
         if (!el)
             throw new Error(`Element ${refId} not found`);
@@ -386,16 +426,27 @@ const handlers = {
         el.dispatchEvent(ev);
         return null;
     },
-    unhover: () => {
+});
+registerContentScriptTool({
+    action: "unhover",
+    description: "Unhover from the document body",
+    params: z.object({}),
+    handler: () => {
         const ev = new MouseEvent("mouseleave", { bubbles: true });
         document.body.dispatchEvent(ev);
         return null;
     },
-    scroll: (params) => {
-        const obj = asRecord(params);
-        const direction = obj.direction ?? "down";
-        const amount = typeof obj.amount === "number" ? obj.amount : 300;
-        const refId = obj.refId ?? "";
+});
+registerContentScriptTool({
+    action: "scroll",
+    description: "Scroll the page or an element",
+    params: z.object({
+        direction: z.string().optional(),
+        amount: z.number().optional(),
+        refId: z.string().optional(),
+    }),
+    handler: (params) => {
+        const { direction = "down", amount = 300, refId } = params;
         if (refId) {
             const el = getElementByRefId(refId);
             let scrollable = el;
@@ -440,8 +491,13 @@ const handlers = {
         });
         return true;
     },
-    dblclick: (params) => {
-        const refId = getStringParam(params, "refId");
+});
+registerContentScriptTool({
+    action: "dblclick",
+    description: "Double-click a DOM element",
+    params: z.object({ refId: z.string().optional() }),
+    handler: (params) => {
+        const { refId } = params;
         const el = refId ? getElementByRefId(refId) : null;
         if (!el)
             throw new Error(`Element ${refId} not found`);
@@ -449,18 +505,35 @@ const handlers = {
         el.dispatchEvent(ev);
         return null;
     },
-    forward: () => {
+});
+registerContentScriptTool({
+    action: "forward",
+    description: "Navigate forward in history",
+    params: z.object({}),
+    handler: () => {
         window.history.forward();
         return true;
     },
-    reload: () => {
+});
+registerContentScriptTool({
+    action: "reload",
+    description: "Reload the page",
+    params: z.object({}),
+    handler: () => {
         window.location.reload();
         return true;
     },
-    scrollTo: (params) => {
-        const refId = getStringParam(params, "refId");
-        const x = getNumberParam(params, "x", 0);
-        const y = getNumberParam(params, "y", 0);
+});
+registerContentScriptTool({
+    action: "scrollTo",
+    description: "Scroll to coordinates or an element",
+    params: z.object({
+        refId: z.string().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+    }),
+    handler: (params) => {
+        const { refId, x = 0, y = 0 } = params;
         if (refId) {
             const el = getElementByRefId(refId);
             el.scrollIntoView({ behavior: "smooth" });
@@ -469,36 +542,61 @@ const handlers = {
         window.scrollTo({ top: y, left: x, behavior: "smooth" });
         return true;
     },
-    evaluate: (params) => {
-        const code = getStringParam(params, "code");
+});
+registerContentScriptTool({
+    action: "evaluate",
+    description: "Evaluate JavaScript in the page context",
+    params: z.object({ code: z.string().optional() }),
+    handler: (params) => {
+        const { code = "" } = params;
         if (typeof code !== "string") {
             throw new Error("evaluate requires a string argument");
         }
         // Use new Function to avoid capturing local scope (marginally safer than eval)
         return new Function(code)();
     },
-    back: () => {
+});
+registerContentScriptTool({
+    action: "back",
+    description: "Navigate back in history",
+    params: z.object({}),
+    handler: () => {
         window.history.back();
         return true;
     },
-    ping: () => {
+});
+registerContentScriptTool({
+    action: "ping",
+    description: "Ping the content script",
+    params: z.object({}),
+    handler: () => {
         return { ok: true };
     },
-    snapshot: async (params) => {
-        const obj = asRecord(params);
-        const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-        logger.debug("[content-script] snapshot called, maxNodes:", maxNodes, "document.body:", !!document.body);
-        const r = inlineSnapshot(maxNodes);
+});
+registerContentScriptTool({
+    action: "snapshot",
+    description: "Take a DOM snapshot",
+    params: z.object({ max_nodes: z.number().optional() }),
+    handler: async (params) => {
+        const { max_nodes = 500 } = params;
+        logger.debug("[content-script] snapshot called, maxNodes:", max_nodes, "document.body:", !!document.body);
+        const r = inlineSnapshot(max_nodes);
         logger.debug("[content-script] snapshot result nodes:", r.nodes.length);
         return r;
     },
-    fetch: async (params) => {
-        const obj = asRecord(params);
-        const url = obj.url;
-        const method = (obj.method || "GET").toString().toUpperCase();
-        const headers = obj.headers || {};
-        const body = obj.body ?? null;
-        const timeout = typeof obj.timeout === "number" ? obj.timeout : 30_000;
+});
+registerContentScriptTool({
+    action: "fetch",
+    description: "Fetch a URL from the page context",
+    params: z.object({
+        url: z.string(),
+        method: z.string().optional(),
+        headers: z.record(z.unknown()).optional(),
+        body: z.unknown().optional(),
+        timeout: z.number().optional(),
+    }),
+    handler: async (params) => {
+        const { url = "", method = "GET", headers = {}, body = null, timeout = 30_000, } = params;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout || 30_000);
         try {
@@ -527,21 +625,32 @@ const handlers = {
             throw e;
         }
     },
-};
+});
+// ─── Message listener with MANDATORY try-catch ───────────────────
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     const action = request?.action;
     logger.debug("[content-script] received action:", action, "params:", request?.params);
-    const handler = handlers[action];
-    if (!handler) {
+    const tool = csRegistry.get(action);
+    if (!tool) {
         logger.debug("[content-script] no handler for action:", action);
         sendResponse({
             ok: false,
             error: `Unknown content script action: ${action}`,
         });
-        return false;
+        return true;
     }
+    const parsed = tool.params.safeParse(request?.params ?? {});
+    if (!parsed.success) {
+        logger.debug("[content-script] invalid params for action:", action, parsed.error.message);
+        sendResponse({
+            ok: false,
+            error: `Invalid params: ${parsed.error.message}`,
+        });
+        return true;
+    }
+    // ====== MANDATORY TRY-CATCH ======
     try {
-        const result = handler(request?.params);
+        const result = tool.handler(parsed.data);
         if (result instanceof Promise) {
             result
                 .then((value) => {
@@ -550,8 +659,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             })
                 .catch((err) => {
                 const msg = err instanceof Error ? err.message : String(err);
-                logger.debug("[content-script] async error for", action, ":", msg);
-                sendResponse({ ok: false, error: msg || String(err) });
+                logger.error(`[ContentScript] ${action} failed:`, msg);
+                sendResponse({ ok: false, error: msg });
             });
             return true;
         }
@@ -561,8 +670,8 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     }
     catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        logger.debug("[content-script] sync error for", action, ":", msg);
-        sendResponse({ ok: false, error: msg || String(err) });
+        logger.error(`[ContentScript] ${action} failed:`, msg);
+        sendResponse({ ok: false, error: msg });
         return false;
     }
 });
