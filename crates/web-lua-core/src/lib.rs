@@ -81,5 +81,3 @@ macro_rules! lua_api_doc {
         });
     };
 }
-
-

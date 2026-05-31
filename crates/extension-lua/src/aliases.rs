@@ -52,8 +52,7 @@ fn call_with_args_alias_cb<'gc>(
 ) -> Callback<'gc> {
     let f = get_nested_function(ctx, path).unwrap();
     let f_stashed = ctx.stash(f);
-    let args_stashed: Vec<piccolo::StashedValue> =
-        args.into_iter().map(|v| ctx.stash(v)).collect();
+    let args_stashed: Vec<piccolo::StashedValue> = args.into_iter().map(|v| ctx.stash(v)).collect();
     Callback::from_fn(ctx.mutation(), move |ctx, _exec, mut stack| {
         let f = ctx.fetch(&f_stashed);
         stack.clear();
@@ -78,20 +77,18 @@ fn extract_field_alias_cb<'gc>(
     let f_stashed = ctx.stash(f);
     Callback::from_fn(ctx.mutation(), move |ctx, _exec, _stack| {
         let f = ctx.fetch(&f_stashed);
-        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| {
-            async move {
-                seq.try_enter(|ctx, _locals, _exec, mut stack| {
-                    let result = stack.get(0);
-                    let extracted = match result {
-                        Value::Table(t) => t.get_value(ctx, field),
-                        _ => Value::Nil,
-                    };
-                    stack.clear();
-                    stack.push_back(extracted);
-                    Ok(())
-                })?;
-                Ok(SequenceReturn::Return)
-            }
+        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| async move {
+            seq.try_enter(|ctx, _locals, _exec, mut stack| {
+                let result = stack.get(0);
+                let extracted = match result {
+                    Value::Table(t) => t.get_value(ctx, field),
+                    _ => Value::Nil,
+                };
+                stack.clear();
+                stack.push_back(extracted);
+                Ok(())
+            })?;
+            Ok(SequenceReturn::Return)
         });
         Ok(CallbackReturn::Call {
             function: f,
@@ -146,26 +143,24 @@ fn tab_current_cb<'gc>(ctx: Context<'gc>) -> Callback<'gc> {
         filter.set_field(ctx, "currentWindow", Value::Boolean(true));
         stack.clear();
         stack.push_back(Value::Table(filter));
-        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| {
-            async move {
-                seq.try_enter(|ctx, _locals, _exec, mut stack| {
-                    let tabs = stack.get(0);
-                    let id = match tabs {
-                        Value::Table(t) => {
-                            let first_tab = t.get_value(ctx, 1);
-                            match first_tab {
-                                Value::Table(tab) => tab.get_value(ctx, "id"),
-                                _ => Value::Nil,
-                            }
+        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| async move {
+            seq.try_enter(|ctx, _locals, _exec, mut stack| {
+                let tabs = stack.get(0);
+                let id = match tabs {
+                    Value::Table(t) => {
+                        let first_tab = t.get_value(ctx, 1);
+                        match first_tab {
+                            Value::Table(tab) => tab.get_value(ctx, "id"),
+                            _ => Value::Nil,
                         }
-                        _ => Value::Nil,
-                    };
-                    stack.clear();
-                    stack.push_back(id);
-                    Ok(())
-                })?;
-                Ok(SequenceReturn::Return)
-            }
+                    }
+                    _ => Value::Nil,
+                };
+                stack.clear();
+                stack.push_back(id);
+                Ok(())
+            })?;
+            Ok(SequenceReturn::Return)
         });
         Ok(CallbackReturn::Call {
             function: f,
@@ -180,25 +175,27 @@ fn tab_url_cb<'gc>(ctx: Context<'gc>) -> Callback<'gc> {
     let f_stashed = ctx.stash(f);
     Callback::from_fn(ctx.mutation(), move |ctx, _exec, stack| {
         let f = ctx.fetch(&f_stashed);
-        let arg = if stack.is_empty() { Value::Nil } else { stack.get(0) };
+        let arg = if stack.is_empty() {
+            Value::Nil
+        } else {
+            stack.get(0)
+        };
         // If no tab_id provided, return Nil immediately
         if matches!(arg, Value::Nil) {
             return Ok(CallbackReturn::Return);
         }
-        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| {
-            async move {
-                seq.try_enter(|ctx, _locals, _exec, mut stack| {
-                    let tab = stack.get(0);
-                    let url = match tab {
-                        Value::Table(t) => t.get_value(ctx, "url"),
-                        _ => Value::Nil,
-                    };
-                    stack.clear();
-                    stack.push_back(url);
-                    Ok(())
-                })?;
-                Ok(SequenceReturn::Return)
-            }
+        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| async move {
+            seq.try_enter(|ctx, _locals, _exec, mut stack| {
+                let tab = stack.get(0);
+                let url = match tab {
+                    Value::Table(t) => t.get_value(ctx, "url"),
+                    _ => Value::Nil,
+                };
+                stack.clear();
+                stack.push_back(url);
+                Ok(())
+            })?;
+            Ok(SequenceReturn::Return)
         });
         Ok(CallbackReturn::Call {
             function: f,
@@ -213,25 +210,27 @@ fn tab_title_cb<'gc>(ctx: Context<'gc>) -> Callback<'gc> {
     let f_stashed = ctx.stash(f);
     Callback::from_fn(ctx.mutation(), move |ctx, _exec, stack| {
         let f = ctx.fetch(&f_stashed);
-        let arg = if stack.is_empty() { Value::Nil } else { stack.get(0) };
+        let arg = if stack.is_empty() {
+            Value::Nil
+        } else {
+            stack.get(0)
+        };
         // If no tab_id provided, return Nil immediately
         if matches!(arg, Value::Nil) {
             return Ok(CallbackReturn::Return);
         }
-        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| {
-            async move {
-                seq.try_enter(|ctx, _locals, _exec, mut stack| {
-                    let tab = stack.get(0);
-                    let title = match tab {
-                        Value::Table(t) => t.get_value(ctx, "title"),
-                        _ => Value::Nil,
-                    };
-                    stack.clear();
-                    stack.push_back(title);
-                    Ok(())
-                })?;
-                Ok(SequenceReturn::Return)
-            }
+        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| async move {
+            seq.try_enter(|ctx, _locals, _exec, mut stack| {
+                let tab = stack.get(0);
+                let title = match tab {
+                    Value::Table(t) => t.get_value(ctx, "title"),
+                    _ => Value::Nil,
+                };
+                stack.clear();
+                stack.push_back(title);
+                Ok(())
+            })?;
+            Ok(SequenceReturn::Return)
         });
         Ok(CallbackReturn::Call {
             function: f,
@@ -730,14 +729,12 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
         name: "sleep".to_string(),
         action: Some("sleep".to_string()),
         description: "Alias for runtime.sleep.".to_string(),
-        params: vec![
-            web_lua_core::api_docs::ParamDoc {
-                name: "ms".to_string(),
-                lua_type: "number".to_string(),
-                required: false,
-                description: "Milliseconds".to_string(),
-            },
-        ],
+        params: vec![web_lua_core::api_docs::ParamDoc {
+            name: "ms".to_string(),
+            lua_type: "number".to_string(),
+            required: false,
+            description: "Milliseconds".to_string(),
+        }],
         returns: web_lua_core::api_docs::ReturnDoc {
             lua_type: "nil".to_string(),
             description: "None".to_string(),

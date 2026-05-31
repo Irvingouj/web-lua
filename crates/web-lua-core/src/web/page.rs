@@ -1019,14 +1019,12 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             name: "wait_for_load".to_string(),
             action: Some("tab_wait_for_load".to_string()),
             description: "Wait for the current tab to finish loading.".to_string(),
-            params: vec![
-                crate::api_docs::ParamDoc {
-                    name: "timeout".to_string(),
-                    lua_type: "number".to_string(),
-                    required: false,
-                    description: "Timeout in milliseconds".to_string(),
-                },
-            ],
+            params: vec![crate::api_docs::ParamDoc {
+                name: "timeout".to_string(),
+                lua_type: "number".to_string(),
+                required: false,
+                description: "Timeout in milliseconds".to_string(),
+            }],
             returns: crate::api_docs::ReturnDoc {
                 lua_type: "boolean".to_string(),
                 description: "true if loaded within timeout".to_string(),

@@ -24,3 +24,15 @@ crates/*/js/dist/
 web/public/dom_snapshot_wasm.js
 web/public/dom_snapshot_wasm_bg.wasm
 .claude/
+
+# Generated build artifacts
+# (these are produced by scripts/build.js and cargo build)
+crates/dom-semantic-tree/js/dom_semantic_tree.js
+crates/extension-lua/js/API.md
+crates/extension-lua/js/api.json
+crates/web-lua/js/api.json
+web/src/types/generated.ts
+
+# AI tooling / personal
+.omo/
+.opencode/

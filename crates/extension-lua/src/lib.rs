@@ -54,7 +54,9 @@ mod tests {
 
         for (ns, name) in &expected_aliases {
             assert!(
-                registry.iter().any(|d| d.namespace == *ns && d.name == *name),
+                registry
+                    .iter()
+                    .any(|d| d.namespace == *ns && d.name == *name),
                 "Expected alias {}.{} to be registered",
                 ns,
                 name
@@ -62,8 +64,13 @@ mod tests {
         }
 
         // Verify page.go is present as a core API (registered by page.rs), not as an alias
-        let page_go = registry.iter().find(|d| d.namespace == "page" && d.name == "go");
-        assert!(page_go.is_some(), "page.go should be registered as a core API");
+        let page_go = registry
+            .iter()
+            .find(|d| d.namespace == "page" && d.name == "go");
+        assert!(
+            page_go.is_some(),
+            "page.go should be registered as a core API"
+        );
         assert_eq!(
             page_go.unwrap().action.as_deref(),
             Some("page_goto"),

@@ -39,7 +39,11 @@ pub(crate) fn register<'a>(ctx: Context<'a>) {
             match stack.get(0) {
                 Value::String(s) => {
                     let p = String::from_utf8_lossy(s.as_bytes());
-                    p.split('/').filter(|s| !s.is_empty()).last().unwrap_or("").to_string()
+                    p.split('/')
+                        .filter(|s| !s.is_empty())
+                        .last()
+                        .unwrap_or("")
+                        .to_string()
                 }
                 _ => "".to_string(),
             }
