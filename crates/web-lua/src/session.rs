@@ -163,6 +163,108 @@ impl WebSession {
     }
 }
 
+// ─── JS-exposed fs.* APIs ────────────────────────────────────────
+// These allow callers to read/write the OPFS worktree directly
+// from JavaScript, enabling cloud sync, export, and inspection.
+
+#[wasm_bindgen]
+impl WebSession {
+    #[wasm_bindgen(js_name = fsExists)]
+    pub async fn fs_exists(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_exists(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsStat)]
+    pub async fn fs_stat(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_stat(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsList)]
+    pub async fn fs_list(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_list(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsMkdir)]
+    pub async fn fs_mkdir(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_mkdir(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsDelete)]
+    pub async fn fs_delete(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_delete(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsCopy)]
+    pub async fn fs_copy(&self, from: String, to: String) -> WasmAsyncResponse {
+        execute_fs_copy(FsCopyParams { from, to }).await
+    }
+
+    #[wasm_bindgen(js_name = fsMove)]
+    pub async fn fs_move(&self, from: String, to: String) -> WasmAsyncResponse {
+        execute_fs_move(FsCopyParams { from, to }).await
+    }
+
+    #[wasm_bindgen(js_name = fsRead)]
+    pub async fn fs_read(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_read(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsReadText)]
+    pub async fn fs_read_text(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_read_text(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsReadBase64)]
+    pub async fn fs_read_base64(&self, path: String) -> WasmAsyncResponse {
+        execute_fs_read_base64(FsPathParams { path }).await
+    }
+
+    #[wasm_bindgen(js_name = fsReadRange)]
+    pub async fn fs_read_range(&self, path: String, offset: u64, len: usize) -> WasmAsyncResponse {
+        execute_fs_read_range(FsReadRangeParams { path, offset, len }).await
+    }
+
+    #[wasm_bindgen(js_name = fsWrite)]
+    pub async fn fs_write(&self, path: String, data: String) -> WasmAsyncResponse {
+        execute_fs_write(FsWriteParams { path, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsWriteText)]
+    pub async fn fs_write_text(&self, path: String, data: String) -> WasmAsyncResponse {
+        execute_fs_write_text(FsWriteParams { path, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsWriteBase64)]
+    pub async fn fs_write_base64(&self, path: String, data: String) -> WasmAsyncResponse {
+        execute_fs_write_base64(FsWriteParams { path, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsAppend)]
+    pub async fn fs_append(&self, path: String, data: String) -> WasmAsyncResponse {
+        execute_fs_append(FsWriteParams { path, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsAppendText)]
+    pub async fn fs_append_text(&self, path: String, data: String) -> WasmAsyncResponse {
+        execute_fs_append_text(FsWriteParams { path, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsAppendBase64)]
+    pub async fn fs_append_base64(&self, path: String, data: String) -> WasmAsyncResponse {
+        execute_fs_append_base64(FsWriteParams { path, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsUpdate)]
+    pub async fn fs_update(&self, path: String, offset: u64, data: String) -> WasmAsyncResponse {
+        execute_fs_update(FsUpdateParams { path, offset, data }).await
+    }
+
+    #[wasm_bindgen(js_name = fsHash)]
+    pub async fn fs_hash(&self, path: String, algo: String) -> WasmAsyncResponse {
+        execute_fs_hash(FsHashParams { path, algo }).await
+    }
+}
+
 fn find_element_by_label(document: &web_sys::Document, query: &str) -> Option<web_sys::Element> {
     let lower_query = query.to_lowercase().trim().to_string();
     if lower_query.is_empty() {
