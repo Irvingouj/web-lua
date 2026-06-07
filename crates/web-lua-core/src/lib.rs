@@ -1,4 +1,3 @@
-pub mod action;
 pub mod api_docs;
 pub mod command_params;
 pub(crate) mod globals;
@@ -33,7 +32,14 @@ macro_rules! lua_api_doc {
         $crate::api_docs::register($crate::api_docs::LuaApiDoc {
             namespace: $ns.to_string(),
             name: $name.to_string(),
-            action: Some($action.to_string()),
+            public_name: format!("{}.{}", $ns, $name),
+            action: {
+                let a = $action.to_string();
+                if a.is_empty() { None } else { Some(a) }
+            },
+            local_name: None,
+            source: $crate::api_docs::ToolSource::RustCore,
+            transport: $crate::api_docs::ToolTransport::HostAsync,
             description: $desc.to_string(),
             params: vec![$(
                 $crate::api_docs::ParamDoc {
@@ -47,7 +53,6 @@ macro_rules! lua_api_doc {
                 lua_type: $rtype.to_string(),
                 description: $rdesc.to_string(),
             },
-            source: "rust_core".to_string(),
         });
     };
 
@@ -63,7 +68,14 @@ macro_rules! lua_api_doc {
         $crate::api_docs::register($crate::api_docs::LuaApiDoc {
             namespace: $ns.to_string(),
             name: $name.to_string(),
-            action: Some($action.to_string()),
+            public_name: format!("{}.{}", $ns, $name),
+            action: {
+                let a = $action.to_string();
+                if a.is_empty() { None } else { Some(a) }
+            },
+            local_name: None,
+            source: $src,
+            transport: $crate::api_docs::ToolTransport::HostAsync,
             description: $desc.to_string(),
             params: vec![$(
                 $crate::api_docs::ParamDoc {
@@ -77,7 +89,6 @@ macro_rules! lua_api_doc {
                 lua_type: $rtype.to_string(),
                 description: $rdesc.to_string(),
             },
-            source: $src.to_string(),
         });
     };
 }

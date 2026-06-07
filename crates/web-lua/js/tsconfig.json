@@ -11,5 +11,5 @@
     "lib": ["ES2022", "DOM"]
   },
   "include": ["*.ts"],
-  "exclude": ["dist"]
+  "exclude": ["dist", "*.test.ts"]
 }

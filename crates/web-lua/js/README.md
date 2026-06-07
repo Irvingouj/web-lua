@@ -35,7 +35,6 @@ await vm.stopWith(runner);
 - `vm.inspectGlobals()` — Inspect all global variables.
 - `vm.setFuelLimit(limit)` — Set execution fuel limit.
 - `vm.loadLibrary(source)` — Load a Lua library.
-- `generateApiDocs()` — Generate API documentation as Markdown + JSON from the Rust source.
 
 ## Lua APIs available in web environment
 
@@ -65,10 +64,6 @@ await vm.stopWith(runner);
 - `web.storage.get(key)` / `web.storage.set(key, value)` / `web.storage.delete(key)` / `web.storage.list()`
 - `runtime.inspect()` — Inspect all Lua globals
 - `host.call(action, params?)` — Optional extension point for JS handler registration
-
-## Auto-generated docs
-
-The package includes `API.md` and `api.json` in the crate root, generated automatically from Rust `lua_api_doc!` macros. These list every Lua function with parameter types, return shapes, and source locations.
 
 ## License
 

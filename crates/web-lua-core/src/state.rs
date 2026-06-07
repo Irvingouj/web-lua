@@ -19,4 +19,7 @@ pub struct HostState {
     pub(crate) pending_async_command: Option<AsyncCommand>,
     /// Monotonic counter for async call IDs.
     pub(crate) async_call_counter: u32,
+    /// Whether a JS doc provider is available. When false, runtime docs
+    /// callbacks fall back to static docs from api_docs::REGISTRY.
+    pub(crate) has_js_doc_provider: bool,
 }

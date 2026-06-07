@@ -89,33 +89,6 @@ async function buildTarget(target) {
     run(`node ${bundleScript} ${target.outDir} ${target.cratePrefix}`, rootDir);
   }
 
-  // Generate API docs by loading the self-contained WASM module in Node.js
-  const jsFile = target.name === "web-lua"
-    ? "web_lua.js"
-    : target.name === "extension-lua"
-      ? "extension_lua.js"
-      : null;
-  if (jsFile) {
-    const jsPath = path.join(outDir, jsFile);
-    if (fs.existsSync(jsPath)) {
-      try {
-        const wasmModule = await import(jsPath);
-        if (typeof wasmModule.generateApiDocs === "function") {
-          const md = wasmModule.generateApiDocs("markdown");
-          const json = wasmModule.generateApiDocs("json");
-          const jsDir = path.resolve(target.outDir, "../js");
-          if (fs.existsSync(jsDir)) {
-            fs.writeFileSync(path.join(jsDir, "API.md"), md);
-            fs.writeFileSync(path.join(jsDir, "api.json"), json);
-            console.log(`  API.md + api.json generated`);
-          }
-        }
-      } catch (e) {
-        console.warn(`  Doc generation skipped: ${e.message}`);
-      }
-    }
-  }
-
   console.log(`✅ ${target.name} built`);
 }
 
@@ -154,6 +127,28 @@ function copyExtensionAssets() {
       }
       stripEsmMarker(path.join(srcDir, "content-script.js"));
       stripEsmMarker(path.join(distDir, "content-script.js"));
+
+      // Bundle content-script.ts into a single classic script (IIFE) so it
+      // can be injected by chrome.scripting.executeScript without ESM errors.
+      const esbuildBin = path.join(rootDir, "web", "node_modules", ".bin", "esbuild");
+      if (fs.existsSync(esbuildBin)) {
+        const bundleCmd = [
+          esbuildBin,
+          path.join(srcDir, "content-script.ts"),
+          "--bundle",
+          "--platform=browser",
+          "--format=iife",
+          `--outfile=${path.join(distDir, "content-script.js")}`,
+        ].join(" ");
+        try {
+          execSync(bundleCmd, { cwd: rootDir, stdio: "pipe" });
+          console.log("  Bundled content-script.js with esbuild");
+        } catch (bundleErr) {
+          console.warn("  esbuild bundle failed:", bundleErr.message);
+        }
+      } else {
+        console.warn("  esbuild not found, skipping content-script bundle");
+      }
     } catch (e) {
       console.error("  TypeScript compilation failed:", e.message);
       process.exit(1);

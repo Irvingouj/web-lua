@@ -22,7 +22,7 @@ const packages = {
   web: {
     dir: "crates/web-lua/js",
     wasm: ["web_lua.js", "web_lua.d.ts"],
-    extra: ["API.md", "api.json", "README.md"],
+    extra: ["README.md"],
   },
   extension: {
     dir: "crates/extension-lua/js",
@@ -31,8 +31,6 @@ const packages = {
       "content-script.js",
       "background.js",
       "manifest.json",
-      "API.md",
-      "api.json",
       "README.md",
     ],
     generated: "../../../web/src/types/generated.ts",
@@ -80,6 +78,28 @@ function stripEsmMarker(filePath) {
 }
 stripEsmMarker(path.join(absDir, "content-script.js"));
 stripEsmMarker(path.join(distDir, "content-script.js"));
+
+// Bundle content-script.ts into a single classic script (IIFE) so it
+// can be injected by chrome.scripting.executeScript without ESM errors.
+const esbuildBin = path.join(rootDir, "web", "node_modules", ".bin", "esbuild");
+if (fs.existsSync(esbuildBin)) {
+  const bundleCmd = [
+    esbuildBin,
+    path.join(absDir, "content-script.ts"),
+    "--bundle",
+    "--platform=browser",
+    "--format=iife",
+    `--outfile=${path.join(distDir, "content-script.js")}`,
+  ].join(" ");
+  try {
+    execSync(bundleCmd, { cwd: rootDir, stdio: "pipe" });
+    console.log("  Bundled content-script.js with esbuild");
+  } catch (bundleErr) {
+    console.warn("  esbuild bundle failed:", bundleErr.message);
+  }
+} else {
+  console.warn("  esbuild not found, skipping content-script bundle");
+}
 
 // Copy WASM bundles and static assets into dist/
 for (const file of [...pkg.wasm, ...pkg.extra]) {

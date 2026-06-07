@@ -116,7 +116,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::from(action),
+                action: action.to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);

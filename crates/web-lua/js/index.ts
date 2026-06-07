@@ -5,21 +5,65 @@
 
 import type { CellResult, WasmGlobalsSnapshot } from "./web_lua.js";
 import wasmInit, {
-  generateApiDocs,
+  getApiDocsJson,
   WebSession as RawWebSession,
 } from "./web_lua.js";
+import {
+  MergedDocRegistry,
+  registerHostHandler,
+  type AsyncError,
+  type AsyncResponse,
+  type Command,
+  type ToolDefinition,
+  type ToolDoc,
+  type ToolDocParam,
+  type ToolRegistrationDoc,
+  type ToolReturnDoc,
+  type ToolSource,
+  type ToolTransport,
+  clearRegistry,
+  dispatchTool,
+  getTool,
+  listTools,
+  register,
+  registerHostHandlers,
+  registerTool,
+} from "./registry.js";
 
-export { registerHostHandler, registerHostHandlers } from "./registry.js";
+export type {
+  AsyncError,
+  AsyncResponse,
+  Command,
+  ToolDefinition,
+  ToolDoc,
+  ToolDocParam,
+  ToolRegistrationDoc,
+  ToolReturnDoc,
+  ToolSource,
+  ToolTransport,
+};
+export {
+  clearRegistry,
+  dispatchTool,
+  getTool,
+  listTools,
+  MergedDocRegistry,
+  register,
+  registerHostHandler,
+  registerHostHandlers,
+  registerTool,
+};
 export type {
   CellResult as LuaRunResult,
   WasmGlobalsSnapshot as LuaGlobalsSnapshot,
 };
-export { generateApiDocs };
 
 export interface LuaApiDoc {
   namespace: string;
   name: string;
+  public_name: string;
   action: string | null;
+  local_name: string | null;
   description: string;
   params: {
     name: string;
@@ -32,16 +76,52 @@ export interface LuaApiDoc {
     description: string;
   };
   source: string;
+  transport: string;
+}
+
+function convertLuaApiDocToToolDoc(doc: LuaApiDoc): import("./registry.js").ToolDoc {
+  return {
+    action: doc.action ?? `${doc.namespace}_${doc.name}`,
+    namespace: doc.namespace,
+    name: doc.name,
+    publicName: doc.public_name,
+    localName: doc.local_name ?? undefined,
+    source: doc.source as import("./registry.js").ToolSource,
+    transport: doc.transport as import("./registry.js").ToolTransport,
+    description: doc.description,
+    params: doc.params.map((p) => ({
+      name: p.name,
+      type: p.lua_type,
+      required: p.required,
+      description: p.description,
+    })),
+    returns: {
+      type: doc.returns.lua_type,
+      description: doc.returns.description,
+    },
+    errorCode: "E_TOOL",
+    errorCategory: "tool",
+  };
 }
 
 /**
- * Generate API documentation as a parsed JSON array.
- * Returns structured docs so callers can filter, search, or
- * transform the registry without manual JSON.parse.
+ * Global merged documentation registry for web-lua.
+ * Combines static docs from the Rust api_docs::REGISTRY with
+ * any runtime docs from JS-registered tools.
  */
-export function generateApiDocsJson(): LuaApiDoc[] {
-  return JSON.parse(generateApiDocs("json"));
-}
+export const mergedDocRegistry = new MergedDocRegistry();
+
+// Register runtime doc provider host handlers.
+// These are called by the Rust __runtime_* actions via execute_host_call.
+registerHostHandler("runtime_docs", async () => mergedDocRegistry.list());
+registerHostHandler(
+  "runtime_get_doc",
+  async (params: { query: string }) => mergedDocRegistry.get(params.query) ?? null,
+);
+registerHostHandler(
+  "runtime_search_docs",
+  async (params: { query: string }) => mergedDocRegistry.search(params.query),
+);
 
 export class WebSession {
   private raw: RawWebSession;
@@ -53,6 +133,12 @@ export class WebSession {
   static async init(): Promise<[WebSession, Promise<void>]> {
     await wasmInit();
     const session = new WebSession(new RawWebSession());
+
+    // Populate merged doc registry with static docs from Rust
+    const docsJson = getApiDocsJson();
+    const docs: LuaApiDoc[] = JSON.parse(docsJson);
+    mergedDocRegistry.setStaticDocs(docs.map(convertLuaApiDocToToolDoc));
+
     return [session, Promise.resolve()];
   }
 

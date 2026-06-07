@@ -1,9 +1,44 @@
 use serde_json;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
+use web_lua_base::types::WasmAsyncCommand;
 use web_lua_base::types::WasmAsyncError;
 use web_lua_base::types::WasmAsyncResponse;
 use web_lua_core::command_params::*;
+
+// ─── Registry ───────────────────────────────────────────────────
+
+pub type Handler =
+    Box<dyn Fn(WasmAsyncCommand) -> Pin<Box<dyn Future<Output = Result<WasmAsyncResponse, String>>>>>;
+
+thread_local! {
+    static HANDLER_REGISTRY: RefCell<HashMap<String, Handler>> = RefCell::new(HashMap::new());
+}
+
+pub fn register_handler(name: &str, handler: Handler) {
+    HANDLER_REGISTRY.with(|reg| {
+        reg.borrow_mut().insert(name.to_string(), handler);
+    });
+}
+
+pub async fn dispatch_command(cmd: &WasmAsyncCommand) -> Result<WasmAsyncResponse, String> {
+    // host.call escape hatch: action names are dynamic
+    if cmd.action.starts_with("host_") {
+        let host_action = &cmd.action[5..];
+        return Ok(execute_host_call(host_action, cmd.params.clone()).await);
+    }
+
+    let action = cmd.action.clone();
+    let future_opt = HANDLER_REGISTRY.with(|reg| reg.borrow().get(&action).map(|h| h(cmd.clone())));
+    match future_opt {
+        Some(fut) => fut.await,
+        None => Err(format!("Unknown action: {}", cmd.action)),
+    }
+}
 
 #[wasm_bindgen]
 extern "C" {
@@ -23,6 +58,38 @@ fn no_window_response() -> WasmAsyncResponse {
             code: "E_NO_WINDOW".into(),
         }),
     }
+}
+
+pub fn find_element_by_label(document: &web_sys::Document, query: &str) -> Option<web_sys::Element> {
+    let lower_query = query.to_lowercase().trim().to_string();
+    if lower_query.is_empty() {
+        return None;
+    }
+    let elements = document
+        .query_selector_all("input, textarea, select, button, a, [role='button'], [role='link']")
+        .ok()?;
+    for i in 0..elements.length() {
+        if let Some(node) = elements.item(i) {
+            if let Ok(el) = node.dyn_into::<web_sys::Element>() {
+                if let Some(aria_label) = el.get_attribute("aria-label") {
+                    if aria_label.to_lowercase().trim() == lower_query {
+                        return Some(el);
+                    }
+                }
+                if let Some(input) = el.dyn_ref::<web_sys::HtmlInputElement>() {
+                    if input.placeholder().to_lowercase().trim() == lower_query {
+                        return Some(el);
+                    }
+                }
+                if let Some(text) = el.text_content() {
+                    if text.to_lowercase().trim() == lower_query {
+                        return Some(el);
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 pub async fn execute_fetch(params: FetchParams) -> WasmAsyncResponse {
@@ -962,6 +1029,470 @@ pub async fn execute_page_check(params: PageCheckParams) -> WasmAsyncResponse {
     }
 }
 
+// ─── Inline page actions (moved from session.rs) ───────────────
+
+pub async fn execute_page_url() -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    let href = window.location().href().map_err(|e| format!("{:?}", e))?;
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::String(href)),
+        error: None,
+    })
+}
+
+pub async fn execute_page_title() -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let title = document.title();
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::String(title)),
+        error: None,
+    })
+}
+
+pub async fn execute_page_click(params: PageClickParams) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let element = document
+        .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+        .map_err(|e| format!("{:?}", e))?
+        .or_else(|| find_element_by_label(&document, &params.label))
+        .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
+    element
+        .dyn_ref::<web_sys::HtmlElement>()
+        .ok_or("Element is not clickable")?
+        .click();
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_fill(params: PageFillParams) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let element = document
+        .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+        .map_err(|e| format!("{:?}", e))?
+        .or_else(|| find_element_by_label(&document, &params.label))
+        .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
+    if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+        input.set_value(&params.value);
+    } else {
+        return Err("Element is not an input".into());
+    }
+    let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+    let _ = element.dispatch_event(&event);
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_goto(params: PageGotoParams) -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    window
+        .location()
+        .set_href(&params.url)
+        .map_err(|e| format!("{:?}", e))?;
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_back() -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    window
+        .history()
+        .map_err(|e| format!("{:?}", e))?
+        .back()
+        .map_err(|e| format!("{:?}", e))?;
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_forward() -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    window
+        .history()
+        .map_err(|e| format!("{:?}", e))?
+        .forward()
+        .map_err(|e| format!("{:?}", e))?;
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_reload() -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    window.location().reload().map_err(|e| format!("{:?}", e))?;
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_snapshot_text(
+    params: DomSnapshotParams,
+) -> Result<WasmAsyncResponse, String> {
+    let resp = execute_dom_snapshot(params);
+    if let Some(ref value) = resp.value {
+        if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
+            return Ok(WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::String(text.to_string())),
+                error: None,
+            });
+        }
+    }
+    Ok(resp)
+}
+
+pub async fn execute_page_snapshot_data(
+    params: DomSnapshotParams,
+) -> Result<WasmAsyncResponse, String> {
+    Ok(execute_dom_snapshot(params))
+}
+
+pub async fn execute_page_append(params: PageAppendParams) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let element = document
+        .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+        .map_err(|e| format!("{:?}", e))?
+        .or_else(|| find_element_by_label(&document, &params.label))
+        .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
+    if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+        let current = input.value();
+        input.set_value(&format!("{}{}", current, params.text));
+    } else {
+        return Err("Element is not an input".into());
+    }
+    let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+    let _ = element.dispatch_event(&event);
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_page_find(params: PageFindParams) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let elements = document
+        .query_selector_all(&params.selector)
+        .map_err(|e| format!("{:?}", e))?;
+    let mut results = Vec::new();
+    for i in 0..elements.length() {
+        if let Some(el) = elements.item(i) {
+            if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                let tag = el.tag_name();
+                let ref_id = el.get_attribute("data-ref-id").unwrap_or_default();
+                let text = el.text_content().unwrap_or_default();
+                results.push(serde_json::json!({
+                    "tag": tag,
+                    "refId": ref_id,
+                    "text": text,
+                }));
+            }
+        }
+    }
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Array(results)),
+        error: None,
+    })
+}
+
+pub async fn execute_page_wait_for(
+    params: PageWaitForParams,
+) -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    let document = window.document().ok_or("No document available")?;
+    let start = js_sys::Date::now();
+    let timeout = params.timeout as f64;
+    let interval_ms = 100.0;
+
+    loop {
+        if let Ok(Some(_)) = document.query_selector(&params.selector) {
+            return Ok(WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::Bool(true)),
+                error: None,
+            });
+        }
+        let elapsed = js_sys::Date::now() - start;
+        if elapsed >= timeout {
+            return Ok(WasmAsyncResponse {
+                ok: false,
+                value: None,
+                error: Some(WasmAsyncError {
+                    message: format!("Timeout waiting for selector: {}", params.selector),
+                    code: "E_TIMEOUT".into(),
+                }),
+            });
+        }
+        let promise = js_sys::Promise::new(
+            &mut |resolve: js_sys::Function, _reject: js_sys::Function| {
+                let set_timeout = js_sys::Reflect::get(&window, &"setTimeout".into())
+                    .unwrap()
+                    .dyn_into::<js_sys::Function>()
+                    .unwrap();
+                let _ = set_timeout.call2(&window, &resolve, &JsValue::from_f64(interval_ms));
+            },
+        );
+        let _ = JsFuture::from(promise).await;
+    }
+}
+
+pub async fn execute_page_extract(
+    params: PageExtractParams,
+) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let mut result = serde_json::Map::new();
+    for field in &params.fields {
+        match field.as_str() {
+            "title" => {
+                result.insert(
+                    "title".to_string(),
+                    serde_json::Value::String(document.title()),
+                );
+            }
+            "url" => {
+                let href = web_sys::window()
+                    .ok_or("No window available")?
+                    .location()
+                    .href()
+                    .map_err(|e| format!("{:?}", e))?;
+                result.insert("url".to_string(), serde_json::Value::String(href));
+            }
+            "headings" => {
+                let max_headings = params.max_headings as usize;
+                let headings = document
+                    .query_selector_all("h1, h2, h3, h4, h5, h6")
+                    .map_err(|e| format!("{:?}", e))?;
+                let mut list = Vec::new();
+                for i in 0..headings.length() {
+                    if let Some(el) = headings.item(i) {
+                        if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                            let text = el
+                                .text_content()
+                                .unwrap_or_default()
+                                .trim()
+                                .to_string();
+                            let text = if text.len() > max_headings {
+                                text.chars().take(max_headings).collect::<String>()
+                            } else {
+                                text
+                            };
+                            list.push(serde_json::json!({
+                                "tag": el.tag_name(),
+                                "text": text,
+                            }));
+                        }
+                    }
+                }
+                result.insert("headings".to_string(), serde_json::Value::Array(list));
+            }
+            "links" => {
+                let max_links = params.max_links as usize;
+                let links = document
+                    .query_selector_all("a[href]")
+                    .map_err(|e| format!("{:?}", e))?;
+                let mut list = Vec::new();
+                for i in 0..links.length() {
+                    if let Some(el) = links.item(i) {
+                        if let Some(el) = el.dyn_ref::<web_sys::Element>() {
+                            let text = el
+                                .text_content()
+                                .unwrap_or_default()
+                                .trim()
+                                .to_string();
+                            let text = if text.len() > max_links {
+                                text.chars().take(max_links).collect::<String>()
+                            } else {
+                                text
+                            };
+                            list.push(serde_json::json!({
+                                "href": el.get_attribute("href").unwrap_or_default(),
+                                "text": text,
+                            }));
+                        }
+                    }
+                }
+                result.insert("links".to_string(), serde_json::Value::Array(list));
+            }
+            "text" => {
+                let max_text = params.max_text as usize;
+                let body_text = document
+                    .body()
+                    .and_then(|b| b.text_content())
+                    .unwrap_or_default()
+                    .trim()
+                    .chars()
+                    .take(max_text)
+                    .collect::<String>();
+                result.insert("text".to_string(), serde_json::Value::String(body_text));
+            }
+            _ => {}
+        }
+    }
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Object(result)),
+        error: None,
+    })
+}
+
+// ─── Sidepanel actions (synonyms in web-lua) ────────────────────
+
+pub async fn execute_sidepanel_snapshot_text(
+    params: DomSnapshotParams,
+) -> Result<WasmAsyncResponse, String> {
+    let resp = execute_dom_snapshot(params);
+    if let Some(ref value) = resp.value {
+        if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
+            return Ok(WasmAsyncResponse {
+                ok: true,
+                value: Some(serde_json::Value::String(text.to_string())),
+                error: None,
+            });
+        }
+    }
+    Ok(resp)
+}
+
+pub async fn execute_sidepanel_snapshot_data(
+    params: DomSnapshotParams,
+) -> Result<WasmAsyncResponse, String> {
+    Ok(execute_dom_snapshot(params))
+}
+
+pub async fn execute_sidepanel_click(
+    params: PageClickParams,
+) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let element = document
+        .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+        .map_err(|e| format!("{:?}", e))?
+        .or_else(|| find_element_by_label(&document, &params.label))
+        .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
+    element
+        .dyn_ref::<web_sys::HtmlElement>()
+        .ok_or("Element is not clickable")?
+        .click();
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_sidepanel_fill(
+    params: PageFillParams,
+) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let element = document
+        .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+        .map_err(|e| format!("{:?}", e))?
+        .or_else(|| find_element_by_label(&document, &params.label))
+        .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
+    if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+        input.set_value(&params.value);
+    } else {
+        return Err("Element is not an input".into());
+    }
+    let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+    let _ = element.dispatch_event(&event);
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_sidepanel_append(
+    params: PageAppendParams,
+) -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let element = document
+        .query_selector(&format!("[data-ref-id='{}']", params.ref_id))
+        .map_err(|e| format!("{:?}", e))?
+        .or_else(|| find_element_by_label(&document, &params.label))
+        .ok_or_else(|| format!("Element with ref_id '{}' not found. Handles are scoped to a single snapshot. Call page.snapshot() again to get fresh refIds.", params.ref_id))?;
+    if let Some(input) = element.dyn_ref::<web_sys::HtmlInputElement>() {
+        let current = input.value();
+        input.set_value(&format!("{}{}", current, params.text));
+    } else {
+        return Err("Element is not an input".into());
+    }
+    let event = web_sys::Event::new("input").map_err(|e| format!("{:?}", e))?;
+    let _ = element.dispatch_event(&event);
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::Null),
+        error: None,
+    })
+}
+
+pub async fn execute_sidepanel_url() -> Result<WasmAsyncResponse, String> {
+    let window = web_sys::window().ok_or("No window available")?;
+    let href = window.location().href().map_err(|e| format!("{:?}", e))?;
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::String(href)),
+        error: None,
+    })
+}
+
+pub async fn execute_sidepanel_title() -> Result<WasmAsyncResponse, String> {
+    let document = web_sys::window()
+        .ok_or("No window available")?
+        .document()
+        .ok_or("No document available")?;
+    let title = document.title();
+    Ok(WasmAsyncResponse {
+        ok: true,
+        value: Some(serde_json::Value::String(title)),
+        error: None,
+    })
+}
+
 pub async fn execute_storage_list() -> WasmAsyncResponse {
     match get_local_storage() {
         Ok(storage) => {
@@ -1376,4 +1907,335 @@ pub async fn execute_fs_hash(
             error: Some(fs_err_to_wasm(e)),
         },
     }
+}
+
+// ─── Registry Initialization ────────────────────────────────────
+
+macro_rules! reg_async_resp {
+    ($reg:expr, $name:expr, $params:ty, $fn:path) => {
+        $reg.insert(
+            $name.to_string(),
+            Box::new(|cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    let params = cmd
+                        .parse_params::<$params>()
+                        .map_err(|e| format!("Invalid {} params: {}", $name, e))?;
+                    Ok($fn(params).await)
+                })
+            }),
+        );
+    };
+}
+
+macro_rules! reg_async_result {
+    ($reg:expr, $name:expr, $params:ty, $fn:path) => {
+        $reg.insert(
+            $name.to_string(),
+            Box::new(|cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    let params = cmd
+                        .parse_params::<$params>()
+                        .map_err(|e| format!("Invalid {} params: {}", $name, e))?;
+                    $fn(params).await
+                })
+            }),
+        );
+    };
+}
+
+macro_rules! reg_async_resp_no_params {
+    ($reg:expr, $name:expr, $fn:path) => {
+        $reg.insert(
+            $name.to_string(),
+            Box::new(|_cmd: WasmAsyncCommand| {
+                Box::pin(async move { Ok($fn().await) })
+            }),
+        );
+    };
+}
+
+macro_rules! reg_async_result_no_params {
+    ($reg:expr, $name:expr, $fn:path) => {
+        $reg.insert(
+            $name.to_string(),
+            Box::new(|_cmd: WasmAsyncCommand| {
+                Box::pin(async move { $fn().await })
+            }),
+        );
+    };
+}
+
+macro_rules! reg_sync_resp {
+    ($reg:expr, $name:expr, $params:ty, $fn:path) => {
+        $reg.insert(
+            $name.to_string(),
+            Box::new(|cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    let params = cmd
+                        .parse_params::<$params>()
+                        .map_err(|e| format!("Invalid {} params: {}", $name, e))?;
+                    Ok($fn(params))
+                })
+            }),
+        );
+    };
+}
+
+macro_rules! reg_unavailable {
+    ($reg:expr, $($name:expr),+ $(,)?) => {
+        $(
+            $reg.insert(
+                $name.to_string(),
+                Box::new(|_cmd: WasmAsyncCommand| {
+                    Box::pin(async move {
+                        Err(format!("{} is not available in web-lua context", $name))
+                    })
+                }),
+            );
+        )+
+    };
+}
+
+pub async fn execute_runtime_docs() -> WasmAsyncResponse {
+    execute_host_call("runtime_docs", serde_json::json!({})).await
+}
+
+pub async fn execute_runtime_get_doc(params: serde_json::Value) -> WasmAsyncResponse {
+    execute_host_call("runtime_get_doc", params).await
+}
+
+pub async fn execute_runtime_search_docs(params: serde_json::Value) -> WasmAsyncResponse {
+    execute_host_call("runtime_search_docs", params).await
+}
+
+pub fn init_registry() {
+    HANDLER_REGISTRY.with(|reg| {
+        let mut reg = reg.borrow_mut();
+
+        // Runtime doc provider actions
+        reg_async_resp_no_params!(reg, "__runtime_docs", execute_runtime_docs);
+        reg.insert(
+            "__runtime_get_doc".to_string(),
+            Box::new(|cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    Ok(execute_runtime_get_doc(cmd.params).await)
+                })
+            }),
+        );
+        reg.insert(
+            "__runtime_search_docs".to_string(),
+            Box::new(|cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    Ok(execute_runtime_search_docs(cmd.params).await)
+                })
+            }),
+        );
+
+        // web.fetch
+        reg_async_resp!(reg, "fetch", FetchParams, execute_fetch);
+        // web.sleep
+        reg_async_resp!(reg, "sleep", SleepParams, execute_sleep);
+        // page.wait
+        reg_async_resp!(reg, "page_wait", PageWaitParams, execute_page_wait);
+        // page.press
+        reg_async_resp!(reg, "page_press", PagePressParams, execute_page_press);
+        // page.select
+        reg_async_resp!(reg, "page_select", PageSelectParams, execute_page_select);
+        // page.check
+        reg_async_resp!(reg, "page_check", PageCheckParams, execute_page_check);
+        // page.hover
+        reg_async_resp!(reg, "page_hover", PageHoverParams, execute_page_hover);
+        // page.unhover
+        reg_async_resp_no_params!(reg, "page_unhover", execute_page_unhover);
+        // page.scroll
+        reg_async_resp!(reg, "page_scroll", PageScrollParams, execute_page_scroll);
+        // page.scroll_to
+        reg_async_resp!(reg, "page_scroll_to", PageScrollToParams, execute_page_scroll_to);
+        // page.dblclick
+        reg_async_resp!(reg, "page_dblclick", PageDblClickParams, execute_page_dblclick);
+        // page.type
+        reg_async_resp!(reg, "page_type", PageTypeParams, execute_page_type);
+        // dom.snapshot
+        reg_sync_resp!(reg, "dom_snapshot", DomSnapshotParams, execute_dom_snapshot);
+        // dom.format
+        reg_sync_resp!(reg, "dom_format", DomFormatParams, execute_dom_format);
+        // web.fetch_dom
+        reg_async_resp!(reg, "fetch_dom", FetchDomParams, execute_fetch_dom);
+        // storage.get
+        reg_async_resp!(reg, "storage_get", StorageGetParams, execute_storage_get);
+        // storage.set
+        reg_async_resp!(reg, "storage_set", StorageSetParams, execute_storage_set);
+        // storage.delete
+        reg_async_resp!(reg, "storage_delete", StorageDeleteParams, execute_storage_delete);
+        // storage.list
+        reg_async_resp_no_params!(reg, "storage_list", execute_storage_list);
+
+        // fs.*
+        reg_async_resp!(reg, "fs_exists", FsPathParams, execute_fs_exists);
+        reg_async_resp!(reg, "fs_stat", FsPathParams, execute_fs_stat);
+        reg_async_resp!(reg, "fs_list", FsPathParams, execute_fs_list);
+        reg_async_resp!(reg, "fs_mkdir", FsPathParams, execute_fs_mkdir);
+        reg_async_resp!(reg, "fs_delete", FsPathParams, execute_fs_delete);
+        reg_async_resp!(reg, "fs_copy", FsCopyParams, execute_fs_copy);
+        reg_async_resp!(reg, "fs_move", FsCopyParams, execute_fs_move);
+        reg_async_resp!(reg, "fs_read", FsPathParams, execute_fs_read);
+        reg_async_resp!(reg, "fs_read_text", FsPathParams, execute_fs_read_text);
+        reg_async_resp!(reg, "fs_read_base64", FsPathParams, execute_fs_read_base64);
+        reg_async_resp!(reg, "fs_read_range", FsReadRangeParams, execute_fs_read_range);
+        reg_async_resp!(reg, "fs_write", FsWriteParams, execute_fs_write);
+        reg_async_resp!(reg, "fs_write_text", FsWriteParams, execute_fs_write_text);
+        reg_async_resp!(reg, "fs_write_base64", FsWriteParams, execute_fs_write_base64);
+        reg_async_resp!(reg, "fs_append", FsWriteParams, execute_fs_append);
+        reg_async_resp!(reg, "fs_append_text", FsWriteParams, execute_fs_append_text);
+        reg_async_resp!(reg, "fs_append_base64", FsWriteParams, execute_fs_append_base64);
+        reg_async_resp!(reg, "fs_update", FsUpdateParams, execute_fs_update);
+        reg_async_resp!(reg, "fs_hash", FsHashParams, execute_fs_hash);
+
+        // Inline page actions
+        reg_async_result_no_params!(reg, "page_url", execute_page_url);
+        reg_async_result_no_params!(reg, "page_title", execute_page_title);
+        reg_async_result!(reg, "page_click", PageClickParams, execute_page_click);
+        reg_async_result!(reg, "page_fill", PageFillParams, execute_page_fill);
+        reg_async_result!(reg, "page_goto", PageGotoParams, execute_page_goto);
+        reg_async_result_no_params!(reg, "page_back", execute_page_back);
+        reg_async_result_no_params!(reg, "page_forward", execute_page_forward);
+        reg_async_result_no_params!(reg, "page_reload", execute_page_reload);
+        reg_async_result!(reg, "page_snapshot_text", DomSnapshotParams, execute_page_snapshot_text);
+        reg_async_result!(reg, "page_snapshot_data", DomSnapshotParams, execute_page_snapshot_data);
+        reg_async_result!(reg, "page_append", PageAppendParams, execute_page_append);
+        reg_async_result!(reg, "page_find", PageFindParams, execute_page_find);
+        reg_async_result!(reg, "page_wait_for", PageWaitForParams, execute_page_wait_for);
+        reg_async_result!(reg, "page_extract", PageExtractParams, execute_page_extract);
+
+        // Sidepanel synonyms
+        reg_async_result!(reg, "sidepanel_snapshot_text", DomSnapshotParams, execute_sidepanel_snapshot_text);
+        reg_async_result!(reg, "sidepanel_snapshot_data", DomSnapshotParams, execute_sidepanel_snapshot_data);
+        reg_async_result!(reg, "sidepanel_click", PageClickParams, execute_sidepanel_click);
+        reg_async_resp!(reg, "sidepanel_dblclick", PageDblClickParams, execute_page_dblclick);
+        reg_async_result!(reg, "sidepanel_fill", PageFillParams, execute_sidepanel_fill);
+        reg_async_resp!(reg, "sidepanel_type", PageTypeParams, execute_page_type);
+        reg_async_result!(reg, "sidepanel_append", PageAppendParams, execute_sidepanel_append);
+        reg_async_resp!(reg, "sidepanel_press", PagePressParams, execute_page_press);
+        reg_async_resp!(reg, "sidepanel_select", PageSelectParams, execute_page_select);
+        reg_async_resp!(reg, "sidepanel_check", PageCheckParams, execute_page_check);
+        reg_async_resp!(reg, "sidepanel_hover", PageHoverParams, execute_page_hover);
+        reg_async_resp_no_params!(reg, "sidepanel_unhover", execute_page_unhover);
+        reg_async_resp!(reg, "sidepanel_scroll", PageScrollParams, execute_page_scroll);
+        reg_async_resp!(reg, "sidepanel_scroll_to", PageScrollToParams, execute_page_scroll_to);
+        reg_async_result_no_params!(reg, "sidepanel_url", execute_sidepanel_url);
+        reg_async_result_no_params!(reg, "sidepanel_title", execute_sidepanel_title);
+        reg_async_resp!(reg, "sidepanel_wait", PageWaitParams, execute_page_wait);
+
+        // Test-only mock
+        reg.insert(
+            "mock_async".to_string(),
+            Box::new(|_cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    Ok(WasmAsyncResponse {
+                        ok: true,
+                        value: Some(serde_json::Value::Null),
+                        error: None,
+                    })
+                })
+            }),
+        );
+
+        // Not yet implemented
+        reg.insert(
+            "page_screenshot".to_string(),
+            Box::new(|_cmd: WasmAsyncCommand| {
+                Box::pin(async move {
+                    Ok(WasmAsyncResponse {
+                        ok: false,
+                        value: None,
+                        error: Some(WasmAsyncError {
+                            message: "screenshot not yet implemented in web-lua".into(),
+                            code: "E_NOT_IMPLEMENTED".into(),
+                        }),
+                    })
+                })
+            }),
+        );
+
+        // Extension-only APIs
+        reg_unavailable!(
+            reg,
+            "tab_query",
+            "tab_create",
+            "tab_activate",
+            "tab_close",
+            "tab_execute_script",
+            "tab_click",
+            "tab_fill",
+            "tab_snapshot",
+            "tab_scroll_to",
+            "tab_evaluate",
+            "tab_type",
+            "tab_press",
+            "tab_select",
+            "tab_check",
+            "tab_hover",
+            "tab_unhover",
+            "tab_scroll",
+            "tab_dblclick",
+            "tab_back",
+            "tab_wait_for_load",
+            "tab_fetch",
+            "cookies_get",
+            "cookies_set",
+            "cookies_delete",
+            "cookies_list",
+            "history_search",
+            "history_delete",
+            "bookmarks_search",
+            "bookmarks_create",
+            "bookmarks_delete",
+            "notifications_create",
+            "notifications_clear",
+            "clipboard_read",
+            "clipboard_write",
+            "chrome_runtime_sendMessage",
+            "chrome_tabs_query",
+            "chrome_tabs_create",
+            "chrome_tabs_update",
+            "chrome_tabs_remove",
+            "chrome_tabs_get",
+            "chrome_tabs_reload",
+            "chrome_tabs_sendMessage",
+            "chrome_alarms_create",
+            "chrome_alarms_clear",
+            "chrome_action_setBadgeText",
+            "chrome_action_setBadgeBackgroundColor",
+            "chrome_action_setTitle",
+            "chrome_action_setIcon",
+            "chrome_contextMenus_create",
+            "chrome_contextMenus_remove",
+            "chrome_windows_getAll",
+            "chrome_windows_create",
+            "chrome_windows_update",
+            "chrome_windows_remove",
+            "chrome_sidePanel_setOptions",
+            "chrome_cookies_get",
+            "chrome_cookies_set",
+            "chrome_cookies_remove",
+            "chrome_cookies_getAll",
+            "chrome_bookmarks_search",
+            "chrome_bookmarks_create",
+            "chrome_bookmarks_remove",
+            "chrome_history_search",
+            "chrome_history_deleteUrl",
+            "chrome_notifications_create",
+            "chrome_notifications_clear",
+            "chrome_scripting_executeScript",
+            "page_close",
+            "page_active_tab",
+            "page_tabs",
+            "page_switch",
+            "page_new_tab",
+            "runtime_inspect",
+            "url_parse",
+            "url_encode",
+            "web_log",
+        );
+    });
 }

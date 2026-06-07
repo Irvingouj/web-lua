@@ -27,7 +27,7 @@ pub(crate) fn register<'a>(
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
-            action: crate::action::Action::MockAsync,
+            action: "mock_async".to_string(),
             params: serde_json::json!({ "label": label }),
         };
         hs.pending_async_command = Some(command);
@@ -135,7 +135,7 @@ pub(crate) fn register<'a>(
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
-            action: crate::action::Action::Fetch,
+            action: "fetch".to_string(),
             params,
         };
         hs.pending_async_command = Some(command);
@@ -395,7 +395,7 @@ pub(crate) fn register<'a>(
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
-            action: crate::action::Action::Sleep,
+            action: "sleep".to_string(),
             params,
         };
         hs.pending_async_command = Some(command);
@@ -476,7 +476,7 @@ pub(crate) fn register<'a>(
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
-            action: crate::action::Action::FetchDom,
+            action: "fetch_dom".to_string(),
             params,
         };
         hs.pending_async_command = Some(command);

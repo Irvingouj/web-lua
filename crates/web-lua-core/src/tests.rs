@@ -1,4 +1,3 @@
-use crate::action::Action;
 use crate::api_docs;
 use crate::plugin::LuaPlugin;
 use crate::session::NotebookSession;
@@ -1243,6 +1242,143 @@ mod tests {
     }
 
     #[test]
+    fn test_runtime_docs_async_with_js_provider() {
+        let mut session = NotebookSession::new();
+        session.set_js_doc_provider_available(true);
+
+        let result = session.run_cell(
+            r#"
+            local docs = runtime.docs()
+            print(type(docs))
+            print(#docs)
+            "#,
+            "",
+        );
+
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "__runtime_docs");
+        assert_eq!(cmd.params, serde_json::json!({}));
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": [{"namespace": "test", "name": "foo"}]}"#,
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.error.is_none());
+        assert!(
+            resume_result.stdout.iter().any(|s| s.contains("table")),
+            "got: {:?}",
+            resume_result.stdout
+        );
+        assert!(
+            resume_result.stdout.iter().any(|s| s.contains("1")),
+            "got: {:?}",
+            resume_result.stdout
+        );
+    }
+
+    #[test]
+    fn test_runtime_get_doc_async_with_js_provider() {
+        let mut session = NotebookSession::new();
+        session.set_js_doc_provider_available(true);
+
+        let result = session.run_cell(
+            r#"
+            local doc = runtime.get_doc("page.click")
+            print(type(doc))
+            print(doc.namespace .. "." .. doc.name)
+            "#,
+            "",
+        );
+
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "__runtime_get_doc");
+        assert_eq!(cmd.params, serde_json::json!({ "query": "page.click" }));
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": {"namespace": "page", "name": "click"}}"#,
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.error.is_none());
+        assert!(
+            resume_result.stdout.iter().any(|s| s.contains("table")),
+            "got: {:?}",
+            resume_result.stdout
+        );
+        assert!(
+            resume_result.stdout.iter().any(|s| s.contains("page.click")),
+            "got: {:?}",
+            resume_result.stdout
+        );
+    }
+
+    #[test]
+    fn test_runtime_search_docs_fallback() {
+        let mut session = NotebookSession::new();
+        // has_js_doc_provider defaults to false
+
+        let result = session.run_cell(
+            r#"
+            local docs = runtime.search_docs("inspect")
+            print(type(docs))
+            print(#docs)
+            "#,
+            "",
+        );
+
+        assert_eq!(result.status, CellStatus::Done);
+        assert!(result.error.is_none(), "got error: {:?}", result.error);
+        assert!(
+            result.stdout.iter().any(|s| s.contains("table")),
+            "got: {:?}",
+            result.stdout
+        );
+        // Should find at least runtime.inspect
+        assert!(
+            result.stdout.iter().any(|s| s.contains("1") || s.parse::<usize>().unwrap_or(0) >= 1),
+            "got: {:?}",
+            result.stdout
+        );
+    }
+
+    #[test]
+    fn test_runtime_search_docs_async_with_js_provider() {
+        let mut session = NotebookSession::new();
+        session.set_js_doc_provider_available(true);
+
+        let result = session.run_cell(
+            r#"
+            local docs = runtime.search_docs("click")
+            print(type(docs))
+            print(#docs)
+            "#,
+            "",
+        );
+
+        assert_eq!(result.status, CellStatus::AsyncPending);
+        let cmd = result.pending_command.unwrap();
+        assert_eq!(cmd.action, "__runtime_search_docs");
+        assert_eq!(cmd.params, serde_json::json!({ "query": "click" }));
+
+        let resume_result = session.resume_cell(
+            r#"{"ok": true, "value": [{"namespace": "page", "name": "click"}, {"namespace": "page", "name": "dblclick"}]}"#,
+        );
+        assert_eq!(resume_result.status, CellStatus::Done);
+        assert!(resume_result.error.is_none());
+        assert!(
+            resume_result.stdout.iter().any(|s| s.contains("table")),
+            "got: {:?}",
+            resume_result.stdout
+        );
+        assert!(
+            resume_result.stdout.iter().any(|s| s.contains("2")),
+            "got: {:?}",
+            resume_result.stdout
+        );
+    }
+
+    #[test]
     fn test_async_pending_status() {
         let mut session = NotebookSession::new();
         let result = session.run_cell("local x = web.mock_async(\"test\")\nprint(x)", "");
@@ -2339,7 +2475,7 @@ mod tests {
                     hs.async_call_counter += 1;
                     let command = AsyncCommand {
                         call_id: hs.async_call_counter,
-                        action: crate::action::Action::Other(format!("plugin_action_{}", label)),
+                        action: format!("plugin_action_{}", label),
                         params: serde_json::json!({ "label": label }),
                     };
                     hs.pending_async_command = Some(command);
@@ -2755,39 +2891,16 @@ mod tests {
     fn test_all_rust_core_apis_with_action_have_non_empty_action() {
         let _session = NotebookSession::new();
         let registry = api_docs::REGISTRY.lock().unwrap();
-        for doc in registry.iter().filter(|d| d.source == "rust_core") {
+        for doc in registry.iter().filter(|d| d.source == crate::api_docs::ToolSource::RustCore) {
             // Only skip sync helpers that legitimately have no action
             if doc.namespace == "path" || (doc.namespace == "runtime" && doc.name == "inspect") {
                 continue;
             }
             assert!(
-                doc.action.as_ref().is_some_and(|a| !a.is_empty()),
+                doc.action.is_some(),
                 "API {}.{} has no action string",
                 doc.namespace,
                 doc.name
-            );
-        }
-    }
-
-    #[test]
-    fn test_all_action_variants_have_docs() {
-        let _session = NotebookSession::new();
-        let registry = api_docs::REGISTRY.lock().unwrap();
-        let action_strings: Vec<String> = registry
-            .iter()
-            .filter_map(|d| d.action.clone())
-            .filter(|a| !a.is_empty())
-            .collect();
-
-        for variant in Action::all_variants() {
-            let s = variant.as_str().to_string();
-            if matches!(variant, Action::Host(_) | Action::Other(_)) {
-                continue;
-            }
-            assert!(
-                action_strings.contains(&s),
-                "Action variant {} has no corresponding doc entry",
-                s
             );
         }
     }

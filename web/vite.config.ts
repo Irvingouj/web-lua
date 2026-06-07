@@ -2,10 +2,13 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [preact()],
   root: '.',
   base: './',
+  define: {
+    __DOCTEST__: JSON.stringify(mode === 'doctest'),
+  },
   server: {
     port: 5173,
     fs: {
@@ -27,4 +30,4 @@ export default defineConfig({
       '@pi-oxide/dom-semantic-tree': path.resolve(__dirname, '../crates/dom-semantic-tree/js/index.ts'),
     },
   },
-});
+}));

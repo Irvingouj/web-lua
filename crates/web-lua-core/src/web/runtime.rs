@@ -114,11 +114,30 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
 
     );
 
+    let hs_docs = _host_state.clone();
     let docs_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
-        let docs = crate::api_docs::all_as_json_value();
-        stack.clear();
-        stack.push_back(json_value_to_lua(ctx, &docs));
-        Ok(CallbackReturn::Return)
+        let has_provider = hs_docs.borrow().has_js_doc_provider;
+        if has_provider {
+            let mut hs = hs_docs.borrow_mut();
+            hs.async_call_counter += 1;
+            let call_id = hs.async_call_counter;
+            let command = crate::types::AsyncCommand {
+                call_id,
+                action: "__runtime_docs".to_string(),
+                params: serde_json::json!({}),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        } else {
+            let docs = crate::api_docs::all_as_json_value();
+            stack.clear();
+            stack.push_back(json_value_to_lua(ctx, &docs));
+            Ok(CallbackReturn::Return)
+        }
     });
 
     lua_api_custom!(ctx, runtime_table, name: "docs", callback: docs_cb,
@@ -137,6 +156,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
 
     );
 
+    let hs_get_doc = _host_state.clone();
     let get_doc_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
         let query = if !stack.is_empty() {
             match stack.get(0) {
@@ -157,13 +177,31 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
             .into());
         };
 
-        stack.clear();
-        if let Some(doc) = crate::api_docs::find_as_json_value(&query) {
-            stack.push_back(json_value_to_lua(ctx, &doc));
+        let has_provider = hs_get_doc.borrow().has_js_doc_provider;
+        if has_provider {
+            let mut hs = hs_get_doc.borrow_mut();
+            hs.async_call_counter += 1;
+            let call_id = hs.async_call_counter;
+            let command = crate::types::AsyncCommand {
+                call_id,
+                action: "__runtime_get_doc".to_string(),
+                params: serde_json::json!({ "query": query }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
         } else {
-            stack.push_back(Value::Nil);
+            stack.clear();
+            if let Some(doc) = crate::api_docs::find_as_json_value(&query) {
+                stack.push_back(json_value_to_lua(ctx, &doc));
+            } else {
+                stack.push_back(Value::Nil);
+            }
+            Ok(CallbackReturn::Return)
         }
-        Ok(CallbackReturn::Return)
     });
 
     lua_api_custom!(ctx, runtime_table, name: "get_doc", callback: get_doc_cb,
@@ -181,6 +219,69 @@ pub(crate) fn register<'a>(ctx: Context<'a>, _host_state: Rc<RefCell<HostState>>
         ],
 
         returns: "table | nil" => "API documentation record, or nil when not found",
+
+    );
+
+    let hs_search = _host_state.clone();
+    let search_docs_cb = Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
+        let query = if !stack.is_empty() {
+            match stack.get(0) {
+                Value::String(s) => String::from_utf8_lossy(s.as_bytes()).to_string(),
+                other => {
+                    let msg = format!(
+                        "runtime.search_docs expects a query string, got {}",
+                        other.type_name()
+                    );
+                    return Err(piccolo::IntoValue::into_value(msg, ctx).into());
+                }
+            }
+        } else {
+            return Err(piccolo::IntoValue::into_value(
+                "runtime.search_docs requires a query string",
+                ctx,
+            )
+            .into());
+        };
+
+        let has_provider = hs_search.borrow().has_js_doc_provider;
+        if has_provider {
+            let mut hs = hs_search.borrow_mut();
+            hs.async_call_counter += 1;
+            let call_id = hs.async_call_counter;
+            let command = crate::types::AsyncCommand {
+                call_id,
+                action: "__runtime_search_docs".to_string(),
+                params: serde_json::json!({ "query": query }),
+            };
+            hs.pending_async_command = Some(command);
+            stack.clear();
+            Ok(CallbackReturn::Yield {
+                to_thread: None,
+                then: None,
+            })
+        } else {
+            let docs = crate::api_docs::search_as_json_value(&query);
+            stack.clear();
+            stack.push_back(json_value_to_lua(ctx, &docs));
+            Ok(CallbackReturn::Return)
+        }
+    });
+
+    lua_api_custom!(ctx, runtime_table, name: "search_docs", callback: search_docs_cb,
+
+        namespace: "runtime",
+
+        action: "runtime_search_docs",
+
+        doc: "Search documentation for APIs matching a query string.",
+
+        params: [
+
+        query: "string", required, "Search query such as `click` or `snapshot`",
+
+        ],
+
+        returns: "table" => "Array of matching API documentation records",
 
     );
     set_protected_global!(ctx, "runtime", runtime_table, "runtime");

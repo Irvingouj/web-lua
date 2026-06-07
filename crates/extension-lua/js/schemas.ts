@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type {
+  DomSnapshotParams,
   FetchDomParams,
   FetchParams,
   PageAppendParams,
@@ -45,20 +46,20 @@ type PageReloadParams = {};
 // biome-ignore lint/complexity/noBannedTypes: type-compatibility aliases for empty params
 type PageUnhoverParams = {};
 
-export const DEFAULT_FETCH_TIMEOUT_MS = 30000n;
+export const DEFAULT_FETCH_TIMEOUT_MS = 30000;
 
 export const FetchParamsSchema = z.object({
   url: z.string().url(),
   method: z.string().default("GET"),
   headers: z.record(z.string()).default({}),
   body: z.string().nullable(),
-  timeout: z.bigint().default(DEFAULT_FETCH_TIMEOUT_MS),
+  timeout: z.number().default(DEFAULT_FETCH_TIMEOUT_MS),
 });
 
 export const FetchDomParamsSchema = z.object({
   url: z.string().url(),
   selector: z.string(),
-  max_text: z.bigint(),
+  max_text: z.number(),
 });
 
 export const StorageGetParamsSchema = z.object({
@@ -85,7 +86,7 @@ export const ClipboardWriteParamsSchema = z.union([
 ]);
 
 export const SleepParamsSchema = z.object({
-  duration: z.bigint(),
+  duration: z.number(),
 });
 
 // ─── Page action schemas ─────────────────────────────────────────
@@ -159,7 +160,7 @@ export const PageForwardParamsSchema = z.object({});
 export const PageReloadParamsSchema = z.object({});
 
 export const PageWaitParamsSchema = z.object({
-  duration: z.coerce.bigint().default(1000n),
+  duration: z.number().default(1000),
 });
 
 export const PageFindParamsSchema = z.object({
@@ -168,7 +169,26 @@ export const PageFindParamsSchema = z.object({
 
 export const PageWaitForParamsSchema = z.object({
   selector: z.string(),
-  timeout: z.coerce.bigint().default(30000n),
+  timeout: z.number().default(30000),
+});
+
+export const PageUrlParamsSchema = z.object({});
+
+export const PageTitleParamsSchema = z.object({});
+
+export const PageExtractParamsSchema = z.object({
+  fields: z.array(z.string()),
+  max_text: z.number().default(500),
+  max_headings: z.number().default(200),
+  max_links: z.number().default(100),
+});
+
+export const PageSnapshotParamsSchema = z.object({
+  max_nodes: z.number().default(500),
+});
+
+export const PageSnapshotDataParamsSchema = z.object({
+  max_nodes: z.number().default(500),
 });
 
 // ─── Tab action schemas ──────────────────────────────────────────
@@ -177,150 +197,464 @@ export const PageWaitForParamsSchema = z.object({
 // so handlers always receive a consistent shape.
 
 export const TabClickParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
 });
 
 export const TabFillParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
   value: z.string(),
 });
 
 export const TabTypeParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
   text: z.string(),
 });
 
 export const TabPressParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   key: z.string(),
 });
 
 export const TabSelectParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
   value: z.string(),
 });
 
 export const TabCheckParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
   checked: z.boolean().default(true),
 });
 
 export const TabHoverParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
 });
 
 export const TabUnhoverParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
 });
 
 export const TabScrollParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   direction: z.string().default("down"),
   amount: z.number().default(300),
 });
 
 export const TabDblClickParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
   refId: z.string(),
 });
 
 export const TabBackParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
+  tabId: z.number(),
 });
 
 export const TabWaitForLoadParamsSchema = z.object({
-  tabId: z.coerce.bigint(),
-  timeout: z.coerce.bigint().default(30000n),
+  tabId: z.number(),
+  timeout: z.number().default(30000),
 });
+
+export const TabEvaluateParamsSchema = z.object({
+  tabId: z.number(),
+  script: z.string(),
+});
+
+export const TabFetchParamsSchema = z.object({
+  tabId: z.number(),
+  url: z.string(),
+  method: z.string().nullable().optional(),
+  headers: z.record(z.string()).optional(),
+  body: z.string().nullable().optional(),
+  timeout: z.number().optional(),
+});
+
+export const TabSnapshotParamsSchema = z.object({
+  tabId: z.number(),
+  max_nodes: z.number().optional(),
+  interactive_only: z.boolean().optional(),
+});
+
+export const TabSnapshotTextParamsSchema = z.object({
+  tabId: z.number(),
+  max_nodes: z.number().optional(),
+  interactive_only: z.boolean().optional(),
+});
+
+export const TabSnapshotDataParamsSchema = z.object({
+  tabId: z.number(),
+  max_nodes: z.number().optional(),
+  interactive_only: z.boolean().optional(),
+});
+
+export const TabScrollToParamsSchema = z.object({
+  tabId: z.number(),
+  x: z.number().default(0),
+  y: z.number().default(0),
+  refId: z.string().optional(),
+});
+
+export const TabExecuteScriptParamsSchema = z
+  .object({
+    target: z.object({ tabId: z.number() }).optional(),
+    func: z.function().optional(),
+    args: z.array(z.unknown()).optional(),
+    world: z.enum(["MAIN", "ISOLATED"]).optional(),
+    files: z.array(z.string()).optional(),
+  })
+  .passthrough();
 
 // ─── Chrome passthrough schemas ──────────────────────────────────
 
-export const CookiesGetParamsSchema = z.record(z.any());
-export const CookiesSetParamsSchema = z.record(z.any());
-export const CookiesDeleteParamsSchema = z.record(z.any());
-export const CookiesListParamsSchema = z.record(z.any());
+export const CookiesGetParamsSchema = z
+  .object({
+    url: z.string().optional(),
+    name: z.string().optional(),
+    storeId: z.string().optional(),
+  })
+  .passthrough();
+export const CookiesSetParamsSchema = z
+  .object({
+    url: z.string(),
+    name: z.string().optional(),
+    value: z.string().optional(),
+    domain: z.string().optional(),
+    path: z.string().optional(),
+    secure: z.boolean().optional(),
+    httpOnly: z.boolean().optional(),
+    sameSite: z.string().optional(),
+    expirationDate: z.number().optional(),
+    storeId: z.string().optional(),
+  })
+  .passthrough();
+export const CookiesDeleteParamsSchema = z
+  .object({
+    url: z.string(),
+    name: z.string(),
+    storeId: z.string().optional(),
+  })
+  .passthrough();
+export const CookiesListParamsSchema = z
+  .object({
+    url: z.string().optional(),
+    name: z.string().optional(),
+    domain: z.string().optional(),
+    path: z.string().optional(),
+    secure: z.boolean().optional(),
+    session: z.boolean().optional(),
+    storeId: z.string().optional(),
+  })
+  .passthrough();
 
-export const HistorySearchParamsSchema = z.record(z.any());
+export const HistorySearchParamsSchema = z
+  .object({
+    text: z.string().optional(),
+    startTime: z.number().optional(),
+    endTime: z.number().optional(),
+    maxResults: z.number().optional(),
+  })
+  .passthrough();
 export const HistoryDeleteParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ url: z.string().optional() }).passthrough(),
 ]);
 
 export const BookmarksSearchParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ query: z.string().optional() }).passthrough(),
 ]);
-export const BookmarksCreateParamsSchema = z.record(z.any());
+export const BookmarksCreateParamsSchema = z
+  .object({
+    parentId: z.string().optional(),
+    index: z.number().optional(),
+    title: z.string().optional(),
+    url: z.string().optional(),
+  })
+  .passthrough();
 export const BookmarksDeleteParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ id: z.string().optional() }).passthrough(),
 ]);
 
-export const TabQueryParamsSchema = z.record(z.any());
-export const TabCreateParamsSchema = z.record(z.any());
-export const TabActivateParamsSchema = z.union([z.number(), z.record(z.any())]);
-export const TabCloseParamsSchema = z.union([z.number(), z.record(z.any())]);
+export const TabQueryParamsSchema = z
+  .object({
+    active: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    highlighted: z.boolean().optional(),
+    currentWindow: z.boolean().optional(),
+    lastFocusedWindow: z.boolean().optional(),
+    status: z.string().optional(),
+    title: z.string().optional(),
+    url: z.union([z.string(), z.array(z.string())]).optional(),
+    windowId: z.number().optional(),
+    windowType: z.string().optional(),
+    index: z.number().optional(),
+  })
+  .passthrough();
+export const TabCreateParamsSchema = z
+  .object({
+    windowId: z.number().optional(),
+    index: z.number().optional(),
+    url: z.string().optional(),
+    active: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    openerTabId: z.number().optional(),
+  })
+  .passthrough();
+export const TabActivateParamsSchema = z.union([
+  z.number(),
+  z
+    .object({ tabId: z.number().optional(), id: z.number().optional() })
+    .passthrough(),
+]);
+export const TabCloseParamsSchema = z.union([
+  z.number(),
+  z
+    .object({ tabId: z.number().optional(), id: z.number().optional() })
+    .passthrough(),
+]);
 
-export const PageCloseParamsSchema = z.union([z.number(), z.record(z.any())]);
+export const PageCloseParamsSchema = z.union([
+  z.number(),
+  z
+    .object({ tabId: z.number().optional(), id: z.number().optional() })
+    .passthrough(),
+]);
 export const PageActiveTabParamsSchema = z.object({});
 
-export const NotificationsCreateParamsSchema = z.record(z.any());
+export const NotificationsCreateParamsSchema = z
+  .object({
+    id: z.string().optional(),
+    options: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
 export const NotificationsClearParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ id: z.string().optional() }).passthrough(),
 ]);
+
+// ─── Chrome API schemas (for chrome.* namespace tools) ─────────────
+
+export const ChromeRuntimeSendMessageParamsSchema = z
+  .object({
+    message: z.unknown().optional(),
+    options: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
+export const ChromeTabsQueryParamsSchema = z
+  .object({
+    active: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    highlighted: z.boolean().optional(),
+    currentWindow: z.boolean().optional(),
+    lastFocusedWindow: z.boolean().optional(),
+    status: z.string().optional(),
+    title: z.string().optional(),
+    url: z.union([z.string(), z.array(z.string())]).optional(),
+    windowId: z.number().optional(),
+    windowType: z.string().optional(),
+    index: z.number().optional(),
+  })
+  .passthrough();
+
+export const ChromeTabsCreateParamsSchema = z
+  .object({
+    windowId: z.number().optional(),
+    index: z.number().optional(),
+    url: z.string().optional(),
+    active: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    openerTabId: z.number().optional(),
+  })
+  .passthrough();
+
+export const ChromeTabsUpdateParamsSchema = z
+  .object({
+    tabId: z.number().optional(),
+    update: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
+export const ChromeTabsRemoveParamsSchema = z.union([
+  z.number(),
+  z.array(z.number()),
+  z
+    .object({ tabId: z.number().optional(), id: z.number().optional() })
+    .passthrough(),
+]);
+
+export const ChromeTabsGetParamsSchema = z.union([
+  z.number(),
+  z
+    .object({ tabId: z.number().optional(), id: z.number().optional() })
+    .passthrough(),
+]);
+
+export const ChromeTabsReloadParamsSchema = z
+  .object({
+    tabId: z.number().optional(),
+    reload: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
+export const ChromeTabsSendMessageParamsSchema = z
+  .object({
+    tabId: z.number().optional(),
+    message: z.unknown().optional(),
+    options: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
+export const ChromeAlarmsCreateParamsSchema = z
+  .object({
+    name: z.string().optional(),
+    alarmInfo: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
+export const ChromeAlarmsClearParamsSchema = z.union([
+  z.string(),
+  z.object({ name: z.string().optional() }).passthrough(),
+]);
+
+export const ChromeActionSetBadgeTextParamsSchema = z.object({}).passthrough();
+
+export const ChromeActionSetBadgeBackgroundColorParamsSchema = z
+  .object({})
+  .passthrough();
+
+export const ChromeActionSetTitleParamsSchema = z.object({}).passthrough();
+
+export const ChromeActionSetIconParamsSchema = z.object({}).passthrough();
+
+export const ChromeContextMenusCreateParamsSchema = z.object({}).passthrough();
+
+export const ChromeContextMenusRemoveParamsSchema = z.union([
+  z.number(),
+  z.string(),
+  z
+    .object({
+      menuItemId: z.union([z.number(), z.string()]).optional(),
+      id: z.union([z.number(), z.string()]).optional(),
+    })
+    .passthrough(),
+]);
+
+export const ChromeWindowsGetAllParamsSchema = z
+  .object({
+    populate: z.boolean().optional(),
+    windowTypes: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
+export const ChromeWindowsCreateParamsSchema = z.object({}).passthrough();
+
+export const ChromeWindowsUpdateParamsSchema = z
+  .object({
+    windowId: z.number().optional(),
+    update: z.object({}).passthrough().optional(),
+  })
+  .passthrough();
+
+export const ChromeWindowsRemoveParamsSchema = z.union([
+  z.number(),
+  z.object({ windowId: z.number().optional() }).passthrough(),
+]);
+
+export const ChromeSidePanelSetOptionsParamsSchema = z.object({}).passthrough();
+
+export const ChromeScriptingExecuteScriptParamsSchema = z
+  .object({
+    target: z.object({ tabId: z.number() }).optional(),
+    func: z.function().optional(),
+    args: z.array(z.unknown()).optional(),
+    world: z.enum(["MAIN", "ISOLATED"]).optional(),
+    files: z.array(z.string()).optional(),
+  })
+  .passthrough();
 
 // ─── Sidepanel action schemas ────────────────────────────────────
 
 export const SidepanelClickParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ refId: z.string().optional() }),
 ]);
 export const SidepanelDblClickParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ refId: z.string().optional() }),
 ]);
-export const SidepanelFillParamsSchema = z.record(z.any());
-export const SidepanelTypeParamsSchema = z.record(z.any());
-export const SidepanelPressParamsSchema = z.record(z.any());
-export const SidepanelSelectParamsSchema = z.record(z.any());
-export const SidepanelCheckParamsSchema = z.record(z.any());
+export const SidepanelFillParamsSchema = z
+  .object({ refId: z.string().optional(), value: z.string().optional() })
+  .passthrough();
+export const SidepanelTypeParamsSchema = z
+  .object({ refId: z.string().optional(), text: z.string().optional() })
+  .passthrough();
+export const SidepanelPressParamsSchema = z
+  .object({ key: z.string().optional() })
+  .passthrough();
+export const SidepanelSelectParamsSchema = z
+  .object({ refId: z.string().optional(), value: z.string().optional() })
+  .passthrough();
+export const SidepanelCheckParamsSchema = z
+  .object({ refId: z.string().optional(), checked: z.boolean().optional() })
+  .passthrough();
 export const SidepanelHoverParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ refId: z.string().optional() }),
 ]);
 export const SidepanelUnhoverParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({ refId: z.string().optional() }),
 ]);
-export const SidepanelScrollParamsSchema = z.record(z.any());
+export const SidepanelScrollParamsSchema = z
+  .object({ direction: z.string().optional(), amount: z.number().optional() })
+  .passthrough();
 export const SidepanelScrollToParamsSchema = z.union([
   z.string(),
-  z.record(z.any()),
+  z.object({
+    refId: z.string().optional(),
+    x: z.number().optional(),
+    y: z.number().optional(),
+  }),
 ]);
-export const SidepanelAppendParamsSchema = z.record(z.any());
+export const SidepanelAppendParamsSchema = z
+  .object({ refId: z.string().optional(), text: z.string().optional() })
+  .passthrough();
 export const SidepanelUrlParamsSchema = z.object({});
 export const SidepanelTitleParamsSchema = z.object({});
 export const SidepanelWaitParamsSchema = z.object({
-  duration: z.coerce.bigint().default(1000n),
+  duration: z.number().default(1000),
 });
 export const SidepanelSnapshotParamsSchema = z.object({
-  max_nodes: z.coerce.bigint().default(500n),
+  max_nodes: z.number().default(500),
   interactive_only: z.boolean().default(false),
 });
 export const SidepanelSnapshotTextParamsSchema = z.object({
-  max_nodes: z.coerce.bigint().default(500n),
+  max_nodes: z.number().default(500),
   interactive_only: z.boolean().default(false),
 });
 export const SidepanelSnapshotDataParamsSchema = z.object({
-  max_nodes: z.coerce.bigint().default(500n),
+  max_nodes: z.number().default(500),
   interactive_only: z.boolean().default(false),
+});
+
+// ─── DOM action schemas ──────────────────────────────────────────
+
+export const DomSnapshotParamsSchema = z.object({
+  max_nodes: z.number().default(500),
+  interactive_only: z.boolean().default(false),
+});
+
+export const DomFormatParamsSchema = z.object({
+  snapshot: z.unknown(),
+  format: z
+    .enum(["compact-text", "json", "json-pretty"])
+    .default("compact-text"),
 });
 
 // Type-satisfaction checks: ensure zod-inferred types align with ts-rs generated types.
@@ -540,3 +874,41 @@ type _AssertPageUnhoverReverse =
   PageUnhoverParams extends z.infer<typeof PageUnhoverParamsSchema>
     ? true
     : never;
+
+type _AssertDomSnapshot =
+  z.infer<typeof DomSnapshotParamsSchema> extends DomSnapshotParams
+    ? true
+    : never;
+type _AssertDomSnapshotReverse =
+  DomSnapshotParams extends z.infer<typeof DomSnapshotParamsSchema>
+    ? true
+    : never;
+
+// ─── ToolDoc schema for runtime doc providers ─────────────────────
+
+export const ToolDocParamSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+  required: z.boolean(),
+  description: z.string(),
+});
+
+export const ToolReturnDocSchema = z.object({
+  type: z.string(),
+  description: z.string(),
+});
+
+export const ToolDocSchema = z.object({
+  action: z.string(),
+  namespace: z.string(),
+  name: z.string(),
+  publicName: z.string(),
+  localName: z.string().optional(),
+  source: z.string(),
+  transport: z.string(),
+  description: z.string(),
+  params: z.array(ToolDocParamSchema),
+  returns: ToolReturnDocSchema,
+  errorCode: z.string(),
+  errorCategory: z.string(),
+});

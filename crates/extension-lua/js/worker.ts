@@ -9,6 +9,7 @@ import { logger } from "./logger.js";
 
 let session: ExtensionSession | null = null;
 let initialized = false;
+let relayTimeoutMs = 30000;
 const pendingRelays = new Map<string, (result: unknown) => void>();
 
 function generateId(): string {
@@ -33,16 +34,14 @@ const workerSelf = self as unknown as WorkerSelf;
 
 // Define the relay function that extension-lua WASM expects globally
 workerSelf.__extension_lua_relay = (cmd: unknown) => {
-  logger.debug(
-    "[worker] __extension_lua_relay cmd:",
-    (cmd as Record<string, unknown>)?.action,
-  );
+  const action = (cmd as Record<string, unknown>)?.action;
+  console.log("[WORKER RELAY] action:", action, "cmd:", JSON.stringify(cmd));
   return new Promise((resolve) => {
     const relayId = generateId();
     pendingRelays.set(relayId, resolve);
+    console.log("[WORKER RELAY] posting asyncRelay id:", relayId);
     self.postMessage({ type: "asyncRelay", id: relayId, command: cmd });
 
-    const timeoutMs = session?.getRelayTimeoutMs() ?? 30000;
     setTimeout(() => {
       if (pendingRelays.has(relayId)) {
         resolve({
@@ -51,7 +50,7 @@ workerSelf.__extension_lua_relay = (cmd: unknown) => {
         });
         pendingRelays.delete(relayId);
       }
-    }, timeoutMs);
+    }, relayTimeoutMs);
   });
 };
 
@@ -81,6 +80,7 @@ export type WorkerMessage =
   | { type: "loadLibrary"; id: string; source: string }
   | { type: "setLogLevel"; level: number }
   | { type: "setRelayTimeoutMs"; ms: number }
+  | { type: "setJsDocProviderAvailable"; available: boolean }
   | { type: "asyncRelayResult"; id: string; result: unknown };
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
@@ -173,6 +173,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     }
     case "setRelayTimeoutMs": {
       try {
+        relayTimeoutMs = msg.ms;
         session.setRelayTimeoutMs(msg.ms);
         const id = "id" in msg ? msg.id : undefined;
         self.postMessage({
@@ -191,22 +192,34 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       }
       break;
     }
+    case "setJsDocProviderAvailable": {
+      try {
+        session.setJsDocProviderAvailable(msg.available);
+        const id = "id" in msg ? msg.id : undefined;
+        self.postMessage({
+          type: "result",
+          id,
+          data: { ok: true },
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        const id = "id" in msg ? msg.id : undefined;
+        self.postMessage({
+          type: "error",
+          id,
+          error: message,
+        });
+      }
+      break;
+    }
     case "asyncRelayResult": {
-      logger.debug(
-        "[worker] asyncRelayResult id:",
-        msg.id,
-        "result:",
-        typeof msg.result,
-      );
+      console.log("[WORKER RESULT] id:", msg.id, "result:", JSON.stringify(msg.result));
       const resolve = pendingRelays.get(msg.id);
       if (resolve) {
         pendingRelays.delete(msg.id);
         resolve(msg.result);
       } else {
-        logger.warn(
-          "[worker] asyncRelayResult: no pending relay for id",
-          msg.id,
-        );
+        console.warn("[WORKER RESULT] no pending relay for id:", msg.id);
       }
       break;
     }

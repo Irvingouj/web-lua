@@ -33,7 +33,7 @@ describe("FetchParamsSchema", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "hello",
-      timeout: 5000n,
+      timeout: 5000,
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -43,7 +43,7 @@ describe("FetchParamsSchema", () => {
         "Content-Type": "application/json",
       });
       expect(result.data.body).toBe("hello");
-      expect(result.data.timeout).toBe(5000n);
+      expect(result.data.timeout).toBe(5000);
     }
   });
 
@@ -57,7 +57,7 @@ describe("FetchParamsSchema", () => {
       expect(result.data.method).toBe("GET");
       expect(result.data.headers).toEqual({});
       expect(result.data.body).toBeNull();
-      expect(result.data.timeout).toBe(30000n);
+      expect(result.data.timeout).toBe(30000);
     }
   });
 
@@ -103,20 +103,20 @@ describe("FetchDomParamsSchema", () => {
     const result = FetchDomParamsSchema.safeParse({
       url: "https://example.com",
       selector: "h1",
-      max_text: 500n,
+      max_text: 500,
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.url).toBe("https://example.com");
       expect(result.data.selector).toBe("h1");
-      expect(result.data.max_text).toBe(500n);
+      expect(result.data.max_text).toBe(500);
     }
   });
 
   it("rejects missing url field", () => {
     const result = FetchDomParamsSchema.safeParse({
       selector: "h1",
-      max_text: 500n,
+      max_text: 500,
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -129,7 +129,7 @@ describe("FetchDomParamsSchema", () => {
     const result = FetchDomParamsSchema.safeParse({
       url: "https://example.com",
       selector: "h1",
-      max_text: 500,
+      max_text: "invalid",
     });
     expect(result.success).toBe(false);
     if (!result.success) {
@@ -251,10 +251,10 @@ describe("ClipboardWriteParamsSchema", () => {
 
 describe("SleepParamsSchema", () => {
   it("accepts valid params", () => {
-    const result = SleepParamsSchema.safeParse({ duration: 1000n });
+    const result = SleepParamsSchema.safeParse({ duration: 1000 });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.duration).toBe(1000n);
+      expect(result.data.duration).toBe(1000);
     }
   });
 
@@ -270,7 +270,7 @@ describe("SleepParamsSchema", () => {
   });
 
   it("rejects invalid duration type", () => {
-    const result = SleepParamsSchema.safeParse({ duration: 1000 });
+    const result = SleepParamsSchema.safeParse({ duration: "1000" });
     expect(result.success).toBe(false);
     if (!result.success) {
       const durationIssue = result.error.issues.find(
@@ -363,10 +363,10 @@ describe("PagePressParamsSchema", () => {
 
 describe("PageWaitParamsSchema", () => {
   it("accepts valid params", () => {
-    const result = PageWaitParamsSchema.safeParse({ duration: 2000n });
+    const result = PageWaitParamsSchema.safeParse({ duration: 2000 });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.duration).toBe(2000n);
+      expect(result.data.duration).toBe(2000);
     }
   });
 
@@ -374,7 +374,7 @@ describe("PageWaitParamsSchema", () => {
     const result = PageWaitParamsSchema.safeParse({});
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.duration).toBe(1000n);
+      expect(result.data.duration).toBe(1000);
     }
   });
 
@@ -382,7 +382,7 @@ describe("PageWaitParamsSchema", () => {
     const result = PageWaitParamsSchema.safeParse({ duration: 1500 });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.duration).toBe(1500n);
+      expect(result.data.duration).toBe(1500);
     }
   });
 });
@@ -392,12 +392,12 @@ describe("PageWaitParamsSchema", () => {
 describe("TabClickParamsSchema", () => {
   it("accepts valid params", () => {
     const result = TabClickParamsSchema.safeParse({
-      tabId: 42n,
+      tabId: 42,
       refId: "ref-1",
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tabId).toBe(42n);
+      expect(result.data.tabId).toBe(42);
       expect(result.data.refId).toBe("ref-1");
     }
   });
@@ -406,7 +406,7 @@ describe("TabClickParamsSchema", () => {
     const result = TabClickParamsSchema.safeParse({ tabId: 42, refId: "x" });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tabId).toBe(42n);
+      expect(result.data.tabId).toBe(42);
     }
   });
 
@@ -419,7 +419,7 @@ describe("TabClickParamsSchema", () => {
 describe("TabFillParamsSchema", () => {
   it("accepts valid params", () => {
     const result = TabFillParamsSchema.safeParse({
-      tabId: 42n,
+      tabId: 42,
       refId: "ref-1",
       value: "hello",
     });
@@ -431,7 +431,7 @@ describe("TabFillParamsSchema", () => {
 
   it("rejects missing value", () => {
     const result = TabFillParamsSchema.safeParse({
-      tabId: 42n,
+      tabId: 42,
       refId: "ref-1",
     });
     expect(result.success).toBe(false);
@@ -440,7 +440,7 @@ describe("TabFillParamsSchema", () => {
 
 describe("TabPressParamsSchema", () => {
   it("accepts valid params", () => {
-    const result = TabPressParamsSchema.safeParse({ tabId: 42n, key: "Enter" });
+    const result = TabPressParamsSchema.safeParse({ tabId: 42, key: "Enter" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.key).toBe("Enter");
@@ -448,17 +448,17 @@ describe("TabPressParamsSchema", () => {
   });
 
   it("rejects missing key", () => {
-    const result = TabPressParamsSchema.safeParse({ tabId: 42n });
+    const result = TabPressParamsSchema.safeParse({ tabId: 42 });
     expect(result.success).toBe(false);
   });
 });
 
 describe("TabBackParamsSchema", () => {
   it("accepts valid params", () => {
-    const result = TabBackParamsSchema.safeParse({ tabId: 42n });
+    const result = TabBackParamsSchema.safeParse({ tabId: 42 });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tabId).toBe(42n);
+      expect(result.data.tabId).toBe(42);
     }
   });
 
@@ -466,7 +466,7 @@ describe("TabBackParamsSchema", () => {
     const result = TabBackParamsSchema.safeParse({ tabId: 7 });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tabId).toBe(7n);
+      expect(result.data.tabId).toBe(7);
     }
   });
 
@@ -479,31 +479,31 @@ describe("TabBackParamsSchema", () => {
 describe("TabWaitForLoadParamsSchema", () => {
   it("accepts valid params", () => {
     const result = TabWaitForLoadParamsSchema.safeParse({
-      tabId: 42n,
-      timeout: 10000n,
+      tabId: 42,
+      timeout: 10000,
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.timeout).toBe(10000n);
+      expect(result.data.timeout).toBe(10000);
     }
   });
 
   it("applies default timeout", () => {
-    const result = TabWaitForLoadParamsSchema.safeParse({ tabId: 42n });
+    const result = TabWaitForLoadParamsSchema.safeParse({ tabId: 42 });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.timeout).toBe(30000n);
+      expect(result.data.timeout).toBe(30000);
     }
   });
 
   it("coerces number timeout to bigint", () => {
     const result = TabWaitForLoadParamsSchema.safeParse({
-      tabId: 42n,
+      tabId: 42,
       timeout: 5000,
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.timeout).toBe(5000n);
+      expect(result.data.timeout).toBe(5000);
     }
   });
 });
@@ -592,12 +592,12 @@ describe("TabCreateParamsSchema", () => {
 describe("SidepanelSnapshotParamsSchema", () => {
   it("accepts valid params", () => {
     const result = SidepanelSnapshotParamsSchema.safeParse({
-      max_nodes: 100n,
+      max_nodes: 100,
       interactive_only: true,
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.max_nodes).toBe(100n);
+      expect(result.data.max_nodes).toBe(100);
       expect(result.data.interactive_only).toBe(true);
     }
   });
@@ -606,7 +606,7 @@ describe("SidepanelSnapshotParamsSchema", () => {
     const result = SidepanelSnapshotParamsSchema.safeParse({});
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.max_nodes).toBe(500n);
+      expect(result.data.max_nodes).toBe(500);
       expect(result.data.interactive_only).toBe(false);
     }
   });
@@ -617,7 +617,7 @@ describe("SidepanelSnapshotParamsSchema", () => {
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.max_nodes).toBe(250n);
+      expect(result.data.max_nodes).toBe(250);
     }
   });
 

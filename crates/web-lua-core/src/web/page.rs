@@ -34,7 +34,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageSnapshotText,
+                action: "page_snapshot_text".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -77,7 +77,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageSnapshotData,
+                action: "page_snapshot_data".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -120,7 +120,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageSnapshotText,
+                action: "page_snapshot_text".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -178,7 +178,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageClick,
+                action: "page_click".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -227,7 +227,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageDblclick,
+                action: "page_dblclick".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -284,7 +284,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageFill,
+                action: "page_fill".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -342,7 +342,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageType,
+                action: "page_type".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -390,7 +390,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PagePress,
+                action: "page_press".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -413,14 +413,17 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         crate::api_docs::register(crate::api_docs::LuaApiDoc {
             namespace: "page".to_string(),
             name: "enter".to_string(),
+            public_name: "page.enter".to_string(),
             action: Some("page_press".to_string()),
+            local_name: None,
+            source: crate::api_docs::ToolSource::RustCore,
+            transport: crate::api_docs::ToolTransport::HostAsync,
             description: "Alias for page.press(\"Enter\") — press the Enter key.".to_string(),
             params: vec![],
             returns: crate::api_docs::ReturnDoc {
                 lua_type: "nil".to_string(),
                 description: "None".to_string(),
             },
-            source: "rust_core".to_string(),
         });
     }
 
@@ -462,7 +465,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageSelect,
+                action: "page_select".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -521,7 +524,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageCheck,
+                action: "page_check".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -571,7 +574,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageHover,
+                action: "page_hover".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -600,7 +603,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageUnhover,
+                action: "page_unhover".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -672,7 +675,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageScroll,
+                action: "page_scroll".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -723,7 +726,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageScrollTo,
+                action: "page_scroll_to".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -752,7 +755,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageUrl,
+                action: "page_url".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -780,7 +783,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageTitle,
+                action: "page_title".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -808,7 +811,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageScreenshot,
+                action: "page_screenshot".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -854,7 +857,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageGoto,
+                action: "page_goto".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -892,7 +895,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageBack,
+                action: "page_back".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -920,7 +923,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageForward,
+                action: "page_forward".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -948,7 +951,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageReload,
+                action: "page_reload".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -995,7 +998,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageWait,
+                action: "page_wait".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -1017,7 +1020,11 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         crate::api_docs::register(crate::api_docs::LuaApiDoc {
             namespace: "page".to_string(),
             name: "wait_for_load".to_string(),
+            public_name: "page.wait_for_load".to_string(),
             action: Some("tab_wait_for_load".to_string()),
+            local_name: None,
+            source: crate::api_docs::ToolSource::RustCore,
+            transport: crate::api_docs::ToolTransport::HostAsync,
             description: "Wait for the current tab to finish loading.".to_string(),
             params: vec![crate::api_docs::ParamDoc {
                 name: "timeout".to_string(),
@@ -1029,7 +1036,6 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
                 lua_type: "boolean".to_string(),
                 description: "true if loaded within timeout".to_string(),
             },
-            source: "rust_core".to_string(),
         });
     }
 
@@ -1041,7 +1047,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageTabs,
+                action: "page_tabs".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -1086,7 +1092,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageSwitch,
+                action: "page_switch".to_string(),
                 params: serde_json::json!({ "tabId": tab_id }),
             };
             hs.pending_async_command = Some(command);
@@ -1124,7 +1130,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageNewTab,
+                action: "page_new_tab".to_string(),
                 params: serde_json::json!({ "url": url }),
             };
             hs.pending_async_command = Some(command);
@@ -1170,7 +1176,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageClose,
+                action: "page_close".to_string(),
                 params: serde_json::json!({ "tabId": tab_id }),
             };
             hs.pending_async_command = Some(command);
@@ -1199,7 +1205,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageActiveTab,
+                action: "page_active_tab".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -1256,7 +1262,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageFind,
+                action: "page_find".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -1314,7 +1320,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageWaitFor,
+                action: "page_wait_for".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -1383,7 +1389,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageExtract,
+                action: "page_extract".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -1443,7 +1449,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::PageAppend,
+                action: "page_append".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);

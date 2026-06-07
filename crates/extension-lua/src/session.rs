@@ -90,6 +90,13 @@ impl ExtensionSession {
         self.relay_timeout_ms
     }
 
+    /// Enable the JS doc provider so runtime.docs() / runtime.get_doc()
+    /// emit async commands instead of returning static Rust docs.
+    #[wasm_bindgen(js_name = setJsDocProviderAvailable)]
+    pub fn set_js_doc_provider_available(&mut self, available: bool) {
+        self.base.inner.set_js_doc_provider_available(available);
+    }
+
     /// Clean up the session and release resources.
     #[wasm_bindgen(js_name = stopWith)]
     pub fn stop_with(&mut self) {

@@ -35,7 +35,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::DomSnapshot,
+                action: "dom_snapshot".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -94,7 +94,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::DomFormat,
+                action: "dom_format".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);

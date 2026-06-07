@@ -9,14 +9,17 @@ import {
 } from "@pi-oxide/dom-semantic-tree";
 
 import { z } from "zod";
-import { getContentScriptAction } from "./content-script-bridge.js";
+
 import {
   type AsyncError,
   type AsyncResponse,
   type Command,
   dispatchTool,
   getTool,
+  listTools,
+  MergedDocRegistry,
   registerTool,
+  type ToolDoc,
 } from "./tool-registry.js";
 
 let domSnapshotReady: Promise<void> | null = null;
@@ -34,7 +37,6 @@ import type {
   DomSnapshotParams,
   FetchDomParams,
   FetchParams,
-  PageExtractParams,
   SleepParams,
   StorageDeleteParams,
   StorageGetParams,
@@ -45,6 +47,28 @@ import {
   BookmarksCreateParamsSchema,
   BookmarksDeleteParamsSchema,
   BookmarksSearchParamsSchema,
+  ChromeActionSetBadgeBackgroundColorParamsSchema,
+  ChromeActionSetBadgeTextParamsSchema,
+  ChromeActionSetIconParamsSchema,
+  ChromeActionSetTitleParamsSchema,
+  ChromeAlarmsClearParamsSchema,
+  ChromeAlarmsCreateParamsSchema,
+  ChromeContextMenusCreateParamsSchema,
+  ChromeContextMenusRemoveParamsSchema,
+  ChromeRuntimeSendMessageParamsSchema,
+  ChromeScriptingExecuteScriptParamsSchema,
+  ChromeSidePanelSetOptionsParamsSchema,
+  ChromeTabsCreateParamsSchema,
+  ChromeTabsGetParamsSchema,
+  ChromeTabsQueryParamsSchema,
+  ChromeTabsReloadParamsSchema,
+  ChromeTabsRemoveParamsSchema,
+  ChromeTabsSendMessageParamsSchema,
+  ChromeTabsUpdateParamsSchema,
+  ChromeWindowsCreateParamsSchema,
+  ChromeWindowsGetAllParamsSchema,
+  ChromeWindowsRemoveParamsSchema,
+  ChromeWindowsUpdateParamsSchema,
   ClipboardReadParamsSchema,
   ClipboardWriteParamsSchema,
   CookiesDeleteParamsSchema,
@@ -108,15 +132,23 @@ import {
   TabCloseParamsSchema,
   TabCreateParamsSchema,
   TabDblClickParamsSchema,
+  TabEvaluateParamsSchema,
+  TabExecuteScriptParamsSchema,
+  TabFetchParamsSchema,
   TabFillParamsSchema,
   TabHoverParamsSchema,
   TabPressParamsSchema,
   TabQueryParamsSchema,
   TabScrollParamsSchema,
+  TabScrollToParamsSchema,
   TabSelectParamsSchema,
+  TabSnapshotDataParamsSchema,
+  TabSnapshotParamsSchema,
+  TabSnapshotTextParamsSchema,
   TabTypeParamsSchema,
   TabUnhoverParamsSchema,
   TabWaitForLoadParamsSchema,
+  ToolDocSchema,
 } from "./schemas.js";
 
 declare global {
@@ -157,20 +189,6 @@ type TabMessage = {
   params: Record<string, unknown>;
 };
 
-type DomNode = {
-  refId: number;
-  role: string;
-  tag: string;
-  name?: string;
-};
-
-type SnapshotFormat = "compact-text" | "json" | "json-pretty";
-
-type DomFormatParams = {
-  snapshot: unknown;
-  format?: SnapshotFormat;
-};
-
 // ─── Host handler registry ─────────────────────────────────────
 
 const hostHandlers: Record<string, HostHandler> = {};
@@ -187,15 +205,6 @@ export function registerHostHandlers(handlers: Record<string, HostHandler>) {
 }
 
 // ─── Typed params helper ───────────────────────────────────────
-
-function expectParams<T>(params: unknown): T {
-  if (typeof params !== "object" || params === null || Array.isArray(params)) {
-    throw new Error(
-      `Expected params object, got ${params === null ? "null" : Array.isArray(params) ? "array" : typeof params}`,
-    );
-  }
-  return params as T;
-}
 
 // ─── Helpers for extracting values from unknown params ─────────
 
@@ -222,1238 +231,20 @@ function extractTabId(params: unknown): number | null {
   return typeof tabId === "number" ? tabId : null;
 }
 
-function extractArg<T>(params: unknown, index: number, fallback?: T): T {
-  if (Array.isArray(params)) return (params[index] ?? fallback) as T;
-  if (typeof params === "object" && params !== null) return fallback as T;
-  if (index === 0) return params as T;
-  return fallback as T;
-}
-
-function _getStringParam(params: unknown, key: string): string {
-  const val = asRecord(params)[key];
-  return typeof val === "string" ? val : "";
-}
-
-function _getNumberParam(
-  params: unknown,
-  key: string,
-  fallback: number,
-): number {
-  const val = asRecord(params)[key];
-  return typeof val === "number" ? val : fallback;
-}
-
 // ─── Main command dispatcher ─────────────────────────────────────
-
-async function legacyExecuteMainThreadCommand(
-  command: Command,
-): Promise<AsyncResponse> {
-  const params = command.params;
-  switch (command.action) {
-    case "page_url": {
-      const activeTab = getActiveTabId();
-      if (activeTab === null) {
-        return {
-          ok: false,
-          error: { message: "No active tab", code: "E_NO_TAB" },
-        };
-      }
-      return executeInTab(activeTab, () => window.location.href, []);
-    }
-    case "page_title": {
-      const activeTab = getActiveTabId();
-      if (activeTab === null) {
-        return {
-          ok: false,
-          error: { message: "No active tab", code: "E_NO_TAB" },
-        };
-      }
-      return executeInTab(activeTab, () => document.title, []);
-    }
-
-    case "page_extract": {
-      const activeTab = getActiveTabId();
-      if (activeTab === null) {
-        return {
-          ok: false,
-          error: { message: "No active tab", code: "E_NO_TAB" },
-        };
-      }
-      const { fields, max_text, max_headings, max_links } =
-        expectParams<PageExtractParams>(params);
-      const maxTextNum = Number(max_text ?? 500);
-      const maxHeadingsNum = Number(max_headings ?? 200);
-      const maxLinksNum = Number(max_links ?? 100);
-      return executeInTab(
-        activeTab,
-        (
-          fieldsArg: unknown,
-          maxTextArg: unknown,
-          maxHeadingsArg: unknown,
-          maxLinksArg: unknown,
-        ) => {
-          const fieldList = Array.isArray(fieldsArg) ? fieldsArg : [];
-          const maxText = typeof maxTextArg === "number" ? maxTextArg : 500;
-          const maxHeadings =
-            typeof maxHeadingsArg === "number" ? maxHeadingsArg : 200;
-          const maxLinks = typeof maxLinksArg === "number" ? maxLinksArg : 100;
-          const result: Record<string, unknown> = {};
-          for (const field of fieldList) {
-            switch (field) {
-              case "title":
-                result.title = document.title;
-                break;
-              case "url":
-                result.url = window.location.href;
-                break;
-              case "headings": {
-                const headings = Array.from(
-                  document.querySelectorAll("h1, h2, h3, h4, h5, h6"),
-                );
-                result.headings = headings.map((el) => ({
-                  tag: el.tagName,
-                  text: el.textContent?.trim().slice(0, maxHeadings) || "",
-                }));
-                break;
-              }
-              case "links": {
-                const links = Array.from(document.querySelectorAll("a[href]"));
-                result.links = links.map((el) => ({
-                  href: el.getAttribute("href"),
-                  text: el.textContent?.trim().slice(0, maxLinks) || "",
-                }));
-                break;
-              }
-              case "text":
-                result.text =
-                  document.body?.textContent?.trim().slice(0, maxText) || "";
-                break;
-            }
-          }
-          return result;
-        },
-        [fields, maxTextNum, maxHeadingsNum, maxLinksNum],
-      );
-    }
-    case "page_snapshot":
-    case "page_snapshot_text": {
-      const activeTab = getActiveTabId();
-      if (activeTab === null) {
-        return {
-          ok: false,
-          error: { message: "No active tab", code: "E_NO_TAB" },
-        };
-      }
-      const obj = asRecord(params);
-      const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-      const result = await executeInTab(
-        activeTab,
-        (maxNodesArg: unknown) => {
-          const maxNodesNum =
-            typeof maxNodesArg === "number" ? maxNodesArg : 500;
-          // inlineSnapshot is injected into content-script.ts
-          // but executeInTab runs in MAIN world where it may not exist.
-          // We inline a minimal snapshot here.
-          function getAccessibleRole(el: Element): string {
-            const tag = el.tagName.toLowerCase();
-            const ariaRole = el.getAttribute("role");
-            if (ariaRole) return ariaRole;
-            if (
-              tag === "button" ||
-              (tag === "input" && (el as HTMLInputElement).type === "submit")
-            )
-              return "button";
-            if (tag === "a") return "link";
-            if (tag === "input") {
-              const type = (el as HTMLInputElement).type;
-              if (
-                type === "text" ||
-                type === "email" ||
-                type === "password" ||
-                type === "search"
-              )
-                return "textbox";
-              if (type === "checkbox") return "checkbox";
-              if (type === "radio") return "radio";
-              if (type === "submit" || type === "button") return "button";
-            }
-            if (tag === "textarea") return "textbox";
-            if (tag === "select") return "combobox";
-            if (tag === "img") return "img";
-            if (
-              tag === "h1" ||
-              tag === "h2" ||
-              tag === "h3" ||
-              tag === "h4" ||
-              tag === "h5" ||
-              tag === "h6"
-            )
-              return "heading";
-            if (tag === "li") return "listitem";
-            if (tag === "ul" || tag === "ol") return "list";
-            if (tag === "table") return "table";
-            if (tag === "tr") return "row";
-            if (tag === "td" || tag === "th") return "cell";
-            if (tag === "nav") return "navigation";
-            if (tag === "main") return "main";
-            if (tag === "article") return "article";
-            if (tag === "section") return "region";
-            if (tag === "aside") return "complementary";
-            if (tag === "form") return "form";
-            if (tag === "dialog" || tag === "modal") return "dialog";
-            if (tag === "figure") return "figure";
-            if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
-              return "button";
-            return "generic";
-          }
-          function getAccessibleName(el: Element): string {
-            const ariaLabel = el.getAttribute("aria-label");
-            if (ariaLabel) return ariaLabel;
-            const labelledBy = el.getAttribute("aria-labelledby");
-            if (labelledBy) {
-              const labelEl = document.getElementById(labelledBy);
-              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
-            }
-            const tag = el.tagName.toLowerCase();
-            if (tag === "img") {
-              const alt = el.getAttribute("alt");
-              if (alt) return alt;
-            }
-            const title = (el as HTMLElement).title;
-            if (title) return title;
-            const role = getAccessibleRole(el);
-            if (
-              role !== "generic" &&
-              role !== "list" &&
-              role !== "table" &&
-              role !== "row" &&
-              role !== "region" &&
-              role !== "navigation" &&
-              role !== "main"
-            ) {
-              const text = el.textContent?.trim().slice(0, 60) || "";
-              return text;
-            }
-            return "";
-          }
-          function shouldInclude(el: Element): boolean {
-            const role = getAccessibleRole(el);
-            if (role === "generic") return false;
-            if (role === "presentation" || role === "none") return false;
-            if ((el as HTMLElement).hidden) return false;
-            const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden")
-              return false;
-            return true;
-          }
-          type DomNode = {
-            refId: number;
-            role: string;
-            tag: string;
-            name?: string;
-          };
-          const nodes: DomNode[] = [];
-          const lines: string[] = [];
-          let nextRefId = 1;
-          function traverse(el: Element, depth: number) {
-            if (nodes.length >= maxNodesNum) return;
-            const tag = el.tagName.toLowerCase();
-            if (
-              tag === "script" ||
-              tag === "style" ||
-              tag === "noscript" ||
-              tag === "template"
-            )
-              return;
-            const included = shouldInclude(el);
-            let currentDepth = depth;
-            if (included) {
-              const refId = nextRefId++;
-              el.setAttribute("data-ref-id", String(refId));
-              const role = getAccessibleRole(el);
-              const name = getAccessibleName(el);
-              const node: DomNode = { refId, role, tag };
-              if (name) node.name = name;
-              nodes.push(node);
-              const indent = "  ".repeat(depth);
-              const parts: string[] = [`${indent}- ${role}`];
-              if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-              parts.push(`[ref=${refId}]`);
-              lines.push(parts.join(" "));
-              currentDepth = depth + 1;
-            }
-            for (const child of el.children) {
-              traverse(child, currentDepth);
-            }
-          }
-          if (document.body) traverse(document.body, 0);
-          const header = [
-            `URL: ${window.location.href}`,
-            `Title: ${document.title}`,
-            "",
-          ];
-          const text = header.concat(lines).join("\n");
-          return {
-            text,
-            nodes,
-            url: window.location.href,
-            title: document.title,
-            viewport: { width: window.innerWidth, height: window.innerHeight },
-          };
-        },
-        [maxNodes],
-      );
-      if (result.ok && result.value && typeof result.value === "object") {
-        const val = result.value as Record<string, unknown>;
-        return { ok: true, value: val.text };
-      }
-      return {
-        ok: false,
-        error: { message: "Failed to get page snapshot", code: "E_SNAPSHOT" },
-      };
-    }
-    case "page_snapshot_data": {
-      const activeTab = getActiveTabId();
-      if (activeTab === null) {
-        return {
-          ok: false,
-          error: { message: "No active tab", code: "E_NO_TAB" },
-        };
-      }
-      const obj = asRecord(params);
-      const maxNodes = typeof obj.max_nodes === "number" ? obj.max_nodes : 500;
-      return executeInTab(
-        activeTab,
-        (maxNodesArg: unknown) => {
-          const maxNodesNum =
-            typeof maxNodesArg === "number" ? maxNodesArg : 500;
-          function getAccessibleRole(el: Element): string {
-            const tag = el.tagName.toLowerCase();
-            const ariaRole = el.getAttribute("role");
-            if (ariaRole) return ariaRole;
-            if (
-              tag === "button" ||
-              (tag === "input" && (el as HTMLInputElement).type === "submit")
-            )
-              return "button";
-            if (tag === "a") return "link";
-            if (tag === "input") {
-              const type = (el as HTMLInputElement).type;
-              if (
-                type === "text" ||
-                type === "email" ||
-                type === "password" ||
-                type === "search"
-              )
-                return "textbox";
-              if (type === "checkbox") return "checkbox";
-              if (type === "radio") return "radio";
-              if (type === "submit" || type === "button") return "button";
-            }
-            if (tag === "textarea") return "textbox";
-            if (tag === "select") return "combobox";
-            if (tag === "img") return "img";
-            if (
-              tag === "h1" ||
-              tag === "h2" ||
-              tag === "h3" ||
-              tag === "h4" ||
-              tag === "h5" ||
-              tag === "h6"
-            )
-              return "heading";
-            if (tag === "li") return "listitem";
-            if (tag === "ul" || tag === "ol") return "list";
-            if (tag === "table") return "table";
-            if (tag === "tr") return "row";
-            if (tag === "td" || tag === "th") return "cell";
-            if (tag === "nav") return "navigation";
-            if (tag === "main") return "main";
-            if (tag === "article") return "article";
-            if (tag === "section") return "region";
-            if (tag === "aside") return "complementary";
-            if (tag === "form") return "form";
-            if (tag === "dialog" || tag === "modal") return "dialog";
-            if (tag === "figure") return "figure";
-            if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
-              return "button";
-            return "generic";
-          }
-          function getAccessibleName(el: Element): string {
-            const ariaLabel = el.getAttribute("aria-label");
-            if (ariaLabel) return ariaLabel;
-            const labelledBy = el.getAttribute("aria-labelledby");
-            if (labelledBy) {
-              const labelEl = document.getElementById(labelledBy);
-              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
-            }
-            const tag = el.tagName.toLowerCase();
-            if (tag === "img") {
-              const alt = el.getAttribute("alt");
-              if (alt) return alt;
-            }
-            const title = (el as HTMLElement).title;
-            if (title) return title;
-            const role = getAccessibleRole(el);
-            if (
-              role !== "generic" &&
-              role !== "list" &&
-              role !== "table" &&
-              role !== "row" &&
-              role !== "region" &&
-              role !== "navigation" &&
-              role !== "main"
-            ) {
-              const text = el.textContent?.trim().slice(0, 60) || "";
-              return text;
-            }
-            return "";
-          }
-          function shouldInclude(el: Element): boolean {
-            const role = getAccessibleRole(el);
-            if (role === "generic") return false;
-            if (role === "presentation" || role === "none") return false;
-            if ((el as HTMLElement).hidden) return false;
-            const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden")
-              return false;
-            return true;
-          }
-          type DomNode = {
-            refId: number;
-            role: string;
-            tag: string;
-            name?: string;
-          };
-          const nodes: DomNode[] = [];
-          const lines: string[] = [];
-          let nextRefId = 1;
-          function traverse(el: Element, depth: number) {
-            if (nodes.length >= maxNodesNum) return;
-            const tag = el.tagName.toLowerCase();
-            if (
-              tag === "script" ||
-              tag === "style" ||
-              tag === "noscript" ||
-              tag === "template"
-            )
-              return;
-            const included = shouldInclude(el);
-            let currentDepth = depth;
-            if (included) {
-              const refId = nextRefId++;
-              el.setAttribute("data-ref-id", String(refId));
-              const role = getAccessibleRole(el);
-              const name = getAccessibleName(el);
-              const node: DomNode = { refId, role, tag };
-              if (name) node.name = name;
-              nodes.push(node);
-              const indent = "  ".repeat(depth);
-              const parts: string[] = [`${indent}- ${role}`];
-              if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-              parts.push(`[ref=${refId}]`);
-              lines.push(parts.join(" "));
-              currentDepth = depth + 1;
-            }
-            for (const child of el.children) {
-              traverse(child, currentDepth);
-            }
-          }
-          if (document.body) traverse(document.body, 0);
-          const header = [
-            `URL: ${window.location.href}`,
-            `Title: ${document.title}`,
-            "",
-          ];
-          const text = header.concat(lines).join("\n");
-          return {
-            text,
-            nodes,
-            url: window.location.href,
-            title: document.title,
-            viewport: {
-              width: window.innerWidth,
-              height: window.innerHeight,
-            },
-            version: "1.0",
-          };
-        },
-        [maxNodes],
-      );
-    }
-    case "dom_snapshot": {
-      return handleDomSnapshot(expectParams<DomSnapshotParams>(params));
-    }
-    case "dom_format": {
-      return handleDomFormat(expectParams<DomFormatParams>(params));
-    }
-    case "tab_execute_script":
-      return handleChromeApi({
-        action: "chrome_scripting_executeScript",
-        params,
-      });
-    case "tab_scroll_to": {
-      const tabId = extractTabId(params);
-      const obj = asRecord(params);
-      const x = Number(extractArg(params, 1, obj.x ?? 0));
-      const y = Number(extractArg(params, 2, obj.y ?? 0));
-      const refId = extractArg(params, 3, obj.refId ?? obj.ref_id);
-      return sendBridgeMessageToTab(tabId, "tab_scroll_to", {
-        x,
-        y,
-        refId: refId ? String(refId) : undefined,
-      });
-    }
-    case "tab_evaluate": {
-      const tabId = extractTabId(params);
-      const obj = asRecord(params);
-      const script = extractArg(
-        params,
-        1,
-        obj.script ?? obj.code ?? obj.js ?? "",
-      );
-      const targetTab = typeof tabId === "number" ? tabId : getActiveTabId();
-      if (targetTab === null) {
-        return {
-          ok: false,
-          error: {
-            message: "No active tab available",
-            code: "E_NO_TAB",
-            category: "resource",
-          },
-        };
-      }
-      const codeStr = String(script);
-      const evalFunc = (code: string) => {
-        // biome-ignore lint/security/noGlobalEval: Chrome executeScript context only supports eval, not new Function()
-        return eval(code);
-      };
-      try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: targetTab },
-          func: evalFunc,
-          args: [codeStr],
-          world: "MAIN",
-        });
-        if (results?.[0]) {
-          const first = results[0] as (typeof results)[0] & { error?: unknown };
-          if (first.error) {
-            return {
-              ok: false,
-              error: {
-                message: String(first.error),
-                code: "E_SCRIPT_EXECUTION",
-                category: "script",
-              },
-            };
-          }
-          return { ok: true, value: first.result };
-        }
-        return { ok: true, value: null };
-      } catch (err: unknown) {
-        return normalizeChromeError(err);
-      }
-    }
-    case "tab_fetch": {
-      const tabId = extractTabId(params);
-      const obj = asRecord(params);
-      const url = extractArg(params, 1, obj.url);
-      const opts = extractArg(params, 2, obj);
-      const optsRec = asRecord(opts);
-      const method = (optsRec.method as string) ?? "GET";
-      const headers = optsRec.headers ?? {};
-      const body = optsRec.body ?? null;
-      const timeout =
-        typeof optsRec.timeout === "number" ? optsRec.timeout : 30_000;
-      return executeInTab(
-        tabId,
-        (
-          urlArg: unknown,
-          methodArg: unknown,
-          headersArg: unknown,
-          bodyArg: unknown,
-          timeoutArg: unknown,
-        ) => {
-          const urlStr = typeof urlArg === "string" ? urlArg : "";
-          const methodStr = typeof methodArg === "string" ? methodArg : "GET";
-          const headersRec =
-            typeof headersArg === "object" && headersArg !== null
-              ? (headersArg as Record<string, string>)
-              : {};
-          const bodyStr =
-            bodyArg !== null && bodyArg !== undefined ? String(bodyArg) : null;
-          const timeoutNum =
-            typeof timeoutArg === "number" ? timeoutArg : 30_000;
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeoutNum);
-          const fetchOpts: RequestInit = {
-            method: methodStr || "GET",
-            headers: headersRec,
-            signal: controller.signal,
-          };
-          if (bodyStr !== null) {
-            fetchOpts.body = bodyStr;
-          }
-          return fetch(urlStr, fetchOpts)
-            .then(async (resp) => {
-              clearTimeout(timeoutId);
-              const text = await resp.text();
-              return {
-                status: resp.status,
-                ok: resp.ok,
-                headers: Object.fromEntries(resp.headers.entries()),
-                body: text,
-              };
-            })
-            .catch((e) => {
-              clearTimeout(timeoutId);
-              throw e;
-            });
-        },
-        [url, method, headers, body, timeout],
-      );
-    }
-    case "tab_snapshot": {
-      const tabId = extractTabId(params);
-      const obj = asRecord(params);
-      const opts = extractArg(params, 1, obj.options ?? obj);
-      const optRec = asRecord(opts);
-      const maxNodes =
-        typeof optRec.max_nodes === "number" ? optRec.max_nodes : 500;
-      const result = await executeInTab(
-        tabId,
-        (maxNodesArg: unknown) => {
-          const maxNodesNum =
-            typeof maxNodesArg === "number" ? maxNodesArg : 500;
-
-          function getAccessibleRole(el: Element): string {
-            const tag = el.tagName.toLowerCase();
-            const ariaRole = el.getAttribute("role");
-            if (ariaRole) return ariaRole;
-            if (
-              tag === "button" ||
-              (tag === "input" && (el as HTMLInputElement).type === "submit")
-            )
-              return "button";
-            if (tag === "a") return "link";
-            if (tag === "input") {
-              const type = (el as HTMLInputElement).type;
-              if (
-                type === "text" ||
-                type === "email" ||
-                type === "password" ||
-                type === "search"
-              )
-                return "textbox";
-              if (type === "checkbox") return "checkbox";
-              if (type === "radio") return "radio";
-              if (type === "submit" || type === "button") return "button";
-            }
-            if (tag === "textarea") return "textbox";
-            if (tag === "select") return "combobox";
-            if (tag === "img") return "img";
-            if (
-              tag === "h1" ||
-              tag === "h2" ||
-              tag === "h3" ||
-              tag === "h4" ||
-              tag === "h5" ||
-              tag === "h6"
-            )
-              return "heading";
-            if (tag === "li") return "listitem";
-            if (tag === "ul" || tag === "ol") return "list";
-            if (tag === "table") return "table";
-            if (tag === "tr") return "row";
-            if (tag === "td" || tag === "th") return "cell";
-            if (tag === "nav") return "navigation";
-            if (tag === "main") return "main";
-            if (tag === "article") return "article";
-            if (tag === "section") return "region";
-            if (tag === "aside") return "complementary";
-            if (tag === "form") return "form";
-            if (tag === "dialog" || tag === "modal") return "dialog";
-            if (tag === "figure") return "figure";
-            if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
-              return "button";
-            return "generic";
-          }
-
-          function getAccessibleName(el: Element): string {
-            const ariaLabel = el.getAttribute("aria-label");
-            if (ariaLabel) return ariaLabel;
-
-            const labelledBy = el.getAttribute("aria-labelledby");
-            if (labelledBy) {
-              const labelEl = document.getElementById(labelledBy);
-              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
-            }
-
-            const tag = el.tagName.toLowerCase();
-            if (tag === "img") {
-              const alt = el.getAttribute("alt");
-              if (alt) return alt;
-            }
-
-            const title = (el as HTMLElement).title;
-            if (title) return title;
-
-            const role = getAccessibleRole(el);
-            if (
-              role !== "generic" &&
-              role !== "list" &&
-              role !== "table" &&
-              role !== "row" &&
-              role !== "region" &&
-              role !== "navigation" &&
-              role !== "main"
-            ) {
-              const text = el.textContent?.trim().slice(0, 60) || "";
-              return text;
-            }
-            return "";
-          }
-
-          function shouldInclude(el: Element): boolean {
-            const role = getAccessibleRole(el);
-            if (role === "generic") return false;
-            if (role === "presentation" || role === "none") return false;
-            if ((el as HTMLElement).hidden) return false;
-            const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden")
-              return false;
-            return true;
-          }
-
-          function inlineSnapshot(maxNodes: number) {
-            let nextRefId = 1;
-            const nodes: DomNode[] = [];
-            const lines: string[] = [];
-
-            function traverse(el: Element, depth: number) {
-              if (nodes.length >= maxNodes) return;
-
-              const tag = el.tagName.toLowerCase();
-              if (
-                tag === "script" ||
-                tag === "style" ||
-                tag === "noscript" ||
-                tag === "template"
-              )
-                return;
-
-              const included = shouldInclude(el);
-              let currentDepth = depth;
-
-              if (included) {
-                const refId = nextRefId++;
-                el.setAttribute("data-ref-id", String(refId));
-                const role = getAccessibleRole(el);
-                const name = getAccessibleName(el);
-                const node: DomNode = { refId, role, tag };
-                if (name) node.name = name;
-                nodes.push(node);
-
-                const indent = "  ".repeat(depth);
-                const parts: string[] = [`${indent}- ${role}`];
-                if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-                parts.push(`[ref=${refId}]`);
-                lines.push(parts.join(" "));
-
-                currentDepth = depth + 1;
-              }
-
-              for (const child of el.children) {
-                traverse(child, currentDepth);
-              }
-            }
-
-            if (document.body) {
-              traverse(document.body, 0);
-            }
-
-            const header = [
-              `URL: ${window.location.href}`,
-              `Title: ${document.title}`,
-              "",
-            ];
-            return {
-              text: header.concat(lines).join("\n"),
-              nodes,
-              url: window.location.href,
-              title: document.title,
-              viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-              },
-            };
-          }
-
-          return inlineSnapshot(maxNodesNum);
-        },
-        [maxNodes],
-      );
-      if (result.ok && result.value && typeof result.value === "object") {
-        return {
-          ok: true,
-          value: (result.value as Record<string, unknown>).text,
-        };
-      }
-      return result;
-    }
-    case "tab_snapshot_text": {
-      const tabId = extractTabId(params);
-      const obj = asRecord(params);
-      const opts = extractArg(params, 1, obj.options ?? obj);
-      const optRec = asRecord(opts);
-      const maxNodes =
-        typeof optRec.max_nodes === "number" ? optRec.max_nodes : 500;
-      const result = await executeInTab(
-        tabId,
-        (maxNodesArg: unknown) => {
-          const maxNodesNum =
-            typeof maxNodesArg === "number" ? maxNodesArg : 500;
-
-          function getAccessibleRole(el: Element): string {
-            const tag = el.tagName.toLowerCase();
-            const ariaRole = el.getAttribute("role");
-            if (ariaRole) return ariaRole;
-            if (
-              tag === "button" ||
-              (tag === "input" && (el as HTMLInputElement).type === "submit")
-            )
-              return "button";
-            if (tag === "a") return "link";
-            if (tag === "input") {
-              const type = (el as HTMLInputElement).type;
-              if (
-                type === "text" ||
-                type === "email" ||
-                type === "password" ||
-                type === "search"
-              )
-                return "textbox";
-              if (type === "checkbox") return "checkbox";
-              if (type === "radio") return "radio";
-              if (type === "submit" || type === "button") return "button";
-            }
-            if (tag === "textarea") return "textbox";
-            if (tag === "select") return "combobox";
-            if (tag === "img") return "img";
-            if (
-              tag === "h1" ||
-              tag === "h2" ||
-              tag === "h3" ||
-              tag === "h4" ||
-              tag === "h5" ||
-              tag === "h6"
-            )
-              return "heading";
-            if (tag === "li") return "listitem";
-            if (tag === "ul" || tag === "ol") return "list";
-            if (tag === "table") return "table";
-            if (tag === "tr") return "row";
-            if (tag === "td" || tag === "th") return "cell";
-            if (tag === "nav") return "navigation";
-            if (tag === "main") return "main";
-            if (tag === "article") return "article";
-            if (tag === "section") return "region";
-            if (tag === "aside") return "complementary";
-            if (tag === "form") return "form";
-            if (tag === "dialog" || tag === "modal") return "dialog";
-            if (tag === "figure") return "figure";
-            if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
-              return "button";
-            return "generic";
-          }
-
-          function getAccessibleName(el: Element): string {
-            const ariaLabel = el.getAttribute("aria-label");
-            if (ariaLabel) return ariaLabel;
-
-            const labelledBy = el.getAttribute("aria-labelledby");
-            if (labelledBy) {
-              const labelEl = document.getElementById(labelledBy);
-              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
-            }
-
-            const tag = el.tagName.toLowerCase();
-            if (tag === "img") {
-              const alt = el.getAttribute("alt");
-              if (alt) return alt;
-            }
-
-            const title = (el as HTMLElement).title;
-            if (title) return title;
-
-            const role = getAccessibleRole(el);
-            if (
-              role !== "generic" &&
-              role !== "list" &&
-              role !== "table" &&
-              role !== "row" &&
-              role !== "region" &&
-              role !== "navigation" &&
-              role !== "main"
-            ) {
-              const text = el.textContent?.trim().slice(0, 60) || "";
-              return text;
-            }
-            return "";
-          }
-
-          function shouldInclude(el: Element): boolean {
-            const role = getAccessibleRole(el);
-            if (role === "generic") return false;
-            if (role === "presentation" || role === "none") return false;
-            if ((el as HTMLElement).hidden) return false;
-            const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden")
-              return false;
-            return true;
-          }
-
-          function inlineSnapshot(maxNodes: number) {
-            let nextRefId = 1;
-            const nodes: DomNode[] = [];
-            const lines: string[] = [];
-
-            function traverse(el: Element, depth: number) {
-              if (nodes.length >= maxNodes) return;
-
-              const tag = el.tagName.toLowerCase();
-              if (
-                tag === "script" ||
-                tag === "style" ||
-                tag === "noscript" ||
-                tag === "template"
-              )
-                return;
-
-              const included = shouldInclude(el);
-              let currentDepth = depth;
-
-              if (included) {
-                const refId = nextRefId++;
-                el.setAttribute("data-ref-id", String(refId));
-                const role = getAccessibleRole(el);
-                const name = getAccessibleName(el);
-                const node: DomNode = { refId, role, tag };
-                if (name) node.name = name;
-                nodes.push(node);
-
-                const indent = "  ".repeat(depth);
-                const parts: string[] = [`${indent}- ${role}`];
-                if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-                parts.push(`[ref=${refId}]`);
-                lines.push(parts.join(" "));
-
-                currentDepth = depth + 1;
-              }
-
-              for (const child of el.children) {
-                traverse(child, currentDepth);
-              }
-            }
-
-            if (document.body) {
-              traverse(document.body, 0);
-            }
-
-            const header = [
-              `URL: ${window.location.href}`,
-              `Title: ${document.title}`,
-              "",
-            ];
-            return {
-              text: header.concat(lines).join("\n"),
-              nodes,
-              url: window.location.href,
-              title: document.title,
-              viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-              },
-            };
-          }
-
-          return inlineSnapshot(maxNodesNum);
-        },
-        [maxNodes],
-      );
-      if (result.ok && result.value && typeof result.value === "object") {
-        return {
-          ok: true,
-          value: (result.value as Record<string, unknown>).text,
-        };
-      }
-      return result;
-    }
-    case "tab_snapshot_data": {
-      const tabId = extractTabId(params);
-      const obj = asRecord(params);
-      const opts = extractArg(params, 1, obj.options ?? obj);
-      const optRec = asRecord(opts);
-      const maxNodes =
-        typeof optRec.max_nodes === "number" ? optRec.max_nodes : 500;
-      return executeInTab(
-        tabId,
-        (maxNodesArg: unknown) => {
-          const maxNodesNum =
-            typeof maxNodesArg === "number" ? maxNodesArg : 500;
-
-          function getAccessibleRole(el: Element): string {
-            const tag = el.tagName.toLowerCase();
-            const ariaRole = el.getAttribute("role");
-            if (ariaRole) return ariaRole;
-            if (
-              tag === "button" ||
-              (tag === "input" && (el as HTMLInputElement).type === "submit")
-            )
-              return "button";
-            if (tag === "a") return "link";
-            if (tag === "input") {
-              const type = (el as HTMLInputElement).type;
-              if (
-                type === "text" ||
-                type === "email" ||
-                type === "password" ||
-                type === "search"
-              )
-                return "textbox";
-              if (type === "checkbox") return "checkbox";
-              if (type === "radio") return "radio";
-              if (type === "submit" || type === "button") return "button";
-            }
-            if (tag === "textarea") return "textbox";
-            if (tag === "select") return "combobox";
-            if (tag === "img") return "img";
-            if (
-              tag === "h1" ||
-              tag === "h2" ||
-              tag === "h3" ||
-              tag === "h4" ||
-              tag === "h5" ||
-              tag === "h6"
-            )
-              return "heading";
-            if (tag === "li") return "listitem";
-            if (tag === "ul" || tag === "ol") return "list";
-            if (tag === "table") return "table";
-            if (tag === "tr") return "row";
-            if (tag === "td" || tag === "th") return "cell";
-            if (tag === "nav") return "navigation";
-            if (tag === "main") return "main";
-            if (tag === "article") return "article";
-            if (tag === "section") return "region";
-            if (tag === "aside") return "complementary";
-            if (tag === "form") return "form";
-            if (tag === "dialog" || tag === "modal") return "dialog";
-            if (tag === "figure") return "figure";
-            if (tag === "figcaption") return "caption";
-            if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
-              return "button";
-            return "generic";
-          }
-
-          function getAccessibleName(el: Element): string {
-            const ariaLabel = el.getAttribute("aria-label");
-            if (ariaLabel) return ariaLabel;
-
-            const labelledBy = el.getAttribute("aria-labelledby");
-            if (labelledBy) {
-              const labelEl = document.getElementById(labelledBy);
-              if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
-            }
-
-            const tag = el.tagName.toLowerCase();
-            if (tag === "img") {
-              const alt = el.getAttribute("alt");
-              if (alt) return alt;
-            }
-
-            const title = (el as HTMLElement).title;
-            if (title) return title;
-
-            const role = getAccessibleRole(el);
-            if (
-              role !== "generic" &&
-              role !== "list" &&
-              role !== "table" &&
-              role !== "row" &&
-              role !== "region" &&
-              role !== "navigation" &&
-              role !== "main"
-            ) {
-              const text = el.textContent?.trim().slice(0, 60) || "";
-              return text;
-            }
-            return "";
-          }
-
-          function shouldInclude(el: Element): boolean {
-            const role = getAccessibleRole(el);
-            if (role === "generic") return false;
-            if (role === "presentation" || role === "none") return false;
-            if ((el as HTMLElement).hidden) return false;
-            const style = window.getComputedStyle(el);
-            if (style.display === "none" || style.visibility === "hidden")
-              return false;
-            return true;
-          }
-
-          function inlineSnapshot(maxNodes: number) {
-            let nextRefId = 1;
-            const nodes: DomNode[] = [];
-            const lines: string[] = [];
-
-            function traverse(el: Element, depth: number) {
-              if (nodes.length >= maxNodes) return;
-
-              const tag = el.tagName.toLowerCase();
-              if (
-                tag === "script" ||
-                tag === "style" ||
-                tag === "noscript" ||
-                tag === "template"
-              )
-                return;
-
-              const included = shouldInclude(el);
-              let currentDepth = depth;
-
-              if (included) {
-                const refId = nextRefId++;
-                el.setAttribute("data-ref-id", String(refId));
-                const role = getAccessibleRole(el);
-                const name = getAccessibleName(el);
-                const node: DomNode = { refId, role, tag };
-                if (name) node.name = name;
-                nodes.push(node);
-
-                const indent = "  ".repeat(depth);
-                const parts: string[] = [`${indent}- ${role}`];
-                if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
-                parts.push(`[ref=${refId}]`);
-                lines.push(parts.join(" "));
-
-                currentDepth = depth + 1;
-              }
-
-              for (const child of el.children) {
-                traverse(child, currentDepth);
-              }
-            }
-
-            if (document.body) {
-              traverse(document.body, 0);
-            }
-
-            const header = [
-              `URL: ${window.location.href}`,
-              `Title: ${document.title}`,
-              "",
-            ];
-            return {
-              text: header.concat(lines).join("\n"),
-              nodes,
-              elements: nodes,
-              url: window.location.href,
-              title: document.title,
-              viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-              },
-            };
-          }
-
-          return inlineSnapshot(maxNodesNum);
-        },
-        [maxNodes],
-      );
-    }
-    default:
-      if (command.action.startsWith("chrome_")) {
-        return handleChromeApi(command);
-      }
-      if (command.action.startsWith("host_")) {
-        return handleHostCallAction(command.action.slice(5), params);
-      }
-      return {
-        ok: false,
-        error: {
-          message: `Unknown main-thread action: ${command.action}`,
-          code: "EUNKNOWN",
-          category: "unknown",
-        },
-      };
-  }
-}
-
-function normalizeParams(action: string, params: unknown): unknown {
-  if (typeof params === "number" || typeof params === "bigint") {
-    if (
-      action === "tab_back" ||
-      action === "tab_unhover" ||
-      action === "tab_wait_for_load" ||
-      action === "tab_scroll"
-    ) {
-      return { tabId: params };
-    }
-  }
-  if (Array.isArray(params)) {
-    switch (action) {
-      case "tab_click":
-        return { tabId: params[0], refId: params[1] };
-      case "tab_fill":
-        return { tabId: params[0], refId: params[1], value: params[2] };
-      case "tab_type":
-        return { tabId: params[0], refId: params[1], text: params[2] };
-      case "tab_press":
-        return { tabId: params[0], key: params[1] };
-      case "tab_select":
-        return { tabId: params[0], refId: params[1], value: params[2] };
-      case "tab_check":
-        return {
-          tabId: params[0],
-          refId: params[1],
-          checked: params[2] ?? true,
-        };
-      case "tab_hover":
-        return { tabId: params[0], refId: params[1] };
-      case "tab_unhover":
-        return { tabId: params[0] };
-      case "tab_scroll":
-        return {
-          tabId: params[0],
-          direction: params[1] ?? "down",
-          amount: params[2] ?? 300,
-        };
-      case "tab_dblclick":
-        return { tabId: params[0], refId: params[1] };
-      case "tab_back":
-        return { tabId: params[0] };
-      case "tab_wait_for_load":
-        return { tabId: params[0], timeout: params[1] ?? 30000n };
-    }
-  }
-  return params;
-}
 
 export async function executeMainThreadCommand(
   command: Command,
 ): Promise<AsyncResponse> {
-  const tool = getTool(command.action);
-  if (tool) {
-    const normalizedParams = normalizeParams(command.action, command.params);
-    return dispatchTool(command.action, normalizedParams);
-  }
-  return legacyExecuteMainThreadCommand(command);
+  console.log(
+    "[RUNNER execute] action:",
+    command.action,
+    "params:",
+    JSON.stringify(command.params),
+  );
+  const result = await dispatchTool(command.action, command.params);
+  console.log("[RUNNER execute] result:", JSON.stringify(result));
+  return result;
 }
 
 // ─── Fetch helpers ───────────────────────────────────────────────
@@ -1771,6 +562,185 @@ async function waitForTabLoad(
   }
 }
 
+// ─── Inline snapshot helper for executeInTab ───────────────────
+
+function createInlineSnapshotFunc(): (maxNodesArg: unknown) => unknown {
+  return (maxNodesArg: unknown) => {
+    const maxNodesNum = typeof maxNodesArg === "number" ? maxNodesArg : 500;
+
+    function getAccessibleRole(el: Element): string {
+      const tag = el.tagName.toLowerCase();
+      const ariaRole = el.getAttribute("role");
+      if (ariaRole) return ariaRole;
+      if (
+        tag === "button" ||
+        (tag === "input" && (el as HTMLInputElement).type === "submit")
+      )
+        return "button";
+      if (tag === "a") return "link";
+      if (tag === "input") {
+        const type = (el as HTMLInputElement).type;
+        if (
+          type === "text" ||
+          type === "email" ||
+          type === "password" ||
+          type === "search"
+        )
+          return "textbox";
+        if (type === "checkbox") return "checkbox";
+        if (type === "radio") return "radio";
+        if (type === "submit" || type === "button") return "button";
+      }
+      if (tag === "textarea") return "textbox";
+      if (tag === "select") return "combobox";
+      if (tag === "img") return "img";
+      if (
+        tag === "h1" ||
+        tag === "h2" ||
+        tag === "h3" ||
+        tag === "h4" ||
+        tag === "h5" ||
+        tag === "h6"
+      )
+        return "heading";
+      if (tag === "li") return "listitem";
+      if (tag === "ul" || tag === "ol") return "list";
+      if (tag === "table") return "table";
+      if (tag === "tr") return "row";
+      if (tag === "td" || tag === "th") return "cell";
+      if (tag === "nav") return "navigation";
+      if (tag === "main") return "main";
+      if (tag === "article") return "article";
+      if (tag === "section") return "region";
+      if (tag === "aside") return "complementary";
+      if (tag === "form") return "form";
+      if (tag === "dialog" || tag === "modal") return "dialog";
+      if (tag === "figure") return "figure";
+      if (tag === "figcaption") return "caption";
+      if (el.getAttribute("onclick") || (el as HTMLElement).onclick)
+        return "button";
+      return "generic";
+    }
+
+    function getAccessibleName(el: Element): string {
+      const ariaLabel = el.getAttribute("aria-label");
+      if (ariaLabel) return ariaLabel;
+      const labelledBy = el.getAttribute("aria-labelledby");
+      if (labelledBy) {
+        const labelEl = document.getElementById(labelledBy);
+        if (labelEl) return labelEl.textContent?.slice(0, 60) || "";
+      }
+      const tag = el.tagName.toLowerCase();
+      if (tag === "img") {
+        const alt = el.getAttribute("alt");
+        if (alt) return alt;
+      }
+      const title = (el as HTMLElement).title;
+      if (title) return title;
+      const role = getAccessibleRole(el);
+      if (
+        role !== "generic" &&
+        role !== "list" &&
+        role !== "table" &&
+        role !== "row" &&
+        role !== "region" &&
+        role !== "navigation" &&
+        role !== "main"
+      ) {
+        const text = el.textContent?.trim().slice(0, 60) || "";
+        return text;
+      }
+      return "";
+    }
+
+    function shouldInclude(el: Element): boolean {
+      const role = getAccessibleRole(el);
+      if (role === "generic") return false;
+      if (role === "presentation" || role === "none") return false;
+      if ((el as HTMLElement).hidden) return false;
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden")
+        return false;
+      return true;
+    }
+
+    function inlineSnapshot(maxNodes: number) {
+      let nextRefId = 1;
+      const nodes: Array<{
+        refId: number;
+        role: string;
+        tag: string;
+        name?: string;
+      }> = [];
+      const lines: string[] = [];
+
+      function traverse(el: Element, depth: number) {
+        if (nodes.length >= maxNodes) return;
+        const tag = el.tagName.toLowerCase();
+        if (
+          tag === "script" ||
+          tag === "style" ||
+          tag === "noscript" ||
+          tag === "template"
+        )
+          return;
+        const included = shouldInclude(el);
+        let currentDepth = depth;
+        if (included) {
+          const refId = nextRefId++;
+          el.setAttribute("data-ref-id", String(refId));
+          const role = getAccessibleRole(el);
+          const name = getAccessibleName(el);
+          const node: {
+            refId: number;
+            role: string;
+            tag: string;
+            name?: string;
+          } = {
+            refId,
+            role,
+            tag,
+          };
+          if (name) node.name = name;
+          nodes.push(node);
+          const indent = "  ".repeat(depth);
+          const parts: string[] = [`${indent}- ${role}`];
+          if (name) parts.push(`"${name.replace(/"/g, '\\"')}"`);
+          parts.push(`[ref=${refId}]`);
+          lines.push(parts.join(" "));
+          currentDepth = depth + 1;
+        }
+        for (const child of el.children) {
+          traverse(child, currentDepth);
+        }
+      }
+
+      if (document.body) {
+        traverse(document.body, 0);
+      }
+
+      const header = [
+        `URL: ${window.location.href}`,
+        `Title: ${document.title}`,
+        "",
+      ];
+      return {
+        text: header.concat(lines).join("\n"),
+        nodes,
+        elements: nodes,
+        url: window.location.href,
+        title: document.title,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+      };
+    }
+
+    return inlineSnapshot(maxNodesNum);
+  };
+}
+
 // ─── Active tab cache & persistent content-script communication ──
 
 let activeTabId: number | null = null;
@@ -1825,17 +795,127 @@ export function removeExtensionListeners(): void {
   chrome.tabs.onUpdated.removeListener(onUpdatedListener);
 }
 
+export async function ensureContentScript(tabId: number | null): Promise<void> {
+  const chrome = window.chrome;
+  if (!chrome?.runtime?.id) {
+    const error = new Error("Not in extension context");
+    (error as unknown as Record<string, unknown>).code = "E_NO_EXTENSION";
+    (error as unknown as Record<string, unknown>).category = "permission";
+    throw error;
+  }
+
+  const targetTab = typeof tabId === "number" ? tabId : activeTabId;
+  if (targetTab === null) {
+    const error = new Error("No active tab available");
+    (error as unknown as Record<string, unknown>).code = "E_NO_TAB";
+    (error as unknown as Record<string, unknown>).category = "resource";
+    throw error;
+  }
+
+  // Always verify content script is alive — it may have been lost after navigation
+  let injected = false;
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const pingResult = await chrome.tabs.sendMessage(targetTab, {
+        channel: "piccolo-tool",
+        version: 1,
+        requestId: crypto.randomUUID(),
+        action: "__content_script_ping",
+        params: {},
+      });
+
+      if (
+        pingResult &&
+        typeof pingResult === "object" &&
+        (pingResult as Record<string, unknown>).error !== undefined
+      ) {
+        throw new Error(String((pingResult as Record<string, unknown>).error));
+      }
+
+      try {
+        const docsResult = await chrome.tabs.sendMessage(targetTab, {
+          channel: "piccolo-tool",
+          version: 1,
+          requestId: crypto.randomUUID(),
+          action: "__content_script_tool_docs",
+          params: {},
+        });
+        if (
+          docsResult &&
+          typeof docsResult === "object" &&
+          (docsResult as Record<string, unknown>).value !== undefined
+        ) {
+          const docs = (docsResult as Record<string, unknown>).value;
+          if (Array.isArray(docs)) {
+            mergedDocRegistry.mergeRuntimeDocs(docs as ToolDoc[]);
+          }
+        }
+      } catch (_e) {
+        // Ignore docs fetch errors — ping succeeded, content script is ready
+      }
+
+      return;
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : String(err)) || "";
+      if (msg.includes("Receiving end does not exist") && attempt < 5) {
+        if (!injected) {
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: targetTab, frameIds: [0] },
+              files: ["content-script.js"],
+              world: "ISOLATED",
+            });
+            injected = true;
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          } catch (_injectErr: unknown) {
+            const error = new Error("Content script not ready after injection");
+            (error as unknown as Record<string, unknown>).code =
+              "E_CONTENT_SCRIPT_NOT_READY";
+            (error as unknown as Record<string, unknown>).category =
+              "content_script";
+            throw error;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
+      }
+      const error = new Error("Content script not ready after injection");
+      (error as unknown as Record<string, unknown>).code =
+        "E_CONTENT_SCRIPT_NOT_READY";
+      (error as unknown as Record<string, unknown>).category = "content_script";
+      throw error;
+    }
+  }
+
+  const error = new Error("Content script not ready after injection");
+  (error as unknown as Record<string, unknown>).code =
+    "E_CONTENT_SCRIPT_NOT_READY";
+  (error as unknown as Record<string, unknown>).category = "content_script";
+  throw error;
+}
+
 async function sendBridgeMessageToTab(
   tabId: number | null,
   runnerAction: string,
   params: Record<string, unknown>,
 ): Promise<AsyncResponse> {
-  const csAction = getContentScriptAction(runnerAction);
+  const tool = getTool(runnerAction);
+  if (!tool) {
+    return {
+      ok: false,
+      error: {
+        message: `Tool not found: ${runnerAction}`,
+        code: "E_TOOL_NOT_FOUND",
+      },
+    };
+  }
+  const csAction = tool.localName;
   if (!csAction) {
     return {
       ok: false,
       error: {
-        message: `No content script bridge mapping for ${runnerAction}`,
+        message: `Tool ${runnerAction} has no localName for content script dispatch`,
         code: "E_BRIDGE",
       },
     };
@@ -1890,26 +970,49 @@ async function sendMessageToTab(
       },
     };
   }
+
+  try {
+    await ensureContentScript(targetTab);
+  } catch (err: unknown) {
+    const code =
+      (err as { code?: string }).code ?? "E_CONTENT_SCRIPT_NOT_READY";
+    const category =
+      (err as { category?: string }).category ?? "content_script";
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      error: { message: msg, code, category },
+    };
+  }
+
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const result = await chrome.tabs.sendMessage(targetTab, message);
-      // Content-script handlers may return { ok: false, error: msg } on failure.
-      // Flatten that so Lua consumers always see a single error shape.
-      if (
-        result &&
-        typeof result === "object" &&
-        (result as Record<string, unknown>).ok === false
-      ) {
-        const raw = (result as Record<string, unknown>).error;
-        const msg = typeof raw === "string" ? raw : String(raw);
-        return {
-          ok: false,
-          error: {
-            message: msg || "Content script error",
-            code: "E_CONTENT_SCRIPT",
-          },
-        };
+      const result = await chrome.tabs.sendMessage(targetTab, {
+        channel: "piccolo-tool",
+        version: 1,
+        requestId: crypto.randomUUID(),
+        action: message.action,
+        params: message.params,
+      });
+
+      if (result && typeof result === "object") {
+        const obj = result as Record<string, unknown>;
+        if (obj.error !== undefined) {
+          const msg =
+            typeof obj.error === "string" ? obj.error : String(obj.error);
+          return {
+            ok: false,
+            error: {
+              message: msg || "Content script error",
+              code: "E_CONTENT_SCRIPT",
+            },
+          };
+        }
+        if (obj.value !== undefined) {
+          return { ok: true, value: obj.value };
+        }
       }
+
       return { ok: true, value: result };
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : String(err)) || "";
@@ -2218,7 +1321,7 @@ registerSidepanelTool({
   params: SidepanelSnapshotParamsSchema,
   handler: async (params) => {
     const result = await handleDomSnapshot({
-      max_nodes: params.max_nodes ?? 500n,
+      max_nodes: params.max_nodes ?? 500,
       interactive_only: params.interactive_only ?? false,
     });
     if (!result.ok) {
@@ -2235,7 +1338,7 @@ registerSidepanelTool({
   params: SidepanelSnapshotTextParamsSchema,
   handler: async (params) => {
     const result = await handleDomSnapshot({
-      max_nodes: params.max_nodes ?? 500n,
+      max_nodes: params.max_nodes ?? 500,
       interactive_only: params.interactive_only ?? false,
     });
     if (!result.ok) {
@@ -2252,7 +1355,7 @@ registerSidepanelTool({
   params: SidepanelSnapshotDataParamsSchema,
   handler: async (params) => {
     const result = await handleDomSnapshot({
-      max_nodes: params.max_nodes ?? 500n,
+      max_nodes: params.max_nodes ?? 500,
       interactive_only: params.interactive_only ?? false,
     });
     if (!result.ok) {
@@ -2291,21 +1394,16 @@ async function handleDomSnapshot(
   }
 }
 
-async function handleDomFormat(
-  params: DomFormatParams,
-): Promise<AsyncResponse<string>> {
-  try {
-    await ensureDomSnapshot();
-    const { snapshot, format } = params;
-    const text = formatSnapshot(snapshot, format);
-    return { ok: true, value: text };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      error: { message: message || String(err), code: "E_FORMAT" },
-    };
-  }
+// ─── Host call handler ───────────────────────────────────────────
+
+async function _handleHostCallAction(
+  action: string,
+  params: unknown,
+): Promise<AsyncResponse<unknown>> {
+  const result = await chromeApiCall(
+    chrome.runtime.sendMessage({ action, params }),
+  );
+  return { ok: true, value: result };
 }
 
 function _getElementRole(el: Element): string {
@@ -2339,39 +1437,6 @@ function _getElementRole(el: Element): string {
   return "generic";
 }
 
-// ─── Host call handler ───────────────────────────────────────────
-
-async function handleHostCallAction(
-  action: string,
-  params: unknown,
-): Promise<AsyncResponse> {
-  const handler = hostHandlers[action] ?? window.__hostHandlers?.[action];
-  if (!handler) {
-    return {
-      ok: false,
-      error: {
-        message: `No handler registered for "${action}"`,
-        code: "ENOHANDLER",
-        category: "host",
-      },
-    };
-  }
-  try {
-    const value = await handler(params);
-    return { ok: true, value };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      ok: false,
-      error: {
-        message: message || String(err),
-        code: "EHOSTCALL",
-        category: "host",
-      },
-    };
-  }
-}
-
 // ─── Chrome error normalizer ───────────────────────────────────
 
 function normalizeChromeError(err: unknown): { ok: false; error: AsyncError } {
@@ -2402,236 +1467,1295 @@ function normalizeChromeError(err: unknown): { ok: false; error: AsyncError } {
   };
 }
 
-// ─── Chrome API dispatcher ─────────────────────────────────────
+// ─── Chrome API helpers ────────────────────────────────────────
 
-async function handleChromeApi(command: Command): Promise<AsyncResponse> {
+function assertExtensionContext(action: string): void {
   const chrome = window.chrome;
   if (!chrome?.runtime?.id) {
-    return {
-      ok: false,
-      error: {
-        message: `${command.action} is only available in a browser extension context`,
-        code: "E_NO_EXTENSION",
-        category: "permission",
-      },
-    };
-  }
-
-  const p = command.params;
-  const first = Array.isArray(p)
-    ? p[0]
-    : typeof p === "object" && p !== null
-      ? p
-      : p;
-  const second = Array.isArray(p) ? p[1] : undefined;
-  const firstRec = asRecord(first);
-
-  try {
-    let result: unknown;
-    switch (command.action) {
-      case "chrome_runtime_sendMessage": {
-        result = await chrome.runtime.sendMessage(firstRec || {});
-        break;
-      }
-      case "chrome_tabs_query": {
-        result = await chrome.tabs.query(firstRec || {});
-        break;
-      }
-      case "chrome_tabs_create": {
-        result = await chrome.tabs.create(firstRec || {});
-        break;
-      }
-      case "chrome_tabs_update": {
-        const tabId = firstRec.tabId || first;
-        const updateProps = firstRec.update || second || {};
-        result = await chrome.tabs.update(
-          typeof tabId === "number" ? tabId : (null as unknown as number),
-          // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-          updateProps as any,
-        );
-        break;
-      }
-      case "chrome_tabs_remove": {
-        const tabId = firstRec.tabId || firstRec.id || first;
-        await chrome.tabs.remove(tabId as number);
-        result = null;
-        break;
-      }
-      case "chrome_tabs_get": {
-        const tabId = firstRec.tabId || firstRec.id || first;
-        result = await chrome.tabs.get(tabId as number);
-        break;
-      }
-      case "chrome_tabs_reload": {
-        const tabId = firstRec.tabId || first;
-        const reloadProps = firstRec.reload || second || {};
-        await chrome.tabs.reload(
-          typeof tabId === "number" ? tabId : (undefined as unknown as number),
-          // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-          reloadProps as any,
-        );
-        result = null;
-        break;
-      }
-      case "chrome_tabs_sendMessage": {
-        const tabId = firstRec.tabId || first;
-        const message = firstRec.message || second || {};
-        result = await chrome.tabs.sendMessage(tabId as number, message);
-        break;
-      }
-      case "chrome_alarms_create": {
-        const name =
-          firstRec.name || (typeof first === "string" ? first : "") || "";
-        const alarmInfo = firstRec.alarmInfo || second || firstRec || {};
-        await chrome.alarms.create(name as string, alarmInfo);
-        result = null;
-        break;
-      }
-      case "chrome_alarms_clear": {
-        const alarmName =
-          firstRec.name || (typeof first === "string" ? first : "") || "";
-        result = await chrome.alarms.clear(alarmName as string);
-        break;
-      }
-      case "chrome_action_setBadgeText": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        await chrome.action.setBadgeText((firstRec || {}) as any);
-        result = null;
-        break;
-      }
-      case "chrome_action_setBadgeBackgroundColor": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        await chrome.action.setBadgeBackgroundColor((firstRec || {}) as any);
-        result = null;
-        break;
-      }
-      case "chrome_action_setTitle": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        await chrome.action.setTitle((firstRec || {}) as any);
-        result = null;
-        break;
-      }
-      case "chrome_action_setIcon": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.action.setIcon((firstRec || {}) as any);
-        break;
-      }
-      case "chrome_contextMenus_create": {
-        result = await chrome.contextMenus.create(firstRec || {});
-        break;
-      }
-      case "chrome_contextMenus_remove": {
-        const menuId = firstRec.menuItemId || firstRec.id || first;
-        await chrome.contextMenus.remove(menuId);
-        result = null;
-        break;
-      }
-      case "chrome_windows_getAll": {
-        result = await chrome.windows.getAll(firstRec || {});
-        break;
-      }
-      case "chrome_windows_create": {
-        result = await chrome.windows.create(firstRec || {});
-        break;
-      }
-      case "chrome_windows_update": {
-        const windowId = firstRec.windowId || first;
-        const updateInfo = firstRec.update || second || {};
-        result = await chrome.windows.update(windowId, updateInfo);
-        break;
-      }
-      case "chrome_windows_remove": {
-        const windowId = firstRec.windowId || first;
-        await chrome.windows.remove(windowId);
-        result = null;
-        break;
-      }
-      case "chrome_sidePanel_setOptions": {
-        await chrome.sidePanel.setOptions(firstRec || {});
-        result = null;
-        break;
-      }
-      case "chrome_cookies_get": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.cookies.get((firstRec || {}) as any);
-        break;
-      }
-      case "chrome_cookies_set": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.cookies.set((firstRec || {}) as any);
-        break;
-      }
-      case "chrome_cookies_remove": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.cookies.remove((firstRec || {}) as any);
-        break;
-      }
-      case "chrome_cookies_getAll": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.cookies.getAll((firstRec || {}) as any);
-        break;
-      }
-      case "chrome_bookmarks_search": {
-        const query =
-          firstRec.query || (typeof first === "string" ? first : "") || "";
-        result = await chrome.bookmarks.search(query);
-        break;
-      }
-      case "chrome_bookmarks_create": {
-        result = await chrome.bookmarks.create(firstRec || {});
-        break;
-      }
-      case "chrome_bookmarks_remove": {
-        const bookmarkId = firstRec.id || first;
-        await chrome.bookmarks.remove(bookmarkId);
-        result = null;
-        break;
-      }
-      case "chrome_history_search": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.history.search((firstRec || {}) as any);
-        break;
-      }
-      case "chrome_history_deleteUrl": {
-        await chrome.history.deleteUrl(firstRec.url || first);
-        result = null;
-        break;
-      }
-      case "chrome_notifications_create": {
-        const notifId =
-          firstRec.id || (typeof first === "string" ? first : "") || "";
-        const options = firstRec.options || second || {};
-        result = await chrome.notifications.create(notifId as string, options);
-        break;
-      }
-      case "chrome_notifications_clear": {
-        const notifId =
-          firstRec.id || (typeof first === "string" ? first : "") || "";
-        result = await chrome.notifications.clear(notifId as string);
-        break;
-      }
-      case "chrome_scripting_executeScript": {
-        // biome-ignore lint/suspicious/noExplicitAny: bridging dynamic params to typed Chrome API
-        result = await chrome.scripting.executeScript((firstRec || {}) as any);
-        break;
-      }
-      default:
-        return {
-          ok: false,
-          error: {
-            message: `Unimplemented chrome action: ${command.action}`,
-            code: "E_UNKNOWN",
-            category: "unknown",
-          },
-        };
-    }
-    return { ok: true, value: result };
-  } catch (err: unknown) {
-    return normalizeChromeError(err);
+    const error = new Error(
+      `${action} is only available in a browser extension context`,
+    );
+    (error as unknown as Record<string, unknown>).code = "E_NO_EXTENSION";
+    (error as unknown as Record<string, unknown>).category = "permission";
+    throw error;
   }
 }
 
+async function chromeApiCall<T>(promise: Promise<T>): Promise<T> {
+  try {
+    return await promise;
+  } catch (err: unknown) {
+    const normalized = normalizeChromeError(err);
+    const error = new Error(normalized.error.message);
+    (error as unknown as Record<string, unknown>).code = normalized.error.code;
+    (error as unknown as Record<string, unknown>).category =
+      normalized.error.category;
+    throw error;
+  }
+}
+
+// ─── Chrome API handlers ───────────────────────────────────────
+
+async function handleChromeRuntimeSendMessage(
+  params: z.infer<typeof ChromeRuntimeSendMessageParamsSchema>,
+): Promise<unknown> {
+  assertExtensionContext("chrome_runtime_sendMessage");
+  return chromeApiCall(chrome.runtime.sendMessage(params));
+}
+
+async function handleChromeTabsQuery(
+  params: z.infer<typeof ChromeTabsQueryParamsSchema>,
+): Promise<chrome.tabs.Tab[]> {
+  assertExtensionContext("chrome_tabs_query");
+  return chromeApiCall(chrome.tabs.query(params as chrome.tabs.QueryInfo));
+}
+
+async function handleChromeTabsCreate(
+  params: z.infer<typeof ChromeTabsCreateParamsSchema>,
+): Promise<chrome.tabs.Tab> {
+  assertExtensionContext("chrome_tabs_create");
+  // Handle string URL shorthand: tab.open("https://example.com")
+  const createProps =
+    typeof params === "string"
+      ? { url: params }
+      : (params as chrome.tabs.CreateProperties);
+  return chromeApiCall(chrome.tabs.create(createProps));
+}
+
+async function handleChromeTabsUpdate(
+  params: z.infer<typeof ChromeTabsUpdateParamsSchema>,
+): Promise<chrome.tabs.Tab> {
+  assertExtensionContext("chrome_tabs_update");
+  const tabId = params.tabId ?? null;
+  const updateProps = params.update ?? {};
+  return chromeApiCall(
+    chrome.tabs.update(
+      typeof tabId === "number" ? tabId : (null as unknown as number),
+      updateProps as chrome.tabs.UpdateProperties,
+    ),
+  );
+}
+
+async function handleChromeTabsRemove(
+  params: z.infer<typeof ChromeTabsRemoveParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_tabs_remove");
+  const tabId =
+    typeof params === "number"
+      ? params
+      : Array.isArray(params)
+        ? params
+        : (params.tabId ?? params.id);
+  if (Array.isArray(tabId)) {
+    await chromeApiCall(chrome.tabs.remove(tabId));
+  } else {
+    await chromeApiCall(chrome.tabs.remove(tabId as number));
+  }
+  return null;
+}
+
+async function handleChromeTabsGet(
+  params: z.infer<typeof ChromeTabsGetParamsSchema>,
+): Promise<chrome.tabs.Tab> {
+  assertExtensionContext("chrome_tabs_get");
+  const tabId =
+    typeof params === "number" ? params : (params.tabId ?? params.id);
+  return chromeApiCall(chrome.tabs.get(tabId as number));
+}
+
+async function handleChromeTabsReload(
+  params: z.infer<typeof ChromeTabsReloadParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_tabs_reload");
+  const tabId = params.tabId;
+  const reloadProps = params.reload ?? {};
+  await chromeApiCall(
+    chrome.tabs.reload(
+      typeof tabId === "number" ? tabId : (undefined as unknown as number),
+      reloadProps as chrome.tabs.ReloadProperties,
+    ),
+  );
+  return null;
+}
+
+async function handleChromeTabsSendMessage(
+  params: z.infer<typeof ChromeTabsSendMessageParamsSchema>,
+): Promise<unknown> {
+  assertExtensionContext("chrome_tabs_sendMessage");
+  const tabId = params.tabId;
+  const message = params.message;
+  return chromeApiCall(chrome.tabs.sendMessage(tabId as number, message));
+}
+
+async function handleChromeAlarmsCreate(
+  params: z.infer<typeof ChromeAlarmsCreateParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_alarms_create");
+  const name = params.name ?? "";
+  const alarmInfo = params.alarmInfo ?? {};
+  await chromeApiCall(chrome.alarms.create(name, alarmInfo));
+  return null;
+}
+
+async function handleChromeAlarmsClear(
+  params: z.infer<typeof ChromeAlarmsClearParamsSchema>,
+): Promise<boolean> {
+  assertExtensionContext("chrome_alarms_clear");
+  const alarmName = typeof params === "string" ? params : (params.name ?? "");
+  return chromeApiCall(chrome.alarms.clear(alarmName));
+}
+
+async function handleChromeActionSetBadgeText(
+  params: z.infer<typeof ChromeActionSetBadgeTextParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_action_setBadgeText");
+  await chromeApiCall(
+    chrome.action.setBadgeText(
+      params as unknown as chrome.action.BadgeTextDetails,
+    ),
+  );
+  return null;
+}
+
+async function handleChromeActionSetBadgeBackgroundColor(
+  params: z.infer<typeof ChromeActionSetBadgeBackgroundColorParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_action_setBadgeBackgroundColor");
+  await chromeApiCall(
+    chrome.action.setBadgeBackgroundColor(
+      params as unknown as chrome.action.BadgeBackgroundColorDetails,
+    ),
+  );
+  return null;
+}
+
+async function handleChromeActionSetTitle(
+  params: z.infer<typeof ChromeActionSetTitleParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_action_setTitle");
+  await chromeApiCall(
+    chrome.action.setTitle(params as unknown as chrome.action.TitleDetails),
+  );
+  return null;
+}
+
+async function handleChromeActionSetIcon(
+  params: z.infer<typeof ChromeActionSetIconParamsSchema>,
+): Promise<unknown> {
+  assertExtensionContext("chrome_action_setIcon");
+  return chromeApiCall(
+    chrome.action.setIcon(params as unknown as chrome.action.TabIconDetails),
+  );
+}
+
+async function handleChromeContextMenusCreate(
+  params: z.infer<typeof ChromeContextMenusCreateParamsSchema>,
+): Promise<unknown> {
+  assertExtensionContext("chrome_contextMenus_create");
+  return new Promise((resolve, reject) => {
+    chrome.contextMenus.create(params, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(undefined);
+      }
+    });
+  });
+}
+
+async function handleChromeContextMenusRemove(
+  params: z.infer<typeof ChromeContextMenusRemoveParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_contextMenus_remove");
+  const menuId =
+    typeof params === "number" || typeof params === "string"
+      ? params
+      : (params.menuItemId ?? params.id);
+  await chrome.contextMenus.remove(menuId as string | number);
+  return null;
+}
+
+async function handleChromeWindowsGetAll(
+  params: z.infer<typeof ChromeWindowsGetAllParamsSchema>,
+): Promise<chrome.windows.Window[]> {
+  assertExtensionContext("chrome_windows_getAll");
+  return chromeApiCall(
+    chrome.windows.getAll(params as chrome.windows.QueryOptions),
+  );
+}
+
+async function handleChromeWindowsCreate(
+  params: z.infer<typeof ChromeWindowsCreateParamsSchema>,
+): Promise<chrome.windows.Window> {
+  assertExtensionContext("chrome_windows_create");
+  return chromeApiCall(chrome.windows.create(params));
+}
+
+async function handleChromeWindowsUpdate(
+  params: z.infer<typeof ChromeWindowsUpdateParamsSchema>,
+): Promise<chrome.windows.Window> {
+  assertExtensionContext("chrome_windows_update");
+  const windowId = params.windowId;
+  const updateInfo = params.update ?? {};
+  return chromeApiCall(chrome.windows.update(windowId as number, updateInfo));
+}
+
+async function handleChromeWindowsRemove(
+  params: z.infer<typeof ChromeWindowsRemoveParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_windows_remove");
+  const windowId = typeof params === "number" ? params : params.windowId;
+  await chromeApiCall(chrome.windows.remove(windowId as number));
+  return null;
+}
+
+async function handleChromeSidePanelSetOptions(
+  params: z.infer<typeof ChromeSidePanelSetOptionsParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_sidePanel_setOptions");
+  await chromeApiCall(chrome.sidePanel.setOptions(params));
+  return null;
+}
+
+async function handleChromeCookiesGet(
+  params: z.infer<typeof CookiesGetParamsSchema>,
+): Promise<chrome.cookies.Cookie | null> {
+  assertExtensionContext("chrome_cookies_get");
+  return chromeApiCall(chrome.cookies.get(params as chrome.cookies.Details));
+}
+
+async function handleChromeCookiesSet(
+  params: z.infer<typeof CookiesSetParamsSchema>,
+): Promise<chrome.cookies.Cookie | null> {
+  assertExtensionContext("chrome_cookies_set");
+  return chromeApiCall(chrome.cookies.set(params as chrome.cookies.SetDetails));
+}
+
+async function handleChromeCookiesRemove(
+  params: z.infer<typeof CookiesDeleteParamsSchema>,
+): Promise<chrome.cookies.Details> {
+  assertExtensionContext("chrome_cookies_remove");
+  return chromeApiCall(chrome.cookies.remove(params as chrome.cookies.Details));
+}
+
+async function handleChromeCookiesGetAll(
+  params: z.infer<typeof CookiesListParamsSchema>,
+): Promise<chrome.cookies.Cookie[]> {
+  assertExtensionContext("chrome_cookies_getAll");
+  return chromeApiCall(chrome.cookies.getAll(params as chrome.cookies.Details));
+}
+
+async function handleChromeBookmarksSearch(
+  params: z.infer<typeof BookmarksSearchParamsSchema>,
+): Promise<chrome.bookmarks.BookmarkTreeNode[]> {
+  assertExtensionContext("chrome_bookmarks_search");
+  const query = typeof params === "string" ? params : (params.query ?? "");
+  return chromeApiCall(chrome.bookmarks.search(query));
+}
+
+async function handleChromeBookmarksCreate(
+  params: z.infer<typeof BookmarksCreateParamsSchema>,
+): Promise<chrome.bookmarks.BookmarkTreeNode> {
+  assertExtensionContext("chrome_bookmarks_create");
+  return chromeApiCall(chrome.bookmarks.create(params));
+}
+
+async function handleChromeBookmarksRemove(
+  params: z.infer<typeof BookmarksDeleteParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_bookmarks_remove");
+  const bookmarkId = typeof params === "string" ? params : (params.id ?? "");
+  await chromeApiCall(chrome.bookmarks.remove(bookmarkId));
+  return null;
+}
+
+async function handleChromeHistorySearch(
+  params: z.infer<typeof HistorySearchParamsSchema>,
+): Promise<chrome.history.HistoryItem[]> {
+  assertExtensionContext("chrome_history_search");
+  return chromeApiCall(
+    chrome.history.search(params as chrome.history.HistoryQuery),
+  );
+}
+
+async function handleChromeHistoryDeleteUrl(
+  params: z.infer<typeof HistoryDeleteParamsSchema>,
+): Promise<null> {
+  assertExtensionContext("chrome_history_deleteUrl");
+  const url = typeof params === "string" ? params : (params.url ?? "");
+  await chromeApiCall(
+    chrome.history.deleteUrl(url as unknown as chrome.history.Url),
+  );
+  return null;
+}
+
+async function handleChromeNotificationsCreate(
+  params: z.infer<typeof NotificationsCreateParamsSchema>,
+): Promise<string> {
+  assertExtensionContext("chrome_notifications_create");
+  const obj =
+    typeof params === "string"
+      ? { id: params, options: {} }
+      : { id: params.id ?? "", options: params.options ?? params };
+  return new Promise((resolve, reject) => {
+    chrome.notifications.create(
+      obj.id,
+      obj.options as unknown as chrome.notifications.NotificationOptions<true>,
+      (notificationId) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve(notificationId ?? "");
+        }
+      },
+    );
+  });
+}
+
+async function handleChromeNotificationsClear(
+  params: z.infer<typeof NotificationsClearParamsSchema>,
+): Promise<boolean> {
+  assertExtensionContext("chrome_notifications_clear");
+  const notifId = typeof params === "string" ? params : (params.id ?? "");
+  return new Promise((resolve, reject) => {
+    chrome.notifications.clear(notifId, (wasCleared) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(wasCleared ?? false);
+      }
+    });
+  });
+}
+
+async function handleChromeScriptingExecuteScript(
+  params: z.infer<typeof ChromeScriptingExecuteScriptParamsSchema>,
+): Promise<unknown> {
+  assertExtensionContext("chrome_scripting_executeScript");
+  return chromeApiCall(
+    chrome.scripting.executeScript(
+      params as chrome.scripting.ScriptInjection<unknown[], unknown>,
+    ),
+  );
+}
+
 // ─── Tool registrations ──────────────────────────────────────────
+
+// ─── Chrome API tool registrations ───────────────────────────────
+
+registerTool({
+  action: "chrome_runtime_sendMessage",
+  namespace: "chrome",
+  name: "runtime.sendMessage",
+  publicName: "chrome.runtime.sendMessage",
+  source: "main_thread",
+  transport: "chrome_api",
+  description:
+    "Send a message to the extension background script or another extension",
+  params: ChromeRuntimeSendMessageParamsSchema,
+  paramTypes: [
+    {
+      name: "message",
+      type: "any",
+      required: false,
+      description: "Message payload",
+    },
+    {
+      name: "options",
+      type: "object",
+      required: false,
+      description: "Options: to, includeTlsChannelId",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "any",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { message: "Message payload", options: "Options" },
+  handler: handleChromeRuntimeSendMessage,
+});
+
+registerTool({
+  action: "chrome_tabs_query",
+  namespace: "chrome",
+  name: "tabs.query",
+  publicName: "chrome.tabs.query",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Query Chrome tabs matching given criteria",
+  params: ChromeTabsQueryParamsSchema,
+  paramTypes: [
+    {
+      name: "query_info",
+      type: "object",
+      required: true,
+      description: "Query filter: active, currentWindow, url, etc.",
+    },
+  ],
+  returns: z.array(z.unknown()),
+  returnDoc: "Tab[]",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { query_info: "Query filter" },
+  handler: handleChromeTabsQuery,
+});
+
+registerTool({
+  action: "chrome_tabs_create",
+  namespace: "chrome",
+  name: "tabs.create",
+  publicName: "chrome.tabs.create",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Create a new Chrome tab",
+  params: ChromeTabsCreateParamsSchema,
+  paramTypes: [
+    {
+      name: "create_properties",
+      type: "object",
+      required: false,
+      description: "URL, windowId, active, etc.",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Tab",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { create_properties: "Create properties" },
+  handler: handleChromeTabsCreate,
+});
+
+registerTool({
+  action: "chrome_tabs_update",
+  namespace: "chrome",
+  name: "tabs.update",
+  publicName: "chrome.tabs.update",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Update properties of a tab",
+  params: ChromeTabsUpdateParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "number",
+      required: false,
+      description: "Tab ID (omit for active tab)",
+    },
+    {
+      name: "update",
+      type: "object",
+      required: false,
+      description: "Properties: url, active, muted, etc.",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Tab",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { tabId: "Tab ID", update: "Update properties" },
+  handler: handleChromeTabsUpdate,
+});
+
+registerTool({
+  action: "chrome_tabs_remove",
+  namespace: "chrome",
+  name: "tabs.remove",
+  publicName: "chrome.tabs.remove",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Close one or more tabs",
+  params: ChromeTabsRemoveParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "number",
+      required: true,
+      description: "Tab ID or array of tab IDs",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { tabId: "Tab ID to close" },
+  handler: handleChromeTabsRemove,
+});
+
+registerTool({
+  action: "chrome_tabs_get",
+  namespace: "chrome",
+  name: "tabs.get",
+  publicName: "chrome.tabs.get",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Get a tab by ID",
+  params: ChromeTabsGetParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "number",
+      required: true,
+      description: "Tab ID",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Tab",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { tabId: "Tab ID" },
+  handler: handleChromeTabsGet,
+});
+
+registerTool({
+  action: "chrome_tabs_reload",
+  namespace: "chrome",
+  name: "tabs.reload",
+  publicName: "chrome.tabs.reload",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Reload a tab",
+  params: ChromeTabsReloadParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "number",
+      required: false,
+      description: "Tab ID (omit for active tab)",
+    },
+    {
+      name: "reload",
+      type: "object",
+      required: false,
+      description: "bypassCache",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { tabId: "Tab ID", reload: "Reload properties" },
+  handler: handleChromeTabsReload,
+});
+
+registerTool({
+  action: "chrome_tabs_sendMessage",
+  namespace: "chrome",
+  name: "tabs.sendMessage",
+  publicName: "chrome.tabs.sendMessage",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Send a message to a specific tab",
+  params: ChromeTabsSendMessageParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "number",
+      required: true,
+      description: "Target tab ID",
+    },
+    {
+      name: "message",
+      type: "any",
+      required: false,
+      description: "Message payload",
+    },
+    {
+      name: "options",
+      type: "object",
+      required: false,
+      description: "Options: frameId",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "any",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: {
+    tabId: "Target tab ID",
+    message: "Message payload",
+    options: "Options",
+  },
+  handler: handleChromeTabsSendMessage,
+});
+
+registerTool({
+  action: "chrome_alarms_create",
+  namespace: "chrome",
+  name: "alarms.create",
+  publicName: "chrome.alarms.create",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Create an alarm",
+  params: ChromeAlarmsCreateParamsSchema,
+  paramTypes: [
+    {
+      name: "name",
+      type: "string",
+      required: false,
+      description: "Alarm name",
+    },
+    {
+      name: "alarmInfo",
+      type: "object",
+      required: false,
+      description: "When: delayInMinutes, periodInMinutes",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { name: "Alarm name", alarmInfo: "Alarm info" },
+  handler: handleChromeAlarmsCreate,
+});
+
+registerTool({
+  action: "chrome_alarms_clear",
+  namespace: "chrome",
+  name: "alarms.clear",
+  publicName: "chrome.alarms.clear",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Clear an alarm",
+  params: ChromeAlarmsClearParamsSchema,
+  paramTypes: [
+    {
+      name: "name",
+      type: "string",
+      required: false,
+      description: "Alarm name (omit clears all)",
+    },
+  ],
+  returns: z.boolean(),
+  returnDoc: "boolean",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { name: "Alarm name" },
+  handler: handleChromeAlarmsClear,
+});
+
+registerTool({
+  action: "chrome_action_setBadgeText",
+  namespace: "chrome",
+  name: "action.setBadgeText",
+  publicName: "chrome.action.setBadgeText",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Set the badge text on the extension action icon",
+  params: ChromeActionSetBadgeTextParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "text, tabId",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Badge text details" },
+  handler: handleChromeActionSetBadgeText,
+});
+
+registerTool({
+  action: "chrome_action_setBadgeBackgroundColor",
+  namespace: "chrome",
+  name: "action.setBadgeBackgroundColor",
+  publicName: "chrome.action.setBadgeBackgroundColor",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Set the badge background color",
+  params: ChromeActionSetBadgeBackgroundColorParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "color, tabId",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Color details" },
+  handler: handleChromeActionSetBadgeBackgroundColor,
+});
+
+registerTool({
+  action: "chrome_action_setTitle",
+  namespace: "chrome",
+  name: "action.setTitle",
+  publicName: "chrome.action.setTitle",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Set the title of the extension action",
+  params: ChromeActionSetTitleParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "title, tabId",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Title details" },
+  handler: handleChromeActionSetTitle,
+});
+
+registerTool({
+  action: "chrome_action_setIcon",
+  namespace: "chrome",
+  name: "action.setIcon",
+  publicName: "chrome.action.setIcon",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Set the icon of the extension action",
+  params: ChromeActionSetIconParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "imageData, path, tabId",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "any",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Icon details" },
+  handler: handleChromeActionSetIcon,
+});
+
+registerTool({
+  action: "chrome_contextMenus_create",
+  namespace: "chrome",
+  name: "contextMenus.create",
+  publicName: "chrome.contextMenus.create",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Create a context menu item",
+  params: ChromeContextMenusCreateParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "Menu item properties",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "string | number",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Menu item properties" },
+  handler: handleChromeContextMenusCreate,
+});
+
+registerTool({
+  action: "chrome_contextMenus_remove",
+  namespace: "chrome",
+  name: "contextMenus.remove",
+  publicName: "chrome.contextMenus.remove",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Remove a context menu item",
+  params: ChromeContextMenusRemoveParamsSchema,
+  paramTypes: [
+    {
+      name: "menuItemId",
+      type: "string | number",
+      required: true,
+      description: "Menu item ID",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { menuItemId: "Menu item ID" },
+  handler: handleChromeContextMenusRemove,
+});
+
+registerTool({
+  action: "chrome_windows_getAll",
+  namespace: "chrome",
+  name: "windows.getAll",
+  publicName: "chrome.windows.getAll",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Get all windows",
+  params: ChromeWindowsGetAllParamsSchema,
+  paramTypes: [
+    {
+      name: "populate",
+      type: "boolean",
+      required: false,
+      description: "Whether to populate tabs",
+    },
+    {
+      name: "windowTypes",
+      type: "string[]",
+      required: false,
+      description: "Window types to filter",
+    },
+  ],
+  returns: z.array(z.unknown()),
+  returnDoc: "Window[]",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { populate: "Populate tabs", windowTypes: "Window types" },
+  handler: handleChromeWindowsGetAll,
+});
+
+registerTool({
+  action: "chrome_windows_create",
+  namespace: "chrome",
+  name: "windows.create",
+  publicName: "chrome.windows.create",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Create a new window",
+  params: ChromeWindowsCreateParamsSchema,
+  paramTypes: [
+    {
+      name: "createData",
+      type: "object",
+      required: false,
+      description: "Window properties",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Window",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { createData: "Window properties" },
+  handler: handleChromeWindowsCreate,
+});
+
+registerTool({
+  action: "chrome_windows_update",
+  namespace: "chrome",
+  name: "windows.update",
+  publicName: "chrome.windows.update",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Update a window",
+  params: ChromeWindowsUpdateParamsSchema,
+  paramTypes: [
+    {
+      name: "windowId",
+      type: "number",
+      required: false,
+      description: "Window ID",
+    },
+    {
+      name: "update",
+      type: "object",
+      required: false,
+      description: "Update properties",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Window",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { windowId: "Window ID", update: "Update properties" },
+  handler: handleChromeWindowsUpdate,
+});
+
+registerTool({
+  action: "chrome_windows_remove",
+  namespace: "chrome",
+  name: "windows.remove",
+  publicName: "chrome.windows.remove",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Remove a window",
+  params: ChromeWindowsRemoveParamsSchema,
+  paramTypes: [
+    {
+      name: "windowId",
+      type: "number",
+      required: true,
+      description: "Window ID",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { windowId: "Window ID" },
+  handler: handleChromeWindowsRemove,
+});
+
+registerTool({
+  action: "chrome_sidePanel_setOptions",
+  namespace: "chrome",
+  name: "sidePanel.setOptions",
+  publicName: "chrome.sidePanel.setOptions",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Set side panel options",
+  params: ChromeSidePanelSetOptionsParamsSchema,
+  paramTypes: [
+    {
+      name: "options",
+      type: "object",
+      required: true,
+      description: "Side panel options",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { options: "Side panel options" },
+  handler: handleChromeSidePanelSetOptions,
+});
+
+registerTool({
+  action: "chrome_cookies_get",
+  namespace: "chrome",
+  name: "cookies.get",
+  publicName: "chrome.cookies.get",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Get a cookie by details",
+  params: CookiesGetParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "Cookie details: name, url, storeId",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Cookie | null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Cookie details" },
+  handler: handleChromeCookiesGet,
+});
+
+registerTool({
+  action: "chrome_cookies_set",
+  namespace: "chrome",
+  name: "cookies.set",
+  publicName: "chrome.cookies.set",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Set a cookie",
+  params: CookiesSetParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "Cookie details: name, value, url, etc.",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Cookie | null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Cookie details" },
+  handler: handleChromeCookiesSet,
+});
+
+registerTool({
+  action: "chrome_cookies_remove",
+  namespace: "chrome",
+  name: "cookies.remove",
+  publicName: "chrome.cookies.remove",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Remove a cookie",
+  params: CookiesDeleteParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: true,
+      description: "Cookie details: name, url",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "Details",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Cookie details" },
+  handler: handleChromeCookiesRemove,
+});
+
+registerTool({
+  action: "chrome_cookies_getAll",
+  namespace: "chrome",
+  name: "cookies.getAll",
+  publicName: "chrome.cookies.getAll",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Get all cookies matching a filter",
+  params: CookiesListParamsSchema,
+  paramTypes: [
+    {
+      name: "details",
+      type: "object",
+      required: false,
+      description: "Filter: url, name, domain, etc.",
+    },
+  ],
+  returns: z.array(z.unknown()),
+  returnDoc: "Cookie[]",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { details: "Filter details" },
+  handler: handleChromeCookiesGetAll,
+});
+
+registerTool({
+  action: "chrome_bookmarks_search",
+  namespace: "chrome",
+  name: "bookmarks.search",
+  publicName: "chrome.bookmarks.search",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Search bookmarks",
+  params: BookmarksSearchParamsSchema,
+  paramTypes: [
+    {
+      name: "query",
+      type: "string | object",
+      required: true,
+      description: "Search string or query object",
+    },
+  ],
+  returns: z.array(z.unknown()),
+  returnDoc: "BookmarkTreeNode[]",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { query: "Search query" },
+  handler: handleChromeBookmarksSearch,
+});
+
+registerTool({
+  action: "chrome_bookmarks_create",
+  namespace: "chrome",
+  name: "bookmarks.create",
+  publicName: "chrome.bookmarks.create",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Create a bookmark",
+  params: BookmarksCreateParamsSchema,
+  paramTypes: [
+    {
+      name: "bookmark",
+      type: "object",
+      required: true,
+      description: "Bookmark details: parentId, title, url, index",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "BookmarkTreeNode",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { bookmark: "Bookmark details" },
+  handler: handleChromeBookmarksCreate,
+});
+
+registerTool({
+  action: "chrome_bookmarks_remove",
+  namespace: "chrome",
+  name: "bookmarks.remove",
+  publicName: "chrome.bookmarks.remove",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Remove a bookmark",
+  params: BookmarksDeleteParamsSchema,
+  paramTypes: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "Bookmark node ID",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { id: "Bookmark node ID" },
+  handler: handleChromeBookmarksRemove,
+});
+
+registerTool({
+  action: "chrome_history_search",
+  namespace: "chrome",
+  name: "history.search",
+  publicName: "chrome.history.search",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Search browser history",
+  params: HistorySearchParamsSchema,
+  paramTypes: [
+    {
+      name: "query",
+      type: "object",
+      required: true,
+      description: "Query: text, startTime, endTime, maxResults",
+    },
+  ],
+  returns: z.array(z.unknown()),
+  returnDoc: "HistoryItem[]",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { query: "Query object" },
+  handler: handleChromeHistorySearch,
+});
+
+registerTool({
+  action: "chrome_history_deleteUrl",
+  namespace: "chrome",
+  name: "history.deleteUrl",
+  publicName: "chrome.history.deleteUrl",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Delete a URL from history",
+  params: HistoryDeleteParamsSchema,
+  paramTypes: [
+    {
+      name: "url",
+      type: "string",
+      required: true,
+      description: "URL to remove",
+    },
+  ],
+  returns: z.null(),
+  returnDoc: "null",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { url: "URL to remove" },
+  handler: handleChromeHistoryDeleteUrl,
+});
+
+registerTool({
+  action: "chrome_notifications_create",
+  namespace: "chrome",
+  name: "notifications.create",
+  publicName: "chrome.notifications.create",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Create a notification",
+  params: NotificationsCreateParamsSchema,
+  paramTypes: [
+    {
+      name: "id",
+      type: "string",
+      required: false,
+      description: "Notification ID",
+    },
+    {
+      name: "options",
+      type: "object",
+      required: true,
+      description: "Notification options: type, title, message, iconUrl",
+    },
+  ],
+  returns: z.string(),
+  returnDoc: "string",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { id: "Notification ID", options: "Notification options" },
+  handler: handleChromeNotificationsCreate,
+});
+
+registerTool({
+  action: "chrome_notifications_clear",
+  namespace: "chrome",
+  name: "notifications.clear",
+  publicName: "chrome.notifications.clear",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Clear a notification",
+  params: NotificationsClearParamsSchema,
+  paramTypes: [
+    {
+      name: "id",
+      type: "string",
+      required: true,
+      description: "Notification ID to clear",
+    },
+  ],
+  returns: z.boolean(),
+  returnDoc: "boolean",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: { id: "Notification ID" },
+  handler: handleChromeNotificationsClear,
+});
+
+registerTool({
+  action: "chrome_scripting_executeScript",
+  namespace: "chrome",
+  name: "scripting.executeScript",
+  publicName: "chrome.scripting.executeScript",
+  source: "main_thread",
+  transport: "chrome_api",
+  description: "Execute a script in a tab",
+  params: ChromeScriptingExecuteScriptParamsSchema,
+  paramTypes: [
+    {
+      name: "target",
+      type: "object",
+      required: false,
+      description: "Target: tabId",
+    },
+    {
+      name: "func",
+      type: "function",
+      required: false,
+      description: "Function to execute",
+    },
+    {
+      name: "args",
+      type: "array",
+      required: false,
+      description: "Function arguments",
+    },
+    {
+      name: "world",
+      type: "string",
+      required: false,
+      description: "Execution world: MAIN or ISOLATED",
+    },
+    {
+      name: "files",
+      type: "string[]",
+      required: false,
+      description: "Script files to inject",
+    },
+  ],
+  returns: z.array(z.unknown()),
+  returnDoc: "InjectionResult[]",
+  errorCode: "ECHROME",
+  errorCategory: "extension",
+  paramDocs: {
+    target: "Target",
+    func: "Function",
+    args: "Arguments",
+    world: "Execution world",
+    files: "Script files",
+  },
+  handler: handleChromeScriptingExecuteScript,
+});
 
 registerTool({
   action: "storage_get",
@@ -2646,7 +2770,7 @@ registerTool({
       description: "Storage key",
     },
   ],
-  returns: z.any(),
+  returns: z.string().nullable(),
   returnDoc: "string | null",
   errorCode: "ESTORAGE",
   errorCategory: "storage",
@@ -2776,7 +2900,7 @@ registerTool({
   action: "fetch",
   namespace: "network",
   description: "Fetch a URL",
-  params: FetchParamsSchema as unknown as z.ZodSchema<FetchParams>,
+  params: FetchParamsSchema,
   paramTypes: [
     {
       name: "url",
@@ -2809,7 +2933,12 @@ registerTool({
       description: "Timeout in milliseconds",
     },
   ],
-  returns: z.any(),
+  returns: z.object({
+    status: z.number(),
+    ok: z.boolean(),
+    headers: z.record(z.string()),
+    body: z.string(),
+  }),
   returnDoc: "FetchValue",
   errorCode: "EFETCH",
   errorCategory: "network",
@@ -2848,7 +2977,13 @@ registerTool({
       description: "Max text length per match",
     },
   ],
-  returns: z.any(),
+  returns: z.object({
+    status: z.number(),
+    ok: z.boolean(),
+    headers: z.record(z.string()),
+    body: z.string(),
+    matches: z.array(z.object({ tag: z.string(), text: z.string() })),
+  }),
   returnDoc: "FetchDomValue",
   errorCode: "EFETCH",
   errorCategory: "network",
@@ -2881,7 +3016,7 @@ registerTool({
       description: "Element label",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -2921,7 +3056,7 @@ registerTool({
       description: "Text to fill",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -2962,7 +3097,7 @@ registerTool({
       description: "Text to type",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3003,7 +3138,7 @@ registerTool({
       description: "Text to append",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3032,7 +3167,7 @@ registerTool({
       description: "Key to press (e.g. 'Enter', 'Escape')",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3063,7 +3198,7 @@ registerTool({
       description: "Option value to select",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3097,7 +3232,7 @@ registerTool({
       description: "Desired checked state (default true)",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3125,7 +3260,7 @@ registerTool({
       description: "Element refId from snapshot",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3143,7 +3278,7 @@ registerTool({
   description: "Unhover in the active tab",
   params: PageUnhoverParamsSchema,
   paramTypes: [],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3180,7 +3315,7 @@ registerTool({
       description: "Element refId to scroll to",
     },
   ],
-  returns: z.any(),
+  returns: z.boolean(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3216,7 +3351,7 @@ registerTool({
       description: "Element refId from snapshot",
     },
   ],
-  returns: z.any(),
+  returns: z.boolean(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3251,7 +3386,7 @@ registerTool({
       description: "Element label",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3283,7 +3418,7 @@ registerTool({
       description: "URL to navigate to",
     },
   ],
-  returns: z.any(),
+  returns: z.unknown(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3291,9 +3426,9 @@ registerTool({
   handler: async (params) => {
     const tabId = getActiveTabId();
     if (tabId === null) throw new Error("No active tab");
-    const result = await handleChromeApi({
-      action: "chrome_tabs_update",
-      params: { tabId, update: { url: params.url } },
+    const result = await dispatchTool("chrome_tabs_update", {
+      tabId,
+      update: { url: params.url },
     });
     if (!result.ok) {
       const error = new Error(result.error.message);
@@ -3312,7 +3447,7 @@ registerTool({
   description: "Navigate back in the active tab",
   params: PageBackParamsSchema,
   paramTypes: [],
-  returns: z.any(),
+  returns: z.boolean(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3330,7 +3465,7 @@ registerTool({
   description: "Navigate forward in the active tab",
   params: PageForwardParamsSchema,
   paramTypes: [],
-  returns: z.any(),
+  returns: z.unknown(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3359,7 +3494,7 @@ registerTool({
   description: "Reload the active tab",
   params: PageReloadParamsSchema,
   paramTypes: [],
-  returns: z.any(),
+  returns: z.unknown(),
   returnDoc: "boolean",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3367,10 +3502,7 @@ registerTool({
   handler: async () => {
     const tabId = getActiveTabId();
     if (tabId === null) throw new Error("No active tab");
-    const result = await handleChromeApi({
-      action: "chrome_tabs_reload",
-      params: { tabId },
-    });
+    const result = await dispatchTool("chrome_tabs_reload", { tabId });
     if (!result.ok) {
       const error = new Error(result.error.message);
       (error as unknown as Record<string, unknown>).code = result.error.code;
@@ -3421,7 +3553,13 @@ registerTool({
       description: "CSS selector",
     },
   ],
-  returns: z.any(),
+  returns: z.array(
+    z.object({
+      tag: z.string(),
+      refId: z.string().nullable(),
+      text: z.string(),
+    }),
+  ),
   returnDoc: "Array<{ tag, refId, text }>",
   errorCode: "EPAGE",
   errorCategory: "page",
@@ -3527,7 +3665,7 @@ registerTool({
       description: "Element refId from snapshot",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3567,7 +3705,7 @@ registerTool({
       description: "Text to fill",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3609,7 +3747,7 @@ registerTool({
       description: "Text to type",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3645,7 +3783,7 @@ registerTool({
       description: "Key to press",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3682,7 +3820,7 @@ registerTool({
       description: "Option value to select",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3724,7 +3862,7 @@ registerTool({
       description: "Desired checked state (default true)",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3760,7 +3898,7 @@ registerTool({
       description: "Element refId from snapshot",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3788,7 +3926,7 @@ registerTool({
       description: "Target tab ID",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3823,7 +3961,7 @@ registerTool({
       description: "Scroll amount in pixels (default 300)",
     },
   ],
-  returns: z.any(),
+  returns: z.boolean(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3859,7 +3997,7 @@ registerTool({
       description: "Element refId from snapshot",
     },
   ],
-  returns: z.any(),
+  returns: z.null(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3887,7 +4025,7 @@ registerTool({
       description: "Target tab ID",
     },
   ],
-  returns: z.any(),
+  returns: z.boolean(),
   returnDoc: "boolean",
   errorCode: "ETAB",
   errorCategory: "tab",
@@ -3940,9 +4078,542 @@ registerTool({
   },
 });
 
+registerTool({
+  action: "tab_evaluate",
+  namespace: "tab",
+  description: "Evaluate JavaScript in a target tab",
+  params: TabEvaluateParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "bigint",
+      required: true,
+      description: "Target tab ID",
+    },
+    {
+      name: "script",
+      type: "string",
+      required: true,
+      description: "JavaScript code to evaluate",
+    },
+  ],
+  returns: z.unknown(),
+  returnDoc: "any",
+  errorCode: "ETAB",
+  errorCategory: "tab",
+  paramDocs: {
+    tabId: "Target tab ID",
+    script: "JavaScript code to evaluate",
+  },
+  handler: async (params) => {
+    const targetTab = Number(params.tabId);
+    const codeStr = String(params.script);
+    const evalFunc = (code: string) => {
+      // biome-ignore lint/security/noGlobalEval: Chrome executeScript context only supports eval, not new Function()
+      return eval(code);
+    };
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: targetTab },
+      func: evalFunc,
+      args: [codeStr],
+      world: "MAIN",
+    });
+    if (results?.[0]) {
+      const first = results[0] as (typeof results)[0] & { error?: unknown };
+      if (first.error) {
+        const error = new Error(String(first.error));
+        (error as unknown as Record<string, unknown>).code =
+          "E_SCRIPT_EXECUTION";
+        (error as unknown as Record<string, unknown>).category = "script";
+        throw error;
+      }
+      return first.result;
+    }
+    return null;
+  },
+});
+
+registerChromePassthrough(
+  "tab_query",
+  "tab",
+  "Query Chrome tabs matching given criteria",
+  "chrome_tabs_query",
+  TabQueryParamsSchema,
+  [
+    {
+      name: "query_info",
+      type: "object",
+      required: true,
+      description: "Query filter: active, currentWindow, url, etc.",
+    },
+  ],
+  { query_info: "Query filter" },
+);
+
+registerChromePassthrough(
+  "tab_create",
+  "tab",
+  "Create a new Chrome tab",
+  "chrome_tabs_create",
+  TabCreateParamsSchema,
+  [
+    {
+      name: "create_properties",
+      type: "object",
+      required: false,
+      description: "URL, windowId, active, etc.",
+    },
+  ],
+  { create_properties: "Create properties" },
+);
+
+registerChromePassthrough(
+  "tab_activate",
+  "tab",
+  "Activate a tab",
+  "chrome_tabs_update",
+  TabActivateParamsSchema,
+  [
+    {
+      name: "tabId",
+      type: "number",
+      required: true,
+      description: "Tab ID to activate",
+    },
+  ],
+  { tabId: "Tab ID to activate" },
+  (params) => {
+    if (typeof params === "number")
+      return { tabId: params, update: { active: true } };
+    const obj = params as Record<string, unknown>;
+    return { tabId: obj.tabId ?? obj.id, update: { active: true } };
+  },
+);
+
+registerChromePassthrough(
+  "tab_close",
+  "tab",
+  "Close one or more tabs",
+  "chrome_tabs_remove",
+  TabCloseParamsSchema,
+  [
+    {
+      name: "tabId",
+      type: "number",
+      required: true,
+      description: "Tab ID or array of tab IDs",
+    },
+  ],
+  { tabId: "Tab ID to close" },
+  (params) => {
+    if (typeof params === "number") return params;
+    const obj = params as Record<string, unknown>;
+    return obj.tabId ?? obj.id ?? extractTabId(params);
+  },
+);
+
+registerChromePassthrough(
+  "tab_execute_script",
+  "tab",
+  "Execute JavaScript in a target tab",
+  "chrome_scripting_executeScript",
+  TabExecuteScriptParamsSchema,
+  [
+    {
+      name: "target",
+      type: "object",
+      required: false,
+      description: "Target: tabId",
+    },
+    {
+      name: "func",
+      type: "function",
+      required: false,
+      description: "Function to execute",
+    },
+    {
+      name: "args",
+      type: "array",
+      required: false,
+      description: "Function arguments",
+    },
+    {
+      name: "world",
+      type: "string",
+      required: false,
+      description: "Execution world: MAIN or ISOLATED",
+    },
+    {
+      name: "files",
+      type: "string[]",
+      required: false,
+      description: "Script files to inject",
+    },
+  ],
+  {
+    target: "Target",
+    func: "Function",
+    args: "Arguments",
+    world: "Execution world",
+    files: "Script files",
+  },
+);
+
+registerTool({
+  action: "tab_scroll_to",
+  namespace: "tab",
+  description: "Scroll to coordinates or an element in a target tab",
+  params: TabScrollToParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "bigint",
+      required: true,
+      description: "Target tab ID",
+    },
+    {
+      name: "x",
+      type: "number",
+      required: false,
+      description: "X coordinate",
+    },
+    {
+      name: "y",
+      type: "number",
+      required: false,
+      description: "Y coordinate",
+    },
+    {
+      name: "refId",
+      type: "string",
+      required: false,
+      description: "Element refId to scroll to",
+    },
+  ],
+  returns: z.boolean(),
+  returnDoc: "boolean",
+  errorCode: "ETAB",
+  errorCategory: "tab",
+  paramDocs: {
+    tabId: "Target tab ID",
+    x: "X coordinate",
+    y: "Y coordinate",
+    refId: "Element refId to scroll to",
+  },
+  handler: async (params) => {
+    return bridgeToTab(Number(params.tabId), "page_scroll_to", {
+      x: params.x,
+      y: params.y,
+      refId: params.refId,
+    });
+  },
+});
+
+registerTool({
+  action: "tab_fetch",
+  namespace: "tab",
+  description: "Perform an HTTP fetch inside a target tab origin",
+  params: TabFetchParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "bigint",
+      required: true,
+      description: "Target tab ID",
+    },
+    {
+      name: "url",
+      type: "string",
+      required: true,
+      description: "URL to fetch",
+    },
+    {
+      name: "method",
+      type: "string",
+      required: false,
+      description: "HTTP method",
+    },
+    {
+      name: "headers",
+      type: "object",
+      required: false,
+      description: "Request headers",
+    },
+    {
+      name: "body",
+      type: "string | null",
+      required: false,
+      description: "Request body",
+    },
+    {
+      name: "timeout",
+      type: "number",
+      required: false,
+      description: "Timeout in milliseconds",
+    },
+  ],
+  returns: z.object({
+    status: z.number(),
+    ok: z.boolean(),
+    headers: z.record(z.string()),
+    body: z.string(),
+  }),
+  returnDoc: "FetchValue",
+  errorCode: "ETAB",
+  errorCategory: "tab",
+  paramDocs: {
+    tabId: "Target tab ID",
+    url: "URL to fetch",
+    method: "HTTP method",
+    headers: "Request headers",
+    body: "Request body",
+    timeout: "Timeout in milliseconds",
+  },
+  handler: async (params) => {
+    const targetTab = Number(params.tabId);
+    const url = params.url;
+    const method = params.method ?? "GET";
+    const headers = params.headers ?? {};
+    const body = params.body ?? null;
+    const timeout = params.timeout ?? 30_000;
+    const result = await executeInTab(
+      targetTab,
+      (
+        urlArg: unknown,
+        methodArg: unknown,
+        headersArg: unknown,
+        bodyArg: unknown,
+        timeoutArg: unknown,
+      ) => {
+        const urlStr = typeof urlArg === "string" ? urlArg : "";
+        const methodStr = typeof methodArg === "string" ? methodArg : "GET";
+        const headersRec =
+          typeof headersArg === "object" && headersArg !== null
+            ? (headersArg as Record<string, string>)
+            : {};
+        const bodyStr =
+          bodyArg !== null && bodyArg !== undefined ? String(bodyArg) : null;
+        const timeoutNum = typeof timeoutArg === "number" ? timeoutArg : 30_000;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutNum);
+        const fetchOpts: RequestInit = {
+          method: methodStr || "GET",
+          headers: headersRec,
+          signal: controller.signal,
+        };
+        if (bodyStr !== null) {
+          fetchOpts.body = bodyStr;
+        }
+        return fetch(urlStr, fetchOpts)
+          .then(async (resp) => {
+            clearTimeout(timeoutId);
+            const text = await resp.text();
+            return {
+              status: resp.status,
+              ok: resp.ok,
+              headers: Object.fromEntries(resp.headers.entries()),
+              body: text,
+            };
+          })
+          .catch((e) => {
+            clearTimeout(timeoutId);
+            throw e;
+          });
+      },
+      [url, method, headers, body, timeout],
+    );
+    if (!result.ok) {
+      const error = new Error(result.error.message);
+      (error as unknown as Record<string, unknown>).code = result.error.code;
+      (error as unknown as Record<string, unknown>).category =
+        result.error.category;
+      throw error;
+    }
+    return result.value;
+  },
+});
+
+registerTool({
+  action: "tab_snapshot",
+  namespace: "tab",
+  description: "Take a DOM snapshot of the target tab and return readable text",
+  params: TabSnapshotParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "bigint",
+      required: true,
+      description: "Target tab ID (defaults to active tab)",
+    },
+    {
+      name: "max_nodes",
+      type: "number",
+      required: false,
+      description: "Maximum nodes to include (default 500)",
+    },
+    {
+      name: "interactive_only",
+      type: "boolean",
+      required: false,
+      description: "Only include interactive elements",
+    },
+  ],
+  returns: z.string(),
+  returnDoc: "string",
+  errorCode: "ETAB",
+  errorCategory: "tab",
+  paramDocs: {
+    tabId: "Target tab ID",
+    max_nodes: "Maximum nodes to include",
+    interactive_only: "Only interactive elements",
+  },
+  handler: async (params) => {
+    const targetTab = Number(params.tabId);
+    const maxNodes = params.max_nodes ?? 500;
+    const result = await executeInTab(targetTab, createInlineSnapshotFunc(), [
+      maxNodes,
+    ]);
+    if (!result.ok) {
+      const error = new Error(result.error.message);
+      (error as unknown as Record<string, unknown>).code = result.error.code;
+      (error as unknown as Record<string, unknown>).category =
+        result.error.category;
+      throw error;
+    }
+    if (result.value && typeof result.value === "object") {
+      return (result.value as Record<string, unknown>).text as string;
+    }
+    return String(result.value);
+  },
+});
+
+registerTool({
+  action: "tab_snapshot_text",
+  namespace: "tab",
+  description: "Take a DOM snapshot and return readable text (explicit alias)",
+  params: TabSnapshotTextParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "bigint",
+      required: true,
+      description: "Target tab ID (defaults to active tab)",
+    },
+    {
+      name: "max_nodes",
+      type: "number",
+      required: false,
+      description: "Maximum nodes to include (default 500)",
+    },
+    {
+      name: "interactive_only",
+      type: "boolean",
+      required: false,
+      description: "Only include interactive elements",
+    },
+  ],
+  returns: z.string(),
+  returnDoc: "string",
+  errorCode: "ETAB",
+  errorCategory: "tab",
+  paramDocs: {
+    tabId: "Target tab ID",
+    max_nodes: "Maximum nodes to include",
+    interactive_only: "Only interactive elements",
+  },
+  handler: async (params) => {
+    const targetTab = Number(params.tabId);
+    const maxNodes = params.max_nodes ?? 500;
+    const result = await executeInTab(targetTab, createInlineSnapshotFunc(), [
+      maxNodes,
+    ]);
+    if (!result.ok) {
+      const error = new Error(result.error.message);
+      (error as unknown as Record<string, unknown>).code = result.error.code;
+      (error as unknown as Record<string, unknown>).category =
+        result.error.category;
+      throw error;
+    }
+    if (result.value && typeof result.value === "object") {
+      return (result.value as Record<string, unknown>).text as string;
+    }
+    return String(result.value);
+  },
+});
+
+registerTool({
+  action: "tab_snapshot_data",
+  namespace: "tab",
+  description: "Take a DOM snapshot and return structured data",
+  params: TabSnapshotDataParamsSchema,
+  paramTypes: [
+    {
+      name: "tabId",
+      type: "bigint",
+      required: true,
+      description: "Target tab ID (defaults to active tab)",
+    },
+    {
+      name: "max_nodes",
+      type: "number",
+      required: false,
+      description: "Maximum nodes to include (default 500)",
+    },
+    {
+      name: "interactive_only",
+      type: "boolean",
+      required: false,
+      description: "Only include interactive elements",
+    },
+  ],
+  returns: z
+    .object({
+      text: z.string(),
+      nodes: z.array(
+        z.object({
+          refId: z.number(),
+          role: z.string(),
+          tag: z.string(),
+          name: z.string().optional(),
+        }),
+      ),
+      url: z.string(),
+      title: z.string(),
+      viewport: z.object({
+        width: z.number(),
+        height: z.number(),
+      }),
+    })
+    .passthrough(),
+  returnDoc: "SnapshotResult",
+  errorCode: "ETAB",
+  errorCategory: "tab",
+  paramDocs: {
+    tabId: "Target tab ID",
+    max_nodes: "Maximum nodes to include",
+    interactive_only: "Only interactive elements",
+  },
+  handler: async (params) => {
+    const targetTab = Number(params.tabId);
+    const maxNodes = params.max_nodes ?? 500;
+    const result = await executeInTab(targetTab, createInlineSnapshotFunc(), [
+      maxNodes,
+    ]);
+    if (!result.ok) {
+      const error = new Error(result.error.message);
+      (error as unknown as Record<string, unknown>).code = result.error.code;
+      (error as unknown as Record<string, unknown>).category =
+        result.error.category;
+      throw error;
+    }
+    return result.value;
+  },
+});
+
 // ─── Chrome passthrough helpers ────────────────────────────────
 
-function registerChromePassthrough<P>(
+function registerChromePassthrough<P, R>(
   action: string,
   namespace: string,
   description: string,
@@ -3963,7 +4634,7 @@ function registerChromePassthrough<P>(
     description,
     params: paramsSchema,
     paramTypes,
-    returns: z.any(),
+    returns: z.unknown(),
     returnDoc: "any",
     errorCode: "ECHROME",
     errorCategory: "extension",
@@ -3972,10 +4643,7 @@ function registerChromePassthrough<P>(
       const transformedParams = paramTransform
         ? paramTransform(params)
         : params;
-      const result = await handleChromeApi({
-        action: chromeAction,
-        params: transformedParams,
-      });
+      const result = await dispatchTool(chromeAction, transformedParams);
       if (!result.ok) {
         const error = new Error(result.error.message);
         (error as unknown as Record<string, unknown>).code = result.error.code;
@@ -3983,7 +4651,7 @@ function registerChromePassthrough<P>(
           result.error.category;
         throw error;
       }
-      return result.value;
+      return result.value as R;
     },
   });
 }
@@ -4155,85 +4823,6 @@ registerChromePassthrough(
     if (typeof params === "string") return params;
     const obj = params as Record<string, unknown>;
     return obj.id ?? "";
-  },
-);
-
-registerChromePassthrough(
-  "tab_query",
-  "tab",
-  "Query Chrome tabs matching given criteria",
-  "chrome_tabs_query",
-  TabQueryParamsSchema,
-  [
-    {
-      name: "query_info",
-      type: "object",
-      required: true,
-      description: "Query filter: active, currentWindow, url, etc.",
-    },
-  ],
-  { query_info: "Query filter" },
-);
-
-registerChromePassthrough(
-  "tab_create",
-  "tab",
-  "Create a new Chrome tab",
-  "chrome_tabs_create",
-  TabCreateParamsSchema,
-  [
-    {
-      name: "create_properties",
-      type: "object",
-      required: false,
-      description: "URL, windowId, active, etc.",
-    },
-  ],
-  { create_properties: "Create properties" },
-);
-
-registerChromePassthrough(
-  "tab_activate",
-  "tab",
-  "Activate a tab",
-  "chrome_tabs_update",
-  TabActivateParamsSchema,
-  [
-    {
-      name: "tabId",
-      type: "number",
-      required: true,
-      description: "Tab ID to activate",
-    },
-  ],
-  { tabId: "Tab ID to activate" },
-  (params) => {
-    if (typeof params === "number")
-      return { tabId: params, update: { active: true } };
-    const obj = params as Record<string, unknown>;
-    return { tabId: obj.tabId ?? obj.id, update: { active: true } };
-  },
-);
-
-registerChromePassthrough(
-  "tab_close",
-  "tab",
-  "Close one or more tabs",
-  "chrome_tabs_remove",
-  TabCloseParamsSchema,
-  [
-    {
-      name: "tabId",
-      type: "number",
-      required: true,
-      description: "Tab ID or array of tab IDs",
-    },
-  ],
-  { tabId: "Tab ID to close" },
-  (params) => {
-    if (typeof params === "number") return params;
-    const obj = params as Record<string, unknown>;
-    return obj.tabId ?? obj.id ?? extractTabId(params);
   },
 );
 
@@ -4743,7 +5332,10 @@ registerTool({
       description: "Only include interactive elements",
     },
   ],
-  returns: z.any(),
+  returns: z.object({
+    data: z.unknown(),
+    text: z.string(),
+  }),
   returnDoc: "DomSnapshotValue",
   errorCode: "ESIDEPANEL",
   errorCategory: "sidepanel",
@@ -4754,5 +5346,77 @@ registerTool({
   handler: async (params) =>
     dispatchSidepanelTool("sidepanel_snapshot_data", params),
 });
+
+const mergedDocRegistry = new MergedDocRegistry();
+
+registerTool({
+  action: "__runtime_docs",
+  namespace: "runtime",
+  name: "docs",
+  publicName: "runtime.docs",
+  source: "main_thread",
+  transport: "extension_worker",
+  description: "List all available tools",
+  params: z.object({}),
+  paramTypes: [],
+  returns: z.array(ToolDocSchema),
+  returnDoc: "ToolDoc[]",
+  errorCode: "ERUNTIME",
+  errorCategory: "runtime",
+  paramDocs: {},
+  handler: async () => mergedDocRegistry.list(),
+});
+
+registerTool({
+  action: "__runtime_get_doc",
+  namespace: "runtime",
+  name: "get_doc",
+  publicName: "runtime.get_doc",
+  source: "main_thread",
+  transport: "extension_worker",
+  description: "Get a tool doc by public name or action",
+  params: z.object({ query: z.string() }),
+  paramTypes: [
+    {
+      name: "query",
+      type: "string",
+      required: true,
+      description: "Public name or action to look up",
+    },
+  ],
+  returns: ToolDocSchema.nullable(),
+  returnDoc: "ToolDoc | null",
+  errorCode: "ERUNTIME",
+  errorCategory: "runtime",
+  paramDocs: { query: "Public name or action to look up" },
+  handler: async (params) => mergedDocRegistry.get(params.query) ?? null,
+});
+
+registerTool({
+  action: "__runtime_search_docs",
+  namespace: "runtime",
+  name: "search_docs",
+  publicName: "runtime.search_docs",
+  source: "main_thread",
+  transport: "extension_worker",
+  description: "Search tool docs by keyword",
+  params: z.object({ query: z.string() }),
+  paramTypes: [
+    {
+      name: "query",
+      type: "string",
+      required: true,
+      description: "Search keyword",
+    },
+  ],
+  returns: z.array(ToolDocSchema),
+  returnDoc: "ToolDoc[]",
+  errorCode: "ERUNTIME",
+  errorCategory: "runtime",
+  paramDocs: { query: "Search keyword" },
+  handler: async (params) => mergedDocRegistry.search(params.query),
+});
+
+mergedDocRegistry.setStaticDocs(listTools());
 
 initExtensionListeners();

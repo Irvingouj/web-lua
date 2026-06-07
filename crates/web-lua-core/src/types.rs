@@ -85,8 +85,7 @@ pub struct GlobalsSnapshot {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct AsyncCommand {
     pub call_id: u32,
-    #[ts(type = "string")]
-    pub action: crate::action::Action,
+    pub action: String,
     #[ts(type = "unknown")]
     pub params: serde_json::Value,
 }

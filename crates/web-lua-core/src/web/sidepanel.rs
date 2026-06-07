@@ -31,7 +31,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelSnapshotText,
+                action: "sidepanel_snapshot_text".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -75,7 +75,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelSnapshotData,
+                action: "sidepanel_snapshot_data".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -124,7 +124,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelClick,
+                action: "sidepanel_click".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -173,7 +173,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelDblclick,
+                action: "sidepanel_dblclick".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -232,7 +232,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelFill,
+                action: "sidepanel_fill".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -292,7 +292,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelType,
+                action: "sidepanel_type".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -342,7 +342,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelPress,
+                action: "sidepanel_press".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -401,7 +401,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelSelect,
+                action: "sidepanel_select".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -460,7 +460,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelCheck,
+                action: "sidepanel_check".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -510,7 +510,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelHover,
+                action: "sidepanel_hover".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -539,7 +539,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelUnhover,
+                action: "sidepanel_unhover".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -594,7 +594,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelScroll,
+                action: "sidepanel_scroll".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -644,7 +644,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelScrollTo,
+                action: "sidepanel_scroll_to".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -673,7 +673,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelUrl,
+                action: "sidepanel_url".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -701,7 +701,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelTitle,
+                action: "sidepanel_title".to_string(),
                 params: serde_json::json!({}),
             };
             hs.pending_async_command = Some(command);
@@ -748,7 +748,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelWait,
+                action: "sidepanel_wait".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -807,7 +807,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             hs.async_call_counter += 1;
             let command = AsyncCommand {
                 call_id: hs.async_call_counter,
-                action: crate::action::Action::SidepanelAppend,
+                action: "sidepanel_append".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);

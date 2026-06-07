@@ -9,11 +9,11 @@ fn default_get() -> String {
     "GET".to_string()
 }
 
-fn default_timeout() -> u64 {
+fn default_timeout() -> u32 {
     30_000
 }
 
-fn default_wait_ms() -> u64 {
+fn default_wait_ms() -> u32 {
     1000
 }
 
@@ -33,19 +33,19 @@ fn default_false() -> bool {
     false
 }
 
-fn default_max_nodes() -> u64 {
+fn default_max_nodes() -> u32 {
     500
 }
 
-fn default_max_text() -> u64 {
+fn default_max_text() -> u32 {
     500
 }
 
-fn default_max_headings() -> u64 {
+fn default_max_headings() -> u32 {
     200
 }
 
-fn default_max_links() -> u64 {
+fn default_max_links() -> u32 {
     100
 }
 
@@ -79,13 +79,13 @@ pub struct FetchParams {
     pub headers: HashMap<String, String>,
     pub body: Option<String>,
     #[serde(default = "default_timeout")]
-    pub timeout: u64,
+    pub timeout: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct SleepParams {
-    pub duration: u64,
+    pub duration: u32,
 }
 
 // ─── page.* ──────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ pub struct PageFindParams {
 pub struct PageWaitForParams {
     pub selector: String,
     #[serde(default = "default_timeout")]
-    pub timeout: u64,
+    pub timeout: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -201,11 +201,11 @@ pub struct PageWaitForParams {
 pub struct PageExtractParams {
     pub fields: Vec<String>,
     #[serde(default = "default_max_text")]
-    pub max_text: u64,
+    pub max_text: u32,
     #[serde(default = "default_max_headings")]
-    pub max_headings: u64,
+    pub max_headings: u32,
     #[serde(default = "default_max_links")]
-    pub max_links: u64,
+    pub max_links: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -215,7 +215,7 @@ pub struct FetchDomParams {
     #[serde(default)]
     pub selector: String,
     #[serde(default = "default_max_text")]
-    pub max_text: u64,
+    pub max_text: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -232,7 +232,7 @@ pub struct PageAppendParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct PageWaitParams {
     #[serde(default = "default_wait_ms", rename = "duration")]
-    pub ms: u64,
+    pub ms: u32,
 }
 
 // ─── storage.* ───────────────────────────────────────────────────
@@ -264,7 +264,7 @@ pub struct DomSnapshotParams {
     #[serde(default = "default_false")]
     pub interactive_only: bool,
     #[serde(default = "default_max_nodes")]
-    pub max_nodes: u64,
+    pub max_nodes: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,7 +282,7 @@ pub struct DomFormatParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabClickParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
 }
@@ -291,7 +291,7 @@ pub struct TabClickParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabFillParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
     pub value: String,
@@ -301,7 +301,7 @@ pub struct TabFillParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabEvaluateParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     pub script: String,
 }
 
@@ -309,23 +309,23 @@ pub struct TabEvaluateParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabBackParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabWaitForLoadParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(default = "default_timeout", rename = "timeout")]
-    pub timeout: u64,
+    pub timeout: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabScrollToParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(default)]
     pub x: f64,
     #[serde(default)]
@@ -338,7 +338,7 @@ pub struct TabScrollToParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabTypeParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
     pub text: String,
@@ -348,7 +348,7 @@ pub struct TabTypeParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabPressParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     pub key: String,
 }
 
@@ -356,7 +356,7 @@ pub struct TabPressParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabSelectParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
     pub value: String,
@@ -366,7 +366,7 @@ pub struct TabSelectParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabCheckParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
     #[serde(default = "default_true")]
@@ -377,7 +377,7 @@ pub struct TabCheckParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabHoverParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
 }
@@ -386,14 +386,14 @@ pub struct TabHoverParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabUnhoverParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabScrollParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(default = "default_scroll_direction")]
     pub direction: String,
     #[serde(default = "default_scroll_amount")]
@@ -404,7 +404,7 @@ pub struct TabScrollParams {
 #[ts(export_to = "web/src/types/generated.ts")]
 pub struct TabDblClickParams {
     #[serde(rename = "tabId")]
-    pub tab_id: u64,
+    pub tab_id: u32,
     #[serde(rename = "refId")]
     pub ref_id: String,
 }

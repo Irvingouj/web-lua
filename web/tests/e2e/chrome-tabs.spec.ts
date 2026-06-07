@@ -322,11 +322,59 @@ print("has_body: " .. tostring(resp.body ~= nil))
       await context.close();
     }
   });
+
+  test("dispatch tool after fresh tab navigation succeeds", async () => {
+    const { context, popup } = await launchExtensionContext();
+    const logs: string[] = [];
+    popup.on("console", (msg) => logs.push(`[page] ${msg.text()}`));
+    popup.on("worker", (worker) => {
+      worker.on("console", (msg) => logs.push(`[worker] ${msg.text()}`));
+    });
+    try {
+      await waitForKernelReady(popup, 30_000);
+      await popup
+        .locator(".cm-content")
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 });
+      await popup.waitForTimeout(500);
+
+      await setCellCode(
+        popup,
+        0,
+        `
+local newTab = tab.open("https://example.com")
+tab.wait_for_load(newTab)
+-- Navigate to a new URL to trigger a fresh page load
+local result = tab.evaluate(newTab, "window.location.href = 'https://example.org'")
+-- Wait for navigation to complete
+tab.wait_for_load(newTab)
+-- Dispatch a content-script-backed tool after fresh navigation
+local snap = tab.snapshot(newTab)
+print("has_snap: " .. tostring(snap ~= nil and #snap > 0))
+      `,
+      );
+      await runCell(popup, 0);
+      await waitForCellStatus(popup, 0, "success", 30_000);
+      await expectCellOutputContains(popup, 0, "has_snap: true");
+    } catch (e) {
+      console.log("=== CONSOLE LOGS ===");
+      logs.forEach((l) => console.log(l));
+      console.log("=== END LOGS ===");
+      throw e;
+    } finally {
+      await context.close();
+    }
+  });
 });
 
 test.describe("page.fetch", () => {
   test("page.fetch uses active tab origin and cookie", async () => {
     const { context, popup } = await launchExtensionContext();
+    const logs: string[] = [];
+    popup.on("console", (msg) => logs.push(`[page] ${msg.text()}`));
+    popup.on("worker", (worker) => {
+      worker.on("console", (msg) => logs.push(`[worker] ${msg.text()}`));
+    });
     try {
       await waitForKernelReady(popup, 30_000);
       await popup
@@ -350,6 +398,11 @@ print("has_body: " .. tostring(resp.body ~= nil))
       await waitForCellStatus(popup, 0, "success", 20_000);
       await expectCellOutputContains(popup, 0, "status: 200");
       await expectCellOutputContains(popup, 0, "has_body: true");
+    } catch (e) {
+      console.log("=== CONSOLE LOGS ===");
+      logs.forEach((l) => console.log(l));
+      console.log("=== END LOGS ===");
+      throw e;
     } finally {
       await context.close();
     }

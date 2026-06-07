@@ -39,7 +39,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
         let call_id = hs.async_call_counter;
         let command = AsyncCommand {
             call_id,
-            action: crate::action::Action::Host(action),
+            action: format!("host_{}", action),
             params,
         };
         hs.pending_async_command = Some(command);

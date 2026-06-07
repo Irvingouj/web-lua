@@ -35,7 +35,6 @@ await vm.stopWith(runner);
 - `vm.inspectGlobals()` — Inspect all global variables.
 - `vm.setFuelLimit(limit)` — Set execution fuel limit.
 - `vm.loadLibrary(source)` — Load a Lua library.
-- `generateApiDocs()` — Generate API documentation as Markdown + JSON from the Rust source.
 
 ## Lua APIs available in extension environment
 
@@ -210,10 +209,6 @@ This package assumes Chrome Manifest V3 APIs (`chrome.scripting.executeScript`, 
 ### 12. Broad permissions trigger store review
 
 Using `host_permissions: ["<all_urls>"]` with `content_scripts.matches: ["<all_urls>"]` is a sensitive combination that often triggers manual review in the Chrome Web Store. Consider narrowing to specific domains if possible.
-
-## Auto-generated docs
-
-The package includes `API.md` and `api.json` in the crate root, generated automatically from Rust `lua_api_doc!` macros. These list every Lua function with parameter types, return shapes, and source locations.
 
 ## License
 

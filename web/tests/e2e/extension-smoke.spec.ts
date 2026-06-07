@@ -52,6 +52,11 @@ test.describe("Extension smoke", () => {
 
   test("web.sleep works in extension popup", async () => {
     const { context, popup } = await launchExtensionContext();
+    const logs: string[] = [];
+    popup.on("console", (msg) => logs.push(`[page] ${msg.text()}`));
+    popup.on("worker", (worker) => {
+      worker.on("console", (msg) => logs.push(`[worker] ${msg.text()}`));
+    });
     try {
       await waitForKernelReady(popup, 30_000);
       await popup
@@ -69,6 +74,11 @@ print("after")`,
       await runCell(popup, 0);
       await waitForCellStatus(popup, 0, "success", 30_000);
       await expectCellOutputContains(popup, 0, "after");
+    } catch (e) {
+      console.log("=== CONSOLE LOGS ===");
+      logs.forEach((l) => console.log(l));
+      console.log("=== END LOGS ===");
+      throw e;
     } finally {
       await context.close();
     }

@@ -40,7 +40,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::from(action),
+                action: action.to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -104,7 +104,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::from(action),
+                action: action.to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -328,7 +328,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::FsReadRange,
+                action: "fs_read_range".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -399,7 +399,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::FsWrite,
+                action: "fs_write".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -513,7 +513,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::FsAppend,
+                action: "fs_append".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -644,7 +644,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::FsUpdate,
+                action: "fs_update".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);
@@ -715,7 +715,7 @@ pub(crate) fn register<'a>(ctx: Context<'a>, host_state: Rc<RefCell<HostState>>)
             let call_id = hs.async_call_counter;
             let command = AsyncCommand {
                 call_id,
-                action: crate::action::Action::FsHash,
+                action: "fs_hash".to_string(),
                 params,
             };
             hs.pending_async_command = Some(command);

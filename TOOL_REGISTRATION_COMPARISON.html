@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool Registration Target Architecture - Current vs Proposal</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+    --code-bg: #0d1117;
+    --gap: 1.25rem;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header {
+    position: sticky; top: 0;
+    background: rgba(15,17,23,0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    z-index: 10;
+  }
+  header h1 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-target { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-current { background: rgba(210,153,34,0.15); color: var(--warn); }
+  .badge-good { background: rgba(63,185,80,0.15); color: var(--accent2); }
+  .badge-bad { background: rgba(248,81,73,0.15); color: var(--danger); }
+  main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+  .hero {
+    margin-bottom: 2rem;
+  }
+  .hero h2 { margin: 0 0 0.5rem; font-size: 1.75rem; }
+  .hero p { color: var(--muted); margin: 0; }
+  .toc {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+  .toc a {
+    padding: 0.4rem 0.75rem;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+  .toc a:hover { background: var(--border); }
+  section { margin-bottom: 3rem; }
+  h3 { margin: 0 0 1rem; font-size: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+  }
+  @media (max-width: 900px) {
+    .cols { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .card-body { padding: 1rem; overflow-x: auto; }
+  .card-body pre { margin: 0; }
+  pre, code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  .highlight { color: var(--accent); font-weight: 600; }
+  .highlight2 { color: var(--accent2); font-weight: 600; }
+  .highlight-bad { color: var(--danger); font-weight: 600; }
+  .highlight-warn { color: var(--warn); font-weight: 600; }
+  .problems {
+    margin: 1rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  .problems li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 0.5rem;
+  }
+  .problems li:last-child { border-bottom: none; }
+  .arrow {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; color: var(--muted);
+  }
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--muted);
+  }
+  .diagram .box { color: var(--accent); }
+  .diagram .flow { color: var(--accent2); }
+  .diagram .label { color: var(--text); }
+  .sep {
+    margin: 2rem 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+  .summary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+  }
+  .summary h4 { margin: 0 0 0.5rem; }
+  .summary ul { margin: 0; padding-left: 1.25rem; }
+  .summary li { margin: 0.25rem 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.6rem; border: 1px solid var(--border); text-align: left; }
+  th { background: var(--code-bg); color: var(--muted); font-weight: 500; }
+  tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+</style>
+</head>
+<body>
+<header>
+  <h1>
+    <span class="badge badge-target">Target</span>
+    Tool Registration Target Architecture
+    <span style="color:var(--muted);font-size:0.85rem;margin-left:auto;">Current vs Proposal</span>
+  </h1>
+</header>
+
+<main>
+<div class="hero">
+  <h2>One Registration Model, Everywhere</h2>
+  <p>The proposal replaces fragmented registries (content-script, runner, host-handlers) with a single canonical <code>register(name, args, returns, doc, handler)</code> shape used by Rust, main thread, content script, and sidepanel.</p>
+</div>
+
+<div class="toc">
+  <a href="#reg-shape">Registration Shape</a>
+  <a href="#dispatch">Dispatch & Validation</a>
+  <a href="#docs">Documentation Model</a>
+  <a href="#cs-flow">Content Script Flow</a>
+  <a href="#rust-flow">Rust Calling JS</a>
+  <a href="#public-api">Public API Identity</a>
+  <a href="#runtime">Runtime Docs</a>
+  <a href="#doctest">Doctests</a>
+  <a href="#errors">Error Model</a>
+  <a href="#summary">Summary</a>
+</div>
+
+<section id="reg-shape">
+  <h3>1. Registration Shape</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Three Different Shapes</div>
+      <div class="card-body">
+        <p style="color:var(--muted);font-size:0.85rem;margin-top:0;"><strong>Main thread</strong> <code>tool-registry.ts</code></p>
+<pre><code>registerTool(
+  action: "page_click",
+  params: PageClickParamsSchema,
+  returns: z.null(),
+  doc: {
+    namespace: "page",
+    description: "Click a DOM element",
+    <span class="highlight-bad">paramDocs: { refId: "..." },      // separate record</span>
+    <span class="highlight-bad">paramTypes: [...],               // separate array</span>
+    <span class="highlight-bad">returnDoc: "null",               // separate string</span>
+    <span class="highlight-bad">errorCode: "EPAGE",              // per-tool error code</span>
+    <span class="highlight-bad">errorCategory: "page",           // per-tool error category</span>
+    <span class="highlight-bad">// NO publicName, source, transport, name</span>
+  },
+  handler: async (p) => { ... }
+);</code></pre>
+
+        <p style="color:var(--muted);font-size:0.85rem;"><strong>Content script</strong> <code>content-script.ts</code></p>
+<pre><code>registerContentScriptTool({
+  <span class="highlight-bad">action: "click",                 // no namespace</span>
+  <span class="highlight-bad">description: "Click a DOM element", // no structured doc</span>
+  <span class="highlight-bad">params: z.object({...}),         // no returns schema</span>
+  <span class="highlight-bad">// NO doc object, NO source, NO transport</span>
+  <span class="highlight-bad">// NO publicName / action separation</span>
+  handler: (p) => { ... }
+});</code></pre>
+
+        <p style="color:var(--muted);font-size:0.85rem;"><strong>Host handlers</strong> <code>web-lua/js/registry.ts</code></p>
+<pre><code>registerHostHandler(
+  <span class="highlight-bad">action: "fetch",</span>
+  <span class="highlight-bad">handler: async (p) => { ... }   // NO schema, NO doc</span>
+);</code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> One Canonical Shape</div>
+      <div class="card-body">
+<pre><code>register(
+  name:    "sidepanel_check",
+  args:    SidepanelCheckParamsSchema,
+  returns: z.null(),
+  doc: {
+    <span class="highlight2">publicName: "sidepanel.check",</span>
+    <span class="highlight2">namespace:  "sidepanel",</span>
+    <span class="highlight2">name:       "check",</span>
+    <span class="highlight2">action:     "sidepanel_check",</span>
+    <span class="highlight2">source:     "sidepanel",</span>
+    <span class="highlight2">transport:  "sidepanel_dom",</span>
+    description: "Check or uncheck a checkbox...",
+    <span class="highlight2">params: [                     // single source of truth</span>
+      { name: "refId", type: "string", required: true,
+        description: "..." },
+      { name: "checked", type: "boolean", required: false,
+        description: "..." },
+    ],
+    <span class="highlight2">returns: {                    // single source of truth</span>
+      type: "null",
+      description: "Returns null after...",
+    },
+  },
+  handler: async (params) => { ... }
+);</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">Same shape in Rust:</p>
+<pre><code>register_lua_tool!(
+    ctx, table,
+    name: "check",
+    action: "sidepanel_check",
+    args: SidepanelCheckParams,
+    returns: Null,
+    doc: ToolDoc { ... },
+    handler: sidepanel_check_handler,
+);</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <ul class="problems">
+    <li><span class="badge badge-bad">Problem</span> Content script registry has no <code>returns</code> schema, no <code>doc</code> object, no <code>publicName</code>/<code>action</code> separation.</li>
+    <li><span class="badge badge-bad">Problem</span> Host handlers registry has no schema validation and no documentation at all.</li>
+    <li><span class="badge badge-bad">Problem</span> Main thread <code>ToolDoc</code> lacks <code>publicName</code>, <code>source</code>, <code>transport</code> — docs cannot describe the execution boundary.</li>
+    <li><span class="badge badge-good">Fix</span> One <code>register(name, args, returns, doc, handler)</code> used everywhere. The <code>doc</code> carries <code>publicName</code>, <code>action</code>, <code>source</code>, <code>transport</code> so the same record explains the tool to docs, dispatcher, Lua, and LLM.</li>
+  </ul>
+</section>
+
+<hr class="sep">
+
+<section id="dispatch">
+  <h3>2. Dispatch & Validation</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Two-Track Dispatch</div>
+      <div class="card-body">
+<pre><code>export async function executeMainThreadCommand(command) {
+  const tool = getTool(command.action);
+  if (tool) {
+    return dispatchTool(command.action, normalizedParams);
+  }
+  <span class="highlight-bad">return legacyExecuteMainThreadCommand(command);</span>
+}</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">The <code>legacyExecuteMainThreadCommand</code> is a <strong>4758-line</strong> <code>switch</code> statement. Many tools bypass the registry entirely.</p>
+
+        <p style="color:var(--muted);font-size:0.85rem;"><code>dispatchTool</code> in <code>tool-registry.ts</code></p>
+<pre><code>export async function dispatchTool(action, params) {
+  const tool = toolRegistry.get(action);
+  if (!tool) return { ok: false, error: ... };
+
+  const parsed = tool.params.safeParse(params);
+  if (!parsed.success) return { ok: false, error: ... };
+
+  const value = await tool.handler(parsed.data);
+  <span class="highlight-bad">// NO return value validation</span>
+  return { ok: true, value };
+}</code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> Unified Dispatcher</div>
+      <div class="card-body">
+<pre><code>async function dispatch(action, params) {
+  const tool = executableRegistry.get(action);
+  if (!tool) return toolNotFound(action);
+
+  const parsedParams = tool.args.safeParse(params);
+  if (!parsedParams.success)
+    return invalidParams(parsedParams.error);
+
+  const rawValue = await tool.handler(parsedParams.data);
+
+  <span class="highlight2">const parsedReturn = tool.returns.safeParse(rawValue);</span>
+  <span class="highlight2">if (!parsedReturn.success)</span>
+  <span class="highlight2">  return invalidReturn(parsedReturn.error);</span>
+
+  return { ok: true, value: parsedReturn.data };
+}</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">Every tool goes through the dispatcher. No legacy switch. No separate host handler path. The dispatcher is the only component that executes tools by action name.</p>
+      </div>
+    </div>
+  </div>
+
+  <ul class="problems">
+    <li><span class="badge badge-bad">Problem</span> Most tools live in a giant <code>switch</code> instead of the registry. The registry is a partial overlay.</li>
+    <li><span class="badge badge-bad">Problem</span> <code>dispatchTool</code> does NOT validate return values against the registered <code>returns</code> schema.</li>
+    <li><span class="badge badge-bad">Problem</span> Host handlers bypass the registry and validation entirely: <code>hostHandlers[action](params)</code> with no schema.</li>
+    <li><span class="badge badge-good">Fix</span> One dispatcher validates both <code>args</code> and <code>returns</code>. Every tool is registered; the switch statement is eliminated.</li>
+  </ul>
+</section>
+
+<hr class="sep">
+
+<section id="docs">
+  <h3>3. Documentation Model</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> ToolDoc (incomplete)</div>
+      <div class="card-body">
+<pre><code>interface ToolDoc {
+  action: string;
+  namespace: string;
+  description: string;
+  params: ToolDocParam[];
+  returns: { type: string; description: string };
+  <span class="highlight-bad">errorCode: string;        // runtime error metadata</span>
+  <span class="highlight-bad">errorCategory: string;   // runtime error metadata</span>
+  <span class="highlight-bad">// NO publicName</span>
+  <span class="highlight-bad">// NO source</span>
+  <span class="highlight-bad">// NO transport</span>
+  <span class="highlight-bad">// NO name (within namespace)</span>
+}</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">Current <code>listTools()</code> returns whatever is in the JS registry. Rust docs are generated statically via <code>generateApiDocs("json")</code> and are never merged with JS or content-script docs at runtime.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> Canonical ToolDoc</div>
+      <div class="card-body">
+<pre><code>type ToolDoc = {
+  publicName: string;      // Lua-facing API name
+  namespace: string;
+  name: string;             // short name within namespace
+  action: string;           // internal async command id
+  source: ToolSource;       // where the handler lives
+  transport: ToolTransport; // how to reach it
+  description: string;
+  params: ToolParamDoc[];
+  returns: ToolReturnDoc;
+};
+
+type ToolSource =
+  | "rust_core"
+  | "extension_worker"
+  | "main_thread"
+  | "content_script"
+  | "sidepanel";
+
+type ToolTransport =
+  | "rust_sync"
+  | "host_async"
+  | "extension_worker"
+  | "chrome_api"
+  | "active_tab_content_script"
+  | "specific_tab_content_script"
+  | "sidepanel_dom";</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">The same <code>ToolDoc</code> is used in Rust, JS, generated <code>API.md</code>, generated <code>api.json</code>, and runtime <code>runtime.docs()</code>. Docs are not side artifacts; they are part of the runtime contract.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section id="cs-flow">
+  <h3>4. Content Script Documentation Flow</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Hardcoded Bridge Map</div>
+      <div class="card-body">
+        <p style="color:var(--muted);font-size:0.85rem;"><code>content-script-bridge.ts</code></p>
+<pre><code>export const bridges: Bridge[] = [
+  { runnerAction: "page_click", contentScriptAction: "click", description: "Click element" },
+  { runnerAction: "page_fill",  contentScriptAction: "fill",  description: "Fill input" },
+  { runnerAction: "page_type",  contentScriptAction: "type",  description: "Type text" },
+  ... // <span class="highlight-bad">30+ hardcoded entries, manually kept in sync</span>
+];
+
+export function getContentScriptAction(runnerAction) {
+  return bridges.find(b => b.runnerAction === runnerAction)
+    ?.contentScriptAction;
+}</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">Content script has NO docs registry. The main thread has NO way to ask the content script "what tools do you have?"</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> Runtime Doc Discovery</div>
+      <div class="card-body">
+        <p style="color:var(--muted);font-size:0.85rem;">Content script exposes an internal docs action:</p>
+<pre><code>register("__tool_docs", z.object({}), z.array(ToolDocSchema), {
+  publicName: "__internal.content_script.tool_docs",
+  namespace: "__internal", name: "content_script_tool_docs",
+  action: "__content_script_tool_docs",
+  source: "content_script",
+  transport: "active_tab_content_script",
+  description: "Return content script tool documentation.",
+  params: [],
+  returns: { type: "ToolDoc[]", description: "..." },
+}, async () => listLocalToolDocs());</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">Main thread calls this after injection and whenever capability state may have changed:</p>
+<pre><code>main thread
+  |
+  | sendMessage(tabId, { action: "__content_script_tool_docs", params: {} })
+  v
+content script
+  |
+  | returns ToolDoc[]
+  v
+main thread merged registry
+  |
+  | host async command result
+  v
+Rust Lua runtime
+  |
+  | runtime.docs() / runtime.get_doc(...) / runtime.search_docs(...)
+  v
+Lua table</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <ul class="problems">
+    <li><span class="badge badge-bad">Problem</span> <code>content-script-bridge.ts</code> is a manually-maintained hardcoded list. Adding a new content-script tool requires editing two files.</li>
+    <li><span class="badge badge-bad">Problem</span> Content script docs are not discoverable at runtime. The main thread cannot ask "what tools are available in this tab?"</li>
+    <li><span class="badge badge-good">Fix</span> Content script registers its own docs. Main thread fetches them via message. The bridge mapping is derived from <code>doc.action</code> and <code>doc.transport</code> — no separate file.</li>
+  </ul>
+</section>
+
+<hr class="sep">
+
+<section id="rust-flow">
+  <h3>5. How Rust Calls JS Functions</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Host Handlers + Direct Calls</div>
+      <div class="card-body">
+<pre><code>// web-lua/js/registry.ts
+const hostHandlers = {};
+
+export function registerHostHandler(action, handler) {
+  hostHandlers[action] = handler;
+}
+
+// Rust Lua callback
+// -> host.call("fetch", { url: "..." })
+// -> JS hostHandlers["fetch"](params)
+// -> NO schema validation
+// -> NO structured error model</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">The host handler registry is a flat map of <code>action -> handler</code>. There is no schema validation, no documentation, and no transport abstraction. The caller must know whether the handler runs in main thread, content script, or sidepanel.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> AsyncCommand / Dispatcher</div>
+      <div class="card-body">
+<pre><code>Lua code
+  page.click({ refId = "12" })
+        |
+        v
+Rust Lua callback
+        |
+        v
+serialize Lua args -> JSON
+        |
+        v
+AsyncCommand {
+  call_id: 7,
+  action: "page_click",
+  params: { "refId": "12" }
+}
+        |
+        v
+WASM boundary
+        |
+        v
+JS runner executeMainThreadCommand(command)
+        |
+        v
+dispatcher.lookup("page_click")
+        |
+        v
+args schema validates params
+        |
+        v
+transport adapter resolves execution env
+  transport = "active_tab_content_script"
+        |
+        v
+chrome.tabs.sendMessage(tabId, {
+  action: "click",        // private local name
+  params: { refId: "12" }
+})
+        |
+        v
+content script local dispatcher
+        |
+        v
+handler("click")
+        |
+        v
+returns schema validates result
+        |
+        v
+AsyncResponse { ok: true, value: null }
+        |
+        v
+Rust resume_async(call_id, response)
+        |
+        v
+Lua coroutine resumes</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <ul class="problems">
+    <li><span class="badge badge-bad">Problem</span> Rust calls JS via <code>host.call()</code> which bypasses the tool registry and dispatcher entirely.</li>
+    <li><span class="badge badge-bad">Problem</span> JS handlers in <code>hostHandlers</code> are not validated on input or output.</li>
+    <li><span class="badge badge-bad">Problem</span> Transport details (content script, sidepanel, chrome API) leak into the calling code instead of being handled by the dispatcher.</li>
+    <li><span class="badge badge-good">Fix</span> Rust emits typed <code>AsyncCommand</code>. JS dispatcher validates args, resolves the transport adapter, executes the handler, validates the return value, then returns an <code>AsyncResponse</code>. Rust resumes the Lua coroutine.</li>
+  </ul>
+</section>
+
+<hr class="sep">
+
+<section id="public-api">
+  <h3>6. Public API Identity</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Action = Public Name</div>
+      <div class="card-body">
+<pre><code>// Current: there is no distinction
+// The "action" string IS the Lua-visible name
+
+host.call("page_click", { refId: "12" })
+//         ^^^^^^^^^^ this is both the public API
+//                    and the internal dispatcher identity
+
+// The LLM sees "page_click" as the function name.
+// There is no "page.click" namespace separation.</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">The current system conflates the Lua API name with the internal async action name. The LLM prompt must describe <code>page_click</code> instead of <code>page.click</code>.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> Two Names: Public + Action</div>
+      <div class="card-body">
+<pre><code>publicName              action
+------------------      --------------------
+web.fetch               fetch
+web.sleep               sleep
+page.click              page_click
+page.snapshot           page_snapshot
+tab.click               tab_click
+sidepanel.check         sidepanel_check
+runtime.docs            __runtime_docs
+runtime.get_doc         __runtime_get_doc
+
+// LLM reads publicName
+// Dispatcher executes action
+
+// Lua usage:
+page.click({ refId = "12" })
+// dispatcher receives action = "page_click"
+// content script receives action = "click"</code></pre>
+        <p style="color:var(--muted);font-size:0.85rem;">The public Lua API name is decoupled from the internal async command identity. The dispatcher maps <code>page_click</code> to the content script action <code>click</code> via the <code>transport</code> adapter. The content script never needs to know whether the request came from <code>page.click</code> or <code>tab.click</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section id="runtime">
+  <h3>7. Runtime Documentation</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Static Generation Only</div>
+      <div class="card-body">
+<pre><code>// Rust static generation
+export function generateApiDocsJson(): LuaApiDoc[] {
+  return JSON.parse(generateApiDocs("json"));
+}
+
+// JS registry
+export function listTools(): ToolDoc[] {
+  // only returns JS-registered tools
+}
+
+// <span class="highlight-bad">NO runtime.docs() API</span>
+// <span class="highlight-bad">NO runtime.get_doc(name) API</span>
+// <span class="highlight-bad">NO runtime.search_docs(query) API</span>
+// <span class="highlight-bad">Rust docs and JS docs never merged at runtime</span></code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> Runtime Discovery APIs</div>
+      <div class="card-body">
+<pre><code>// Lua-visible APIs
+runtime.docs() -> table
+runtime.get_doc(query: string) -> table | nil
+runtime.search_docs(query: string) -> table
+
+// Query can be:
+//   "page.click"       public Lua API name
+//   "page_click"       async action name
+//   "sidepanel.check"  public sidepanel API name
+//   "runtime.docs"     Rust runtime API name
+
+// search_docs indexes:
+//   publicName, namespace, name, action,
+//   description, param names, param descriptions,
+//   return description
+
+// Rust has local docs available without JS round-trip:
+//   api_docs::REGISTRY
+//     |
+//     +-- JS host provider exists? ask for merged docs
+//     +-- no JS host? return Rust-core docs only</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <ul class="problems">
+    <li><span class="badge badge-bad">Problem</span> There is no runtime API for the LLM or Lua code to discover available tools.</li>
+    <li><span class="badge badge-bad">Problem</span> Rust docs (<code>generateApiDocs</code>) and JS docs (<code>listTools</code>) are never merged.</li>
+    <li><span class="badge badge-good">Fix</span> <code>runtime.docs()</code>, <code>runtime.get_doc()</code>, <code>runtime.search_docs()</code> are Lua APIs backed by the merged registry. The LLM can discover and call APIs entirely from inside Lua.</li>
+  </ul>
+</section>
+
+<hr class="sep">
+
+<section id="doctest">
+  <h3>8. Compile-Time Doctests</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> No Doctest System</div>
+      <div class="card-body">
+        <p style="color:var(--muted);">No compile-time doctest mechanism exists. Tests are either unit tests (mocked) or Playwright E2E (full browser). There is no way to test a tool against its own example in the doc.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> __DOCTEST__ Compile Flag</div>
+      <div class="card-body">
+<pre><code>register("sidepanel_check", ...,
+  {
+    publicName: "sidepanel.check", ...,
+    ...(__DOCTEST__ ? {
+      testScript: `
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.refId = "abc";
+        document.body.appendChild(checkbox);
+
+        await callTool("sidepanel_check", {
+          refId: "abc", checked: true,
+        });
+
+        expect(checkbox.checked).toBe(true);
+      `,
+    } : {}),
+  },
+  handler
+);
+
+// Production: __DOCTEST__ = false
+//   -> tree shaking removes testScript
+
+// Doctest build: __DOCTEST__ = true
+//   -> register collects testScript
+//   -> doctest runner executes against real dispatcher</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section id="errors">
+  <h3>9. Error Model</h3>
+  <div class="cols">
+    <div class="card">
+      <div class="card-header"><span class="badge badge-current">Current</span> Ad-hoc Error Codes</div>
+      <div class="card-body">
+<pre><code>// Error codes are defined per-tool in the registry
+errorCode: "EPAGE",
+errorCategory: "page",
+
+// dispatchTool catches and wraps:
+const code = (err as { code?: string }).code ?? tool.errorCode;
+const category = (err as { category?: string }).category ?? tool.errorCategory;
+
+// <span class="highlight-bad">No structured ToolError type</span>
+// <span class="highlight-bad">No action/publicName context in errors</span>
+// <span class="highlight-bad">Error codes are scattered across tool definitions</span></code></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="badge badge-target">Target</span> Structured ToolError</div>
+      <div class="card-body">
+<pre><code>type ToolError = {
+  message: string;
+  code: string;
+  category: string;
+  action: string;
+  publicName?: string;
+};
+
+// Standard error codes:
+E_INVALID_PARAMS
+E_INVALID_RETURN
+E_TOOL_NOT_FOUND
+E_TRANSPORT_UNAVAILABLE
+E_CONTENT_SCRIPT_NOT_READY
+E_NO_ACTIVE_TAB
+E_ELEMENT_NOT_FOUND
+
+// Lua receives errors as regular errors:
+local ok, err = pcall(function()
+  page.click({ refId = "missing" })
+end)
+
+print(ok)  -- false
+print(err) -- E_ELEMENT_NOT_FOUND with action/publicName context</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<section id="summary">
+  <h3>10. Summary: What Changes</h3>
+  <table>
+    <thead>
+      <tr><th>Area</th><th>Current State</th><th>Target State</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Registration API</td>
+        <td>Three different shapes: <code>registerTool</code>, <code>registerContentScriptTool</code>, <code>registerHostHandler</code></td>
+        <td>One <code>register(name, args, returns, doc, handler)</code> everywhere</td>
+      </tr>
+      <tr>
+        <td>Dispatch</td>
+        <td>Registry for some tools, giant <code>switch</code> for others, host handlers for Rust calls</td>
+        <td>Unified dispatcher. No switch. All tools go through <code>dispatch(action, params)</code></td>
+      </tr>
+      <tr>
+        <td>Validation</td>
+        <td>Args validated. Returns NOT validated. Host handlers not validated at all.</td>
+        <td>Both <code>args</code> and <code>returns</code> validated on every tool call</td>
+      </tr>
+      <tr>
+        <td>Doc Model</td>
+        <td><code>ToolDoc</code> lacks <code>publicName</code>, <code>source</code>, <code>transport</code></td>
+        <td>Full <code>ToolDoc</code> with <code>publicName</code>, <code>action</code>, <code>source</code>, <code>transport</code></td>
+      </tr>
+      <tr>
+        <td>Content Script</td>
+        <td>Hardcoded bridge map in <code>content-script-bridge.ts</code>. No runtime doc discovery.</td>
+        <td>Content script exposes <code>__tool_docs</code>. Main thread fetches and merges at runtime.</td>
+      </tr>
+      <tr>
+        <td>Public Name</td>
+        <td>Action string IS the public name. No namespace separation.</td>
+        <td><code>publicName</code> (Lua API) separate from <code>action</code> (dispatcher identity)</td>
+      </tr>
+      <tr>
+        <td>Runtime Docs</td>
+        <td>Static generation only. Rust and JS docs never merged. No Lua APIs.</td>
+        <td><code>runtime.docs()</code>, <code>runtime.get_doc()</code>, <code>runtime.search_docs()</code></td>
+      </tr>
+      <tr>
+        <td>Doctests</td>
+        <td>None</td>
+        <td>Compile-time <code>__DOCTEST__</code> flag. Test scripts attached to docs. Production-stripped.</td>
+      </tr>
+      <tr>
+        <td>Errors</td>
+        <td>Per-tool <code>errorCode</code>/<code>errorCategory</code>. No structured type.</td>
+        <td>Unified <code>ToolError</code> with <code>action</code> and <code>publicName</code> context.</td>
+      </tr>
+      <tr>
+        <td>Transport</td>
+        <td>Implicit in handler code. Content script uses bridge map. Sidepanel uses ad-hoc dispatch.</td>
+        <td>Explicit <code>transport</code> field. Dispatcher resolves transport adapter.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:2rem;">
+    <div class="summary">
+      <h4>Perfect End State</h4>
+      <ul>
+        <li>One registration shape: <code>register(name, args, returns, doc, handler)</code></li>
+        <li>One executable registry: <code>action -> validated handler</code></li>
+        <li>One documentation model: <code>ToolDoc</code> records shared by Rust, JS, generated docs, and Lua runtime</li>
+        <li>One runtime discovery surface: <code>runtime.docs()</code>, <code>runtime.get_doc()</code>, <code>runtime.search_docs()</code></li>
+        <li>One dispatch boundary: Rust emits <code>AsyncCommand</code> -> JS validates and executes -> JS returns <code>AsyncResponse</code> -> Rust resumes Lua</li>
+        <li>One content script docs flow: content script local docs -> main thread fetches by message -> main thread merges -> Rust asks JS -> Lua receives table</li>
+        <li>One doctest mechanism: compile-time <code>__DOCTEST__</code>, collected only in doctest builds, stripped from production</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

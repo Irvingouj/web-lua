@@ -142,6 +142,13 @@ impl NotebookSession {
         self.fuel_limit = limit;
     }
 
+    /// Enable or disable the JS doc provider.
+    /// When enabled, runtime.docs(), runtime.get_doc(), and runtime.search_docs()
+    /// emit async commands instead of returning static docs directly.
+    pub fn set_js_doc_provider_available(&mut self, available: bool) {
+        self.host_state.borrow_mut().has_js_doc_provider = available;
+    }
+
     /// Cancel the current execution.
     pub fn cancel(&mut self) {
         self.cancelled.set(true);

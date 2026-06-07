@@ -184,7 +184,7 @@ impl From<web_lua_core::AsyncCommand> for WasmAsyncCommand {
     fn from(c: web_lua_core::AsyncCommand) -> Self {
         WasmAsyncCommand {
             call_id: c.call_id,
-            action: c.action.into(),
+            action: c.action,
             params: c.params,
         }
     }

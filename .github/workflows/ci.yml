@@ -53,10 +53,3 @@ jobs:
 
       - name: Build WASM targets
         run: node scripts/build.js
-
-      - name: Verify API docs generated
-        run: |
-          test -f crates/web-lua/js/API.md
-          test -f crates/web-lua/js/api.json
-          test -f crates/extension-lua/js/API.md
-          test -f crates/extension-lua/js/api.json

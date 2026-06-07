@@ -70,7 +70,7 @@ impl BaseSession {
     pub fn restore_pending_command(&mut self, cmd: WasmAsyncCommand) {
         let core_cmd = web_lua_core::AsyncCommand {
             call_id: cmd.call_id,
-            action: web_lua_core::action::Action::from(cmd.action.as_str()),
+            action: cmd.action,
             params: cmd.params,
         };
         self.inner.restore_pending_command(core_cmd);

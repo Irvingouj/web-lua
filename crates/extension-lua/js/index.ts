@@ -4,7 +4,6 @@
 // runner loop, and returns a proxy + runner promise.
 
 import type { CellResult, WasmGlobalsSnapshot } from "./extension_lua.js";
-import { generateApiDocs } from "./extension_lua.js";
 import { logger } from "./logger.js";
 import {
   executeMainThreadCommand,
@@ -19,40 +18,7 @@ export type {
   CellResult as LuaRunResult,
   WasmGlobalsSnapshot as LuaGlobalsSnapshot,
 };
-export {
-  generateApiDocs,
-  listTools,
-  registerHostHandler,
-  registerHostHandlers,
-  registerTool,
-};
-
-export interface LuaApiDoc {
-  namespace: string;
-  name: string;
-  action: string | null;
-  description: string;
-  params: {
-    name: string;
-    lua_type: string;
-    required: boolean;
-    description: string;
-  }[];
-  returns: {
-    lua_type: string;
-    description: string;
-  };
-  source: string;
-}
-
-/**
- * Generate API documentation as a parsed JSON array.
- * Returns structured docs so callers can filter, search, or
- * transform the registry without manual JSON.parse.
- */
-export function generateApiDocsJson(): LuaApiDoc[] {
-  return JSON.parse(generateApiDocs("json"));
-}
+export { listTools, registerHostHandler, registerHostHandlers, registerTool };
 
 interface WorkerMessage {
   type: string;
@@ -98,6 +64,7 @@ export class ExtensionSession {
     const session = new ExtensionSession();
     const [ready, runner] = session.startWorker();
     await ready;
+    session.setJsDocProviderAvailable(true);
     return [session, runner];
   }
 
@@ -177,20 +144,10 @@ export class ExtensionSession {
       case "asyncRelay": {
         if (!msg.id || !msg.command) break;
         const action = (msg.command as Record<string, unknown>)?.action;
-        logger.debug(
-          "[ExtensionSession] asyncRelay action:",
-          action,
-          "id:",
-          msg.id,
-        );
+        console.log("[MAIN asyncRelay] action:", action, "id:", msg.id, "cmd:", JSON.stringify(msg.command));
         executeMainThreadCommand(msg.command as Command)
           .then((result) => {
-            logger.debug(
-              "[ExtensionSession] asyncRelayResult action:",
-              action,
-              "resultType:",
-              typeof result,
-            );
+            console.log("[MAIN asyncRelayResult] action:", action, "id:", msg.id, "result:", JSON.stringify(result));
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,
@@ -199,12 +156,7 @@ export class ExtensionSession {
           })
           .catch((err: Error | unknown) => {
             const message = err instanceof Error ? err.message : String(err);
-            logger.error(
-              "[ExtensionSession] asyncRelay error action:",
-              action,
-              "msg:",
-              message,
-            );
+            console.error("[MAIN asyncRelay error] action:", action, "msg:", message);
             this.worker?.postMessage({
               type: "asyncRelayResult",
               id: msg.id,
@@ -280,6 +232,16 @@ export class ExtensionSession {
   setRelayTimeoutMs(ms: number): void {
     if (!this.worker || this.disposed) return;
     this.worker.postMessage({ type: "setRelayTimeoutMs", ms });
+  }
+
+  /**
+   * Enable or disable the JS doc provider.
+   * When enabled, runtime.docs() and runtime.get_doc() emit async commands
+   * that resolve through the merged doc registry.
+   */
+  setJsDocProviderAvailable(available: boolean): void {
+    if (!this.worker || this.disposed) return;
+    this.worker.postMessage({ type: "setJsDocProviderAvailable", available });
   }
 
   /**

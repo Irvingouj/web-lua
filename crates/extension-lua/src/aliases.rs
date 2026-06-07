@@ -68,6 +68,7 @@ fn call_with_args_alias_cb<'gc>(
 }
 
 /// Create a callback that calls a function and extracts a field from the result.
+#[allow(dead_code)]
 fn extract_field_alias_cb<'gc>(
     ctx: Context<'gc>,
     path: &[&'static str],
@@ -326,7 +327,12 @@ fn page_fetch_cb<'gc>(ctx: Context<'gc>) -> Callback<'gc> {
 /// Register all extension aliases.
 pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
     // ── runtime table ─────────────────────────────────────────────
-    let runtime_table = Table::new(ctx.mutation());
+    // Preserve the existing runtime table (has inspect, docs, get_doc, search_docs)
+    // and add extension-specific aliases to it.
+    let runtime_table = match ctx.globals().get_value(ctx, "runtime") {
+        Value::Table(t) => t,
+        _ => Table::new(ctx.mutation()),
+    };
 
     web_lua_core::lua_api_custom!(
         ctx,
@@ -366,14 +372,17 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
     web_lua_core::api_docs::register(web_lua_core::api_docs::LuaApiDoc {
         namespace: "runtime".to_string(),
         name: "storage".to_string(),
-        action: Some("".to_string()),
+        public_name: "runtime.storage".to_string(),
+        action: None,
+        local_name: None,
+        source: web_lua_core::api_docs::ToolSource::RustCore,
+        transport: web_lua_core::api_docs::ToolTransport::HostAsync,
         description: "Alias for web.storage.".to_string(),
         params: vec![],
         returns: web_lua_core::api_docs::ReturnDoc {
             lua_type: "table".to_string(),
             description: "Storage API table".to_string(),
         },
-        source: "rust_core".to_string(),
     });
 
     // runtime.clipboard = web.clipboard (table alias)
@@ -385,14 +394,17 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
     web_lua_core::api_docs::register(web_lua_core::api_docs::LuaApiDoc {
         namespace: "runtime".to_string(),
         name: "clipboard".to_string(),
-        action: Some("".to_string()),
+        public_name: "runtime.clipboard".to_string(),
+        action: None,
+        local_name: None,
+        source: web_lua_core::api_docs::ToolSource::RustCore,
+        transport: web_lua_core::api_docs::ToolTransport::HostAsync,
         description: "Alias for web.clipboard.".to_string(),
         params: vec![],
         returns: web_lua_core::api_docs::ReturnDoc {
             lua_type: "table".to_string(),
             description: "Clipboard API table".to_string(),
         },
-        source: "rust_core".to_string(),
     });
 
     // runtime.notifications = web.notifications (table alias)
@@ -404,14 +416,17 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
     web_lua_core::api_docs::register(web_lua_core::api_docs::LuaApiDoc {
         namespace: "runtime".to_string(),
         name: "notifications".to_string(),
-        action: Some("".to_string()),
+        public_name: "runtime.notifications".to_string(),
+        action: None,
+        local_name: None,
+        source: web_lua_core::api_docs::ToolSource::RustCore,
+        transport: web_lua_core::api_docs::ToolTransport::HostAsync,
         description: "Alias for web.notifications.".to_string(),
         params: vec![],
         returns: web_lua_core::api_docs::ReturnDoc {
             lua_type: "table".to_string(),
             description: "Notifications API table".to_string(),
         },
-        source: "rust_core".to_string(),
     });
 
     ctx.set_global("runtime", runtime_table);
@@ -679,11 +694,52 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
         returns: "string | nil" => "Title or nil",
     );
 
+    // tab.open(url) — create a new tab and return its ID.
+    // Wraps string URL in {url: ...} before calling chrome.tabs.create.
+    let tab_open_fn = get_nested_function(ctx, &["chrome", "tabs", "create"]).unwrap();
+    let tab_open_stashed = ctx.stash(tab_open_fn);
+    let tab_open_cb = Callback::from_fn(ctx.mutation(), move |ctx, _exec, mut stack| {
+        let arg = if stack.is_empty() {
+            Value::Nil
+        } else {
+            stack.get(0)
+        };
+        let f = ctx.fetch(&tab_open_stashed);
+        // Wrap string URL in {url: ...}
+        let wrapped = match arg {
+            Value::String(s) => {
+                let url = String::from_utf8_lossy(s.as_bytes());
+                let t = Table::new(ctx.mutation());
+                t.set_field(ctx, "url", Value::String(ctx.intern(url.as_bytes())));
+                Value::Table(t)
+            }
+            _ => arg,
+        };
+        stack.clear();
+        stack.push_back(wrapped);
+        let then_seq = async_sequence(ctx.mutation(), |_locals, mut seq| async move {
+            seq.try_enter(|ctx, _locals, _exec, mut stack| {
+                let result = stack.get(0);
+                let id = match result {
+                    Value::Table(t) => t.get_value(ctx, "id"),
+                    _ => Value::Nil,
+                };
+                stack.clear();
+                stack.push_back(id);
+                Ok(())
+            })?;
+            Ok(SequenceReturn::Return)
+        });
+        Ok(CallbackReturn::Call {
+            function: f,
+            then: Some(then_seq),
+        })
+    });
     web_lua_core::lua_api_custom!(
         ctx,
         tab_table,
         name: "open",
-        callback: extract_field_alias_cb(ctx, &["chrome", "tabs", "create"], "id"),
+        callback: tab_open_cb,
         namespace: "tab",
         action: "",
         doc: "Create a new tab and return its ID.",
@@ -727,7 +783,11 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
     web_lua_core::api_docs::register(web_lua_core::api_docs::LuaApiDoc {
         namespace: "tab".to_string(),
         name: "sleep".to_string(),
+        public_name: "tab.sleep".to_string(),
         action: Some("sleep".to_string()),
+        local_name: None,
+        source: web_lua_core::api_docs::ToolSource::RustCore,
+        transport: web_lua_core::api_docs::ToolTransport::HostAsync,
         description: "Alias for runtime.sleep.".to_string(),
         params: vec![web_lua_core::api_docs::ParamDoc {
             name: "ms".to_string(),
@@ -739,7 +799,6 @@ pub fn register(ctx: Context, _host_state: Rc<RefCell<HostState>>) {
             lua_type: "nil".to_string(),
             description: "None".to_string(),
         },
-        source: "rust_core".to_string(),
     });
 
     ctx.set_global("tab", tab_table);

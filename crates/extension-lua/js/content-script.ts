@@ -284,32 +284,201 @@ function inlineSnapshot(maxNodes: number): SnapshotResult {
 
 // ─── Content Script Tool Registry ────────────────────────────────
 
-interface ContentScriptTool<P, R> {
-  action: string;
-  params: z.ZodType<P>;
-  handler: (params: P) => R | Promise<R>;
+const CONTENT_SCRIPT_VERSION = "1.0.0";
+
+type ToolSource = "content_script";
+type ToolTransport = "active_tab_content_script";
+
+interface ToolDocParam {
+  name: string;
+  type: string;
+  required: boolean;
   description: string;
 }
 
-export const csRegistry = new Map<
-  string,
-  ContentScriptTool<unknown, unknown>
->();
+interface ToolReturnDoc {
+  type: string;
+  description: string;
+}
 
-export function registerContentScriptTool<P, R>(tool: ContentScriptTool<P, R>) {
-  csRegistry.set(tool.action, tool as ContentScriptTool<unknown, unknown>);
+interface ToolDoc {
+  action: string;
+  namespace: string;
+  name: string;
+  publicName: string;
+  localName?: string;
+  source: ToolSource;
+  transport: ToolTransport;
+  description: string;
+  params: ToolDocParam[];
+  returns: ToolReturnDoc;
+  errorCode: string;
+  errorCategory: string;
+}
+
+interface ToolDefinition<P, R> {
+  action: string;
+  namespace: string;
+  name: string;
+  publicName: string;
+  localName?: string;
+  source: ToolSource;
+  transport: ToolTransport;
+  description: string;
+  params: z.ZodType<P>;
+  returns: z.ZodType<R>;
+  handler: (params: P) => R | Promise<R>;
+  paramDocs: Record<string, string>;
+  paramTypes: ToolDocParam[];
+  returnType?: string;
+  returnDoc: string;
+  errorCode: string;
+  errorCategory: string;
+}
+
+export const csRegistry = new Map<string, ToolDefinition<unknown, unknown>>();
+
+export const contentScriptDocsByPublicName = new Map<string, ToolDoc>();
+export const contentScriptDocsByAction = new Map<string, ToolDoc>();
+
+function _registerContentScriptTool<P, R>(tool: ToolDefinition<P, R>) {
+  const key = tool.localName ?? tool.action;
+  csRegistry.set(key, tool as ToolDefinition<unknown, unknown>);
+  // Also register by full action name so pings and direct calls work
+  if (tool.action !== key) {
+    csRegistry.set(tool.action, tool as ToolDefinition<unknown, unknown>);
+  }
+
+  const doc: ToolDoc = {
+    action: tool.action,
+    namespace: tool.namespace,
+    name: tool.name,
+    publicName: tool.publicName,
+    localName: tool.localName,
+    source: tool.source,
+    transport: tool.transport,
+    description: tool.description,
+    params: tool.paramTypes,
+    returns: {
+      type: tool.returnType ?? "unknown",
+      description: tool.returnDoc,
+    },
+    errorCode: tool.errorCode,
+    errorCategory: tool.errorCategory,
+  };
+
+  contentScriptDocsByPublicName.set(tool.publicName, doc);
+  contentScriptDocsByAction.set(tool.action, doc);
+}
+
+interface ToolRegistrationDoc {
+  namespace: string;
+  name: string;
+  publicName: string;
+  localName?: string;
+  source: ToolSource;
+  transport: ToolTransport;
+  description: string;
+  params?: ToolDocParam[];
+  returnType?: string;
+  returnDoc?: string;
+  errorCode?: string;
+  errorCategory?: string;
+}
+
+function makeToolDefinition<P, R>(
+  action: string,
+  params: z.ZodSchema<P>,
+  returns: z.ZodSchema<R>,
+  doc: ToolRegistrationDoc,
+  handler: (params: P) => R | Promise<R>,
+): ToolDefinition<P, R> {
+  return {
+    action,
+    namespace: doc.namespace,
+    name: doc.name,
+    publicName: doc.publicName,
+    localName: doc.localName,
+    source: doc.source,
+    transport: doc.transport,
+    description: doc.description,
+    params,
+    returns,
+    handler,
+    paramDocs: Object.fromEntries(
+      (doc.params ?? []).map((param) => [param.name, param.description]),
+    ),
+    paramTypes: doc.params ?? [],
+    returnType: doc.returnType,
+    returnDoc: doc.returnDoc ?? "",
+    errorCode: doc.errorCode ?? "E_CONTENT_SCRIPT",
+    errorCategory: doc.errorCategory ?? "content_script",
+  };
+}
+
+export function register<P, R>(
+  action: string,
+  params: z.ZodSchema<P>,
+  returns: z.ZodSchema<R>,
+  doc: ToolRegistrationDoc,
+  handler: (params: P) => R | Promise<R>,
+): void {
+  const tool = makeToolDefinition(action, params, returns, doc, handler);
+  _registerContentScriptTool(tool);
+}
+export function listLocalToolDocs(): ToolDoc[] {
+  return Array.from(contentScriptDocsByAction.values());
+}
+
+function computeToolsHash(): string {
+  const names = Array.from(csRegistry.values())
+    .map((t) => t.publicName)
+    .sort();
+  let hash = 5381;
+  const str = names.join("|");
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) + hash + str.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 // ─── Register all handlers ───────────────────────────────────────
 
-registerContentScriptTool({
-  action: "click",
-  description: "Click a DOM element",
-  params: z.object({
+register(
+  "page_click",
+  z.object({
     refId: z.string().optional(),
     label: z.string().optional(),
   }),
-  handler: (params) => {
+  z.null(),
+  {
+    namespace: "page",
+    name: "click",
+    publicName: "page.click",
+    localName: "click",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Click a DOM element",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+      {
+        name: "label",
+        type: "string",
+        required: false,
+        description: "Element label",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, label } = params;
     let el = refId ? getElementByRefId(refId) : null;
     if (!el && label) {
@@ -325,17 +494,50 @@ registerContentScriptTool({
     (el as HTMLElement).click();
     return null;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "fill",
-  description: "Fill a DOM input",
-  params: z.object({
+register(
+  "page_fill",
+  z.object({
     refId: z.string().optional(),
     label: z.string().optional(),
     value: z.string().optional(),
   }),
-  handler: (params) => {
+  z.null(),
+  {
+    namespace: "page",
+    name: "fill",
+    publicName: "page.fill",
+    localName: "fill",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Fill a DOM input",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+      {
+        name: "label",
+        type: "string",
+        required: false,
+        description: "Element label",
+      },
+      {
+        name: "value",
+        type: "string",
+        required: false,
+        description: "Value to fill",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, label, value = "" } = params;
     let el = refId ? getElementByRefId(refId) : null;
     if (!el && label) {
@@ -356,17 +558,50 @@ registerContentScriptTool({
     }
     throw new Error("Element is not an input");
   },
-});
+);
 
-registerContentScriptTool({
-  action: "type",
-  description: "Type text into a DOM input",
-  params: z.object({
+register(
+  "page_type",
+  z.object({
     refId: z.string().optional(),
     label: z.string().optional(),
     text: z.string().optional(),
   }),
-  handler: (params) => {
+  z.null(),
+  {
+    namespace: "page",
+    name: "type",
+    publicName: "page.type",
+    localName: "type",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Type text into a DOM input",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+      {
+        name: "label",
+        type: "string",
+        required: false,
+        description: "Element label",
+      },
+      {
+        name: "text",
+        type: "string",
+        required: false,
+        description: "Text to type",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, label, text = "" } = params;
     let el = refId ? getElementByRefId(refId) : null;
     if (!el && label) {
@@ -387,17 +622,50 @@ registerContentScriptTool({
     }
     throw new Error("Element is not an input");
   },
-});
+);
 
-registerContentScriptTool({
-  action: "append",
-  description: "Append text to a DOM input",
-  params: z.object({
+register(
+  "page_append",
+  z.object({
     refId: z.string().optional(),
     label: z.string().optional(),
     text: z.string().optional(),
   }),
-  handler: (params) => {
+  z.null(),
+  {
+    namespace: "page",
+    name: "append",
+    publicName: "page.append",
+    localName: "append",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Append text to a DOM input",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+      {
+        name: "label",
+        type: "string",
+        required: false,
+        description: "Element label",
+      },
+      {
+        name: "text",
+        type: "string",
+        required: false,
+        description: "Text to append",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, label, text = "" } = params;
     let el = refId ? getElementByRefId(refId) : null;
     if (!el && label) {
@@ -418,13 +686,34 @@ registerContentScriptTool({
     }
     throw new Error("Element is not an input");
   },
-});
+);
 
-registerContentScriptTool({
-  action: "press",
-  description: "Press a keyboard key",
-  params: z.object({ key: z.string() }),
-  handler: (params) => {
+register(
+  "page_press",
+  z.object({ key: z.string() }),
+  z.null(),
+  {
+    namespace: "page",
+    name: "press",
+    publicName: "page.press",
+    localName: "press",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Press a keyboard key",
+    params: [
+      {
+        name: "key",
+        type: "string",
+        required: true,
+        description: "Key to press",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { key = "" } = params;
     const evDown = new KeyboardEvent("keydown", { key, bubbles: true });
     document.dispatchEvent(evDown);
@@ -432,16 +721,43 @@ registerContentScriptTool({
     document.dispatchEvent(evUp);
     return null;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "select",
-  description: "Select an option in a DOM select",
-  params: z.object({
+register(
+  "page_select",
+  z.object({
     refId: z.string().optional(),
     value: z.string().optional(),
   }),
-  handler: (params) => {
+  z.null(),
+  {
+    namespace: "page",
+    name: "select",
+    publicName: "page.select",
+    localName: "select",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Select an option in a DOM select",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+      {
+        name: "value",
+        type: "string",
+        required: false,
+        description: "Option value to select",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, value = "" } = params;
     const el = refId ? getElementByRefId(refId) : null;
     if (!el) throw new Error(`Element ${refId} not found`);
@@ -451,16 +767,43 @@ registerContentScriptTool({
     }
     throw new Error("Element is not a select");
   },
-});
+);
 
-registerContentScriptTool({
-  action: "check",
-  description: "Check or uncheck a checkbox",
-  params: z.object({
+register(
+  "page_check",
+  z.object({
     refId: z.string().optional(),
     checked: z.boolean().optional(),
   }),
-  handler: (params) => {
+  z.null(),
+  {
+    namespace: "page",
+    name: "check",
+    publicName: "page.check",
+    localName: "check",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Check or uncheck a checkbox",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+      {
+        name: "checked",
+        type: "boolean",
+        required: false,
+        description: "Whether to check the checkbox",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, checked = true } = params;
     const el = refId ? getElementByRefId(refId) : null;
     if (!el) throw new Error(`Element ${refId} not found`);
@@ -470,13 +813,34 @@ registerContentScriptTool({
     }
     throw new Error("Element is not a checkbox");
   },
-});
+);
 
-registerContentScriptTool({
-  action: "hover",
-  description: "Hover over a DOM element",
-  params: z.object({ refId: z.string().optional() }),
-  handler: (params) => {
+register(
+  "page_hover",
+  z.object({ refId: z.string().optional() }),
+  z.null(),
+  {
+    namespace: "page",
+    name: "hover",
+    publicName: "page.hover",
+    localName: "hover",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Hover over a DOM element",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId } = params;
     const el = refId ? getElementByRefId(refId) : null;
     if (!el) throw new Error(`Element ${refId} not found`);
@@ -484,28 +848,75 @@ registerContentScriptTool({
     el.dispatchEvent(ev);
     return null;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "unhover",
-  description: "Unhover from the document body",
-  params: z.object({}),
-  handler: () => {
+register(
+  "page_unhover",
+  z.object({}),
+  z.null(),
+  {
+    namespace: "page",
+    name: "unhover",
+    publicName: "page.unhover",
+    localName: "unhover",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Unhover from the document body",
+    params: [],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
     const ev = new MouseEvent("mouseleave", { bubbles: true });
     document.body.dispatchEvent(ev);
     return null;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "scroll",
-  description: "Scroll the page or an element",
-  params: z.object({
+register(
+  "page_scroll",
+  z.object({
     direction: z.string().optional(),
     amount: z.number().optional(),
     refId: z.string().optional(),
   }),
-  handler: (params) => {
+  z.boolean(),
+  {
+    namespace: "page",
+    name: "scroll",
+    publicName: "page.scroll",
+    localName: "scroll",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Scroll the page or an element",
+    params: [
+      {
+        name: "direction",
+        type: "string",
+        required: false,
+        description: "Scroll direction (up or down)",
+      },
+      {
+        name: "amount",
+        type: "number",
+        required: false,
+        description: "Pixels to scroll",
+      },
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId to scroll within",
+      },
+    ],
+    returnType: "boolean",
+    returnDoc: "true if scrolled",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { direction = "down", amount = 300, refId } = params;
     if (refId) {
       const el = getElementByRefId(refId);
@@ -555,13 +966,34 @@ registerContentScriptTool({
     });
     return true;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "dblclick",
-  description: "Double-click a DOM element",
-  params: z.object({ refId: z.string().optional() }),
-  handler: (params) => {
+register(
+  "page_dblclick",
+  z.object({ refId: z.string().optional() }),
+  z.null(),
+  {
+    namespace: "page",
+    name: "dblclick",
+    publicName: "page.dblclick",
+    localName: "dblclick",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Double-click a DOM element",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId",
+      },
+    ],
+    returnType: "null",
+    returnDoc: "None",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId } = params;
     const el = refId ? getElementByRefId(refId) : null;
     if (!el) throw new Error(`Element ${refId} not found`);
@@ -569,37 +1001,98 @@ registerContentScriptTool({
     el.dispatchEvent(ev);
     return null;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "forward",
-  description: "Navigate forward in history",
-  params: z.object({}),
-  handler: () => {
+register(
+  "page_forward",
+  z.object({}),
+  z.boolean(),
+  {
+    namespace: "page",
+    name: "forward",
+    publicName: "page.forward",
+    localName: "forward",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Navigate forward in history",
+    params: [],
+    returnType: "boolean",
+    returnDoc: "true if navigated",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
     window.history.forward();
     return true;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "reload",
-  description: "Reload the page",
-  params: z.object({}),
-  handler: () => {
+register(
+  "page_reload",
+  z.object({}),
+  z.boolean(),
+  {
+    namespace: "page",
+    name: "reload",
+    publicName: "page.reload",
+    localName: "reload",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Reload the page",
+    params: [],
+    returnType: "boolean",
+    returnDoc: "true if reloaded",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
     window.location.reload();
     return true;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "scrollTo",
-  description: "Scroll to coordinates or an element",
-  params: z.object({
+register(
+  "page_scroll_to",
+  z.object({
     refId: z.string().optional(),
     x: z.number().optional(),
     y: z.number().optional(),
   }),
-  handler: (params) => {
+  z.boolean(),
+  {
+    namespace: "page",
+    name: "scrollTo",
+    publicName: "page.scrollTo",
+    localName: "scrollTo",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Scroll to coordinates or an element",
+    params: [
+      {
+        name: "refId",
+        type: "string",
+        required: false,
+        description: "Element refId to scroll to",
+      },
+      {
+        name: "x",
+        type: "number",
+        required: false,
+        description: "X coordinate",
+      },
+      {
+        name: "y",
+        type: "number",
+        required: false,
+        description: "Y coordinate",
+      },
+    ],
+    returnType: "boolean",
+    returnDoc: "true if scrolled",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { refId, x = 0, y = 0 } = params;
     if (refId) {
       const el = getElementByRefId(refId);
@@ -609,13 +1102,34 @@ registerContentScriptTool({
     window.scrollTo({ top: y, left: x, behavior: "smooth" });
     return true;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "evaluate",
-  description: "Evaluate JavaScript in the page context",
-  params: z.object({ code: z.string().optional() }),
-  handler: (params) => {
+register(
+  "page_evaluate",
+  z.object({ code: z.string().optional() }),
+  z.unknown(),
+  {
+    namespace: "page",
+    name: "evaluate",
+    publicName: "page.evaluate",
+    localName: "evaluate",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Evaluate JavaScript in the page context",
+    params: [
+      {
+        name: "code",
+        type: "string",
+        required: false,
+        description: "JavaScript code to evaluate",
+      },
+    ],
+    returnType: "unknown",
+    returnDoc: "Result of evaluated JavaScript",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  (params) => {
     const { code = "" } = params;
     if (typeof code !== "string") {
       throw new Error("evaluate requires a string argument");
@@ -623,32 +1137,97 @@ registerContentScriptTool({
     // Use new Function to avoid capturing local scope (marginally safer than eval)
     return new Function(code)();
   },
-});
+);
 
-registerContentScriptTool({
-  action: "back",
-  description: "Navigate back in history",
-  params: z.object({}),
-  handler: () => {
+register(
+  "page_back",
+  z.object({}),
+  z.boolean(),
+  {
+    namespace: "page",
+    name: "back",
+    publicName: "page.back",
+    localName: "back",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Navigate back in history",
+    params: [],
+    returnType: "boolean",
+    returnDoc: "true if navigated",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
     window.history.back();
     return true;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "ping",
-  description: "Ping the content script",
-  params: z.object({}),
-  handler: () => {
+register(
+  "page_ping",
+  z.object({}),
+  z.object({ ok: z.literal(true) }),
+  {
+    namespace: "page",
+    name: "ping",
+    publicName: "page.ping",
+    localName: "ping",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Ping the content script",
+    params: [],
+    returnType: "object",
+    returnDoc: "Ping response",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
     return { ok: true };
   },
-});
+);
 
-registerContentScriptTool({
-  action: "snapshot",
-  description: "Take a DOM snapshot",
-  params: z.object({ max_nodes: z.number().optional() }),
-  handler: async (params) => {
+register(
+  "page_snapshot",
+  z.object({ max_nodes: z.number().optional() }),
+  z.object({
+    text: z.string(),
+    nodes: z.array(
+      z.object({
+        refId: z.number(),
+        role: z.string(),
+        tag: z.string(),
+        name: z.string().optional(),
+      }),
+    ),
+    url: z.string(),
+    title: z.string(),
+    viewport: z.object({
+      width: z.number(),
+      height: z.number(),
+    }),
+  }),
+  {
+    namespace: "page",
+    name: "snapshot",
+    publicName: "page.snapshot",
+    localName: "snapshot",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Take a DOM snapshot",
+    params: [
+      {
+        name: "max_nodes",
+        type: "number",
+        required: false,
+        description: "Maximum number of nodes to include",
+      },
+    ],
+    returnType: "object",
+    returnDoc: "DOM snapshot result",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  async (params) => {
     const { max_nodes = 500 } = params;
     logger.debug(
       "[content-script] snapshot called, maxNodes:",
@@ -660,19 +1239,69 @@ registerContentScriptTool({
     logger.debug("[content-script] snapshot result nodes:", r.nodes.length);
     return r;
   },
-});
+);
 
-registerContentScriptTool({
-  action: "fetch",
-  description: "Fetch a URL from the page context",
-  params: z.object({
+register(
+  "page_fetch",
+  z.object({
     url: z.string(),
     method: z.string().optional(),
     headers: z.record(z.unknown()).optional(),
     body: z.unknown().optional(),
     timeout: z.number().optional(),
   }),
-  handler: async (params) => {
+  z.object({
+    status: z.number(),
+    ok: z.boolean(),
+    headers: z.record(z.string()),
+    body: z.string(),
+  }),
+  {
+    namespace: "page",
+    name: "fetch",
+    publicName: "page.fetch",
+    localName: "fetch",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Fetch a URL from the page context",
+    params: [
+      {
+        name: "url",
+        type: "string",
+        required: true,
+        description: "URL to fetch",
+      },
+      {
+        name: "method",
+        type: "string",
+        required: false,
+        description: "HTTP method",
+      },
+      {
+        name: "headers",
+        type: "object",
+        required: false,
+        description: "Request headers",
+      },
+      {
+        name: "body",
+        type: "any",
+        required: false,
+        description: "Request body",
+      },
+      {
+        name: "timeout",
+        type: "number",
+        required: false,
+        description: "Timeout in milliseconds",
+      },
+    ],
+    returnType: "object",
+    returnDoc: "HTTP response",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  async (params) => {
     const {
       url = "",
       method = "GET",
@@ -709,32 +1338,113 @@ registerContentScriptTool({
       throw e;
     }
   },
-});
+);
+
+register(
+  "__content_script_ping",
+  z.object({}),
+  z.object({
+    ready: z.literal(true),
+    version: z.string(),
+    toolsHash: z.string(),
+  }),
+  {
+    namespace: "__internal",
+    name: "ping",
+    publicName: "__internal.content_script.ping",
+    localName: "__ping",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "Ping the content script for readiness",
+    params: [],
+    returnType: "object",
+    returnDoc: "Readiness metadata with version and tools hash",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
+    return {
+      ready: true as const,
+      version: CONTENT_SCRIPT_VERSION,
+      toolsHash: computeToolsHash(),
+    };
+  },
+);
+
+register(
+  "__content_script_tool_docs",
+  z.object({}),
+  z.array(z.unknown()),
+  {
+    namespace: "__internal",
+    name: "tool_docs",
+    publicName: "__internal.content_script.tool_docs",
+    localName: "__tool_docs",
+    source: "content_script",
+    transport: "active_tab_content_script",
+    description: "List all content script tool documentation",
+    params: [],
+    returnType: "array",
+    returnDoc: "Array of ToolDoc for all registered content script tools",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script",
+  },
+  () => {
+    return listLocalToolDocs();
+  },
+);
 
 // ─── Message listener with MANDATORY try-catch ───────────────────
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  const action = (request as Record<string, unknown>)?.action;
-  logger.debug(
-    "[content-script] received action:",
-    action,
-    "params:",
-    (request as Record<string, unknown>)?.params,
-  );
+  // Validate PiccoloToolRequest envelope
+  if (
+    typeof request !== "object" ||
+    request === null ||
+    (request as Record<string, unknown>).channel !== "piccolo-tool" ||
+    (request as Record<string, unknown>).version !== 1
+  ) {
+    const reqId =
+      typeof (request as Record<string, unknown>)?.requestId === "string"
+        ? (request as Record<string, unknown>).requestId
+        : "unknown";
+    sendResponse({
+      channel: "piccolo-tool",
+      version: 1,
+      requestId: reqId,
+      error:
+        "Malformed message: expected PiccoloToolRequest envelope with channel='piccolo-tool' and version=1",
+    });
+    return true;
+  }
 
-  const tool = csRegistry.get(action as string);
+  const { requestId, action, params } = request as Record<string, unknown>;
+
+  if (typeof action !== "string" || typeof requestId !== "string") {
+    sendResponse({
+      channel: "piccolo-tool",
+      version: 1,
+      requestId: (requestId as string) || "unknown",
+      error: "Malformed message: expected action and requestId strings",
+    });
+    return true;
+  }
+
+  logger.debug("[content-script] received action:", action, "params:", params);
+
+  const tool = csRegistry.get(action);
   if (!tool) {
     logger.debug("[content-script] no handler for action:", action);
     sendResponse({
-      ok: false,
+      channel: "piccolo-tool",
+      version: 1,
+      requestId,
       error: `Unknown content script action: ${action}`,
     });
     return true;
   }
 
-  const parsed = tool.params.safeParse(
-    (request as Record<string, unknown>)?.params ?? {},
-  );
+  const parsed = tool.params.safeParse(params ?? {});
   if (!parsed.success) {
     logger.debug(
       "[content-script] invalid params for action:",
@@ -742,7 +1452,9 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       parsed.error.message,
     );
     sendResponse({
-      ok: false,
+      channel: "piccolo-tool",
+      version: 1,
+      requestId,
       error: `Invalid params: ${parsed.error.message}`,
     });
     return true;
@@ -760,12 +1472,22 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
             ":",
             typeof value,
           );
-          sendResponse(value);
+          sendResponse({
+            channel: "piccolo-tool",
+            version: 1,
+            requestId,
+            value,
+          });
         })
         .catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : String(err);
           logger.error(`[ContentScript] ${action} failed:`, msg);
-          sendResponse({ ok: false, error: msg });
+          sendResponse({
+            channel: "piccolo-tool",
+            version: 1,
+            requestId,
+            error: msg,
+          });
         });
       return true;
     }
@@ -775,12 +1497,22 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       ":",
       typeof result,
     );
-    sendResponse(result);
+    sendResponse({
+      channel: "piccolo-tool",
+      version: 1,
+      requestId,
+      value: result,
+    });
     return false;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`[ContentScript] ${action} failed:`, msg);
-    sendResponse({ ok: false, error: msg });
+    sendResponse({
+      channel: "piccolo-tool",
+      version: 1,
+      requestId,
+      error: msg,
+    });
     return false;
   }
 });
