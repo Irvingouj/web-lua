@@ -16,7 +16,7 @@ import {
   type ToolDefinition,
 } from "./tool-registry.js";
 
-let executeMainThreadCommand: typeof import("./runner.js").executeMainThreadCommand;
+let dispatchTool: typeof import("./tool-registry.js").dispatchTool;
 
 describe("real migrated tool registrations", () => {
   beforeAll(async () => {
@@ -63,12 +63,12 @@ describe("real migrated tool registrations", () => {
   });
 
   it("dispatches a real migrated chrome passthrough tool", async () => {
-    const runner = await import("./runner.js");
+    const { dispatchTool } = await import("./tool-registry.js");
     // cookies_get will fail because chrome is stubbed, but it proves
     // the tool is registered and the schema validation runs.
-    const result = await runner.executeMainThreadCommand({
-      action: "cookies_get",
-      params: { name: "session_id", url: "https://example.com" },
+    const result = await dispatchTool("cookies_get", {
+      name: "session_id",
+      url: "https://example.com",
     });
     // Because chrome is undefined, handleChromeApi returns E_NO_EXTENSION
     expect(result.ok).toBe(false);
@@ -89,11 +89,8 @@ describe("runtime doc provider tools", () => {
   });
 
   it("__runtime_docs returns all registered tool docs", async () => {
-    const runner = await import("./runner.js");
-    const result = await runner.executeMainThreadCommand({
-      action: "__runtime_docs",
-      params: {},
-    });
+    const { dispatchTool } = await import("./tool-registry.js");
+    const result = await dispatchTool("__runtime_docs", {});
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(Array.isArray(result.value)).toBe(true);
@@ -108,11 +105,8 @@ describe("runtime doc provider tools", () => {
   });
 
   it("__runtime_get_doc returns a doc by public name", async () => {
-    const runner = await import("./runner.js");
-    const result = await runner.executeMainThreadCommand({
-      action: "__runtime_get_doc",
-      params: { query: "page.click" },
-    });
+    const { dispatchTool } = await import("./tool-registry.js");
+    const result = await dispatchTool("__runtime_get_doc", { query: "page.click" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toBeDefined();
@@ -121,11 +115,8 @@ describe("runtime doc provider tools", () => {
   });
 
   it("__runtime_get_doc returns null for unknown query", async () => {
-    const runner = await import("./runner.js");
-    const result = await runner.executeMainThreadCommand({
-      action: "__runtime_get_doc",
-      params: { query: "nonexistent.tool" },
-    });
+    const { dispatchTool } = await import("./tool-registry.js");
+    const result = await dispatchTool("__runtime_get_doc", { query: "nonexistent.tool" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toBeNull();
@@ -133,11 +124,8 @@ describe("runtime doc provider tools", () => {
   });
 
   it("__runtime_search_docs returns matching docs", async () => {
-    const runner = await import("./runner.js");
-    const result = await runner.executeMainThreadCommand({
-      action: "__runtime_search_docs",
-      params: { query: "click" },
-    });
+    const { dispatchTool } = await import("./tool-registry.js");
+    const result = await dispatchTool("__runtime_search_docs", { query: "click" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(Array.isArray(result.value)).toBe(true);
@@ -170,12 +158,12 @@ describe("runtime doc provider tools", () => {
   });
 });
 
-describe("executeMainThreadCommand", () => {
+describe("dispatchTool", () => {
   beforeEach(async () => {
     vi.stubGlobal("window", { chrome: undefined });
     clearRegistry();
-    const runner = await import("./runner.js");
-    executeMainThreadCommand = runner.executeMainThreadCommand;
+    const registry = await import("./tool-registry.js");
+    dispatchTool = registry.dispatchTool;
   });
 
   afterEach(() => {
@@ -209,18 +197,12 @@ describe("executeMainThreadCommand", () => {
     };
 
     registerTool(tool);
-    const result = await executeMainThreadCommand({
-      action: "test_add_one",
-      params: { value: 5 },
-    });
+    const result = await dispatchTool("test_add_one", { value: 5 });
     expect(result).toEqual({ ok: true, value: 6 });
   });
 
   it("returns E_TOOL_NOT_FOUND for unregistered actions", async () => {
-    const result = await executeMainThreadCommand({
-      action: "unknown_action_xyz",
-      params: {},
-    });
+    const result = await dispatchTool("unknown_action_xyz", {});
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("E_TOOL_NOT_FOUND");
@@ -255,10 +237,7 @@ describe("executeMainThreadCommand", () => {
     };
 
     registerTool(tool);
-    const result = await executeMainThreadCommand({
-      action: "test_count",
-      params: { count: "not-a-number" },
-    });
+    const result = await dispatchTool("test_count", { count: "not-a-number" });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("E_INVALID_PARAMS");
@@ -356,7 +335,7 @@ describe("ensureContentScript", () => {
     let pingCount = 0;
     const { chrome, sendMessage } = createMockChrome(
       (_tabId: unknown, message: Record<string, unknown>) => {
-        if (message.action === "__content_script_ping") {
+        if (message.action === "__ping") {
           pingCount++;
           if (pingCount <= 5) {
             return Promise.reject(
@@ -445,7 +424,7 @@ describe("ensureContentScript", () => {
     let pingCount = 0;
     const { chrome, sendMessage } = createMockChrome(
       (_tabId: unknown, message: Record<string, unknown>) => {
-        if (message.action === "__content_script_ping") {
+        if (message.action === "__ping") {
           pingCount++;
           return Promise.resolve({
             channel: "piccolo-tool",
@@ -466,18 +445,16 @@ describe("ensureContentScript", () => {
     const runner = await import("./runner.js");
     runner.initExtensionListeners();
 
-    const result = await runner.executeMainThreadCommand({
-      action: "page_click",
-      params: { refId: "1" },
-    });
+    const { dispatchTool } = await import("./tool-registry.js");
+    const result = await dispatchTool("page_click", { refId: "1" });
     expect(sendMessage).toHaveBeenCalled();
     expect(pingCount).toBeGreaterThanOrEqual(1);
-    // First call should be __content_script_ping
+    // First call should be __ping
     const firstCallMessage = sendMessage.mock.calls[0][1] as Record<
       string,
       unknown
     >;
-    expect(firstCallMessage.action).toBe("__content_script_ping");
+    expect(firstCallMessage.action).toBe("__ping");
   });
 });
 

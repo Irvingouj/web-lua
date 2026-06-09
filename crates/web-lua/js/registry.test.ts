@@ -10,7 +10,7 @@ import {
   registerHostHandler,
   registerHostHandlers,
   registerTool,
-} from "./registry.js";
+} from "@pi-oxide/extension-lua/shared";
 
 describe("webLuaRegistry", () => {
   beforeEach(() => {

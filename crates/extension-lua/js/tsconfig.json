@@ -11,6 +11,6 @@
     "types": ["chrome"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["*.ts"],
-  "exclude": ["dist", "*.test.ts"]
+  "include": ["*.ts", "src/**/*.ts"],
+  "exclude": ["dist", "*.test.ts", "vite*.config.ts"]
 }

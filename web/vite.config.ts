@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@pi-oxide/web-lua': path.resolve(__dirname, '../crates/web-lua/js/index.ts'),
-      '@pi-oxide/extension-lua': path.resolve(__dirname, '../crates/extension-lua/js/index.ts'),
+      '@pi-oxide/extension-lua': path.resolve(__dirname, '../crates/extension-lua/js/src/main/index.ts'),
       '@pi-oxide/dom-semantic-tree': path.resolve(__dirname, '../crates/dom-semantic-tree/js/index.ts'),
     },
   },

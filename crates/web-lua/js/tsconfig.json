@@ -5,11 +5,19 @@
     "moduleResolution": "NodeNext",
     "declaration": true,
     "outDir": "dist",
+    "rootDir": "../../..",
+    "baseUrl": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "lib": ["ES2022", "DOM"]
+    "lib": ["ES2022", "DOM"],
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@pi-oxide/extension-lua": ["../../extension-lua/js/src/main/index.ts"],
+      "@pi-oxide/extension-lua/shared": ["../../extension-lua/js/src/shared/index.ts"],
+      "@pi-oxide/extension-lua/shared/*": ["../../extension-lua/js/src/shared/*"]
+    }
   },
-  "include": ["*.ts"],
-  "exclude": ["dist", "*.test.ts"]
+  "include": ["*.ts", "../../extension-lua/js/src/**/*.ts"],
+  "exclude": ["dist", "*.test.ts", "vitest.config.ts"]
 }

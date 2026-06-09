@@ -66,7 +66,47 @@ if (pkg.generated) {
 }
 
 // Run tsc
-execSync("tsc", { cwd: absDir, stdio: "inherit" });
+try {
+  execSync("tsc", { cwd: absDir, stdio: "inherit" });
+} finally {
+  // Clean up generated.ts even if tsc fails
+  if (generatedPath && fs.existsSync(generatedPath)) {
+    fs.unlinkSync(generatedPath);
+    console.log("  Cleaned up generated.ts");
+  }
+}
+
+// Flatten nested tsc output for packages that import from sibling crates.
+// When rootDir spans the monorepo, tsc emits files under dist/<pkg.dir>/.
+// We hoist the package's own emitted files to the flat dist/ directory.
+const nestedPkgDir = path.join(distDir, pkg.dir);
+if (fs.existsSync(nestedPkgDir)) {
+  const flatten = (srcDir, destDir) => {
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      const src = path.join(srcDir, entry.name);
+      const dest = path.join(destDir, entry.name);
+      if (entry.isDirectory()) {
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        flatten(src, dest);
+      } else {
+        if (fs.existsSync(dest)) {
+          const srcHash = fs.readFileSync(src);
+          const destHash = fs.readFileSync(dest);
+          if (!srcHash.equals(destHash)) {
+            console.warn(`  Flatten collision: ${path.relative(distDir, dest)} (src differs from dest)`);
+          }
+        }
+        fs.copyFileSync(src, dest);
+      }
+    }
+  };
+  flatten(nestedPkgDir, distDir);
+  const nestedCratesDir = path.join(distDir, "crates");
+  if (fs.existsSync(nestedCratesDir)) {
+    fs.rmSync(nestedCratesDir, { recursive: true });
+  }
+  console.log("  Flattened nested tsc output");
+}
 // Strip ESM marker from content-script.js so it works as a classic MV3 script
 function stripEsmMarker(filePath) {
   if (fs.existsSync(filePath)) {
@@ -137,12 +177,6 @@ if (fs.existsSync(indexDts)) {
   content = content.replace(/new URL\("\.\/worker\.ts"/g, 'new URL("./worker.js"');
   fs.writeFileSync(indexDts, content);
   console.log("  Patched worker URL in dist/index.d.ts");
-}
-
-// Clean up generated.ts
-if (generatedPath && fs.existsSync(generatedPath)) {
-  fs.unlinkSync(generatedPath);
-  console.log("  Cleaned up generated.ts");
 }
 
 console.log(`✅ ${target} JS built in ${distDir}`);

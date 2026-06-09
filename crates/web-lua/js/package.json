@@ -11,10 +11,16 @@
   ],
   "scripts": {
     "build": "node ../../../scripts/build-npm.js web",
-    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js web"
+    "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js web",
+    "test": "vitest run"
   },
   "license": "LicenseRef-PiccoloNotebook-Fair-BYOK-1.0",
   "dependencies": {
+    "@pi-oxide/extension-lua": "^0.4.0",
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^1.6.1"
   }
 }

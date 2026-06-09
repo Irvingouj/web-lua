@@ -4047,30 +4047,96 @@
   };
   var NEVER = INVALID;
 
-  // crates/extension-lua/js/content-script.ts
-  var __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 };
-  var __logLevel = 3;
-  var logger = {
-    debug: (...args) => {
-      if (__logLevel <= 0) console.log(...args);
-    },
-    info: (...args) => {
-      if (__logLevel <= 1) console.log(...args);
-    },
-    warn: (...args) => {
-      if (__logLevel <= 2) console.warn(...args);
-    },
-    error: (...args) => {
-      if (__logLevel <= 3) console.error(...args);
+  // crates/extension-lua/js/src/shared/tool-registry.ts
+  function makeToolDefinition(action, params, returns, doc, handler) {
+    if (!params || !returns || !doc || !handler) {
+      throw new Error(
+        "registerTool(action, params, returns, doc, handler) requires all five arguments"
+      );
     }
-  };
-  window.__luaNotebookSetLogLevel = (level) => {
-    __logLevel = __LOG_LEVELS[level] ?? 3;
-  };
-  if (window.__luaNotebookContentScriptInjected) {
-    throw new Error("Content script already injected");
+    return {
+      action,
+      namespace: doc.namespace,
+      name: doc.name,
+      publicName: doc.publicName,
+      localName: doc.localName,
+      source: doc.source,
+      transport: doc.transport,
+      description: doc.description,
+      params,
+      returns,
+      handler,
+      paramDocs: Object.fromEntries(
+        (doc.params ?? []).map((param) => [param.name, param.description])
+      ),
+      paramTypes: doc.params ?? [],
+      returnType: doc.returnType,
+      returnDoc: doc.returnDoc ?? "",
+      errorCode: doc.errorCode ?? "E_TOOL",
+      errorCategory: doc.errorCategory ?? "tool",
+      allowShadowing: doc.allowShadowing
+    };
   }
-  window.__luaNotebookContentScriptInjected = true;
+
+  // crates/extension-lua/js/src/content-script/registry.ts
+  var csRegistry = /* @__PURE__ */ new Map();
+  var contentScriptDocsByPublicName = /* @__PURE__ */ new Map();
+  var contentScriptDocsByAction = /* @__PURE__ */ new Map();
+  function _registerContentScriptTool(tool) {
+    const key = tool.localName ?? tool.action;
+    csRegistry.set(key, tool);
+    if (tool.action !== key) {
+      csRegistry.set(tool.action, tool);
+    }
+    const doc = {
+      action: tool.action,
+      namespace: tool.namespace,
+      name: tool.name,
+      publicName: tool.publicName,
+      localName: tool.localName,
+      source: tool.source,
+      transport: tool.transport,
+      description: tool.description,
+      params: tool.paramTypes,
+      returns: {
+        type: tool.returnType ?? "unknown",
+        description: tool.returnDoc
+      },
+      errorCode: tool.errorCode,
+      errorCategory: tool.errorCategory
+    };
+    contentScriptDocsByPublicName.set(tool.publicName, doc);
+    contentScriptDocsByAction.set(tool.action, doc);
+  }
+  function register(action, params, returns, doc, handler) {
+    const tool = makeToolDefinition(action, params, returns, doc, handler);
+    _registerContentScriptTool(tool);
+  }
+  function listLocalToolDocs() {
+    return Array.from(contentScriptDocsByAction.values());
+  }
+  function computeToolsHash() {
+    const names = Array.from(csRegistry.values()).map((t) => t.publicName).sort();
+    let hash = 5381;
+    const str = names.join("|");
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) + hash + str.charCodeAt(i);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+  }
+  function dispatchLocalTool(action, params) {
+    const tool = csRegistry.get(action);
+    if (!tool) {
+      return { ok: false, error: `Unknown content script action: ${action}` };
+    }
+    const parsed = tool.params.safeParse(params ?? {});
+    if (!parsed.success) {
+      return { ok: false, error: `Invalid params: ${parsed.error.message}` };
+    }
+    return { ok: true, tool, parsed: parsed.data };
+  }
+
+  // crates/extension-lua/js/src/content-script/dom-utils.ts
   function getElementByRefId(refId) {
     const el = document.querySelector(
       `[data-ref-id='${CSS.escape(String(refId))}']`
@@ -4197,6 +4263,8 @@
     if (style.display === "none" || style.visibility === "hidden") return false;
     return true;
   }
+
+  // crates/extension-lua/js/src/content-script/snapshot.ts
   function inlineSnapshot(maxNodes) {
     let nextRefId = 1;
     const nodes = [];
@@ -4246,108 +4314,159 @@
       }
     };
   }
+
+  // crates/extension-lua/js/src/shared/logger.ts
+  var LEVEL_ORDER = {
+    debug: 0,
+    info: 1,
+    warn: 2,
+    error: 3,
+    none: 4
+  };
+  var currentLevel = "error";
+  function shouldLog(level) {
+    return LEVEL_ORDER[level] >= LEVEL_ORDER[currentLevel];
+  }
+  var logger = {
+    debug: (...args) => {
+      if (shouldLog("debug")) console.log(...args);
+    },
+    info: (...args) => {
+      if (shouldLog("info")) console.log(...args);
+    },
+    warn: (...args) => {
+      if (shouldLog("warn")) console.warn(...args);
+    },
+    error: (...args) => {
+      if (shouldLog("error")) console.error(...args);
+    }
+  };
+
+  // crates/extension-lua/js/src/content-script/schemas.ts
+  var CsClickParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    label: external_exports.string().optional()
+  });
+  var CsFillParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    label: external_exports.string().optional(),
+    value: external_exports.string().optional()
+  });
+  var CsTypeParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    label: external_exports.string().optional(),
+    text: external_exports.string().optional()
+  });
+  var CsAppendParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    label: external_exports.string().optional(),
+    text: external_exports.string().optional()
+  });
+  var CsPressParamsSchema = external_exports.object({
+    key: external_exports.string()
+  });
+  var CsSelectParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    value: external_exports.string().optional()
+  });
+  var CsCheckParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    checked: external_exports.boolean().optional()
+  });
+  var CsHoverParamsSchema = external_exports.object({
+    refId: external_exports.string().optional()
+  });
+  var CsUnhoverParamsSchema = external_exports.object({});
+  var CsScrollParamsSchema = external_exports.object({
+    direction: external_exports.string().optional(),
+    amount: external_exports.number().optional(),
+    refId: external_exports.string().optional()
+  });
+  var CsScrollToParamsSchema = external_exports.object({
+    refId: external_exports.string().optional(),
+    x: external_exports.number().optional(),
+    y: external_exports.number().optional()
+  });
+  var CsDblClickParamsSchema = external_exports.object({
+    refId: external_exports.string().optional()
+  });
+  var CsForwardParamsSchema = external_exports.object({});
+  var CsReloadParamsSchema = external_exports.object({});
+  var CsEvaluateParamsSchema = external_exports.object({
+    code: external_exports.string().optional()
+  });
+  var CsBackParamsSchema = external_exports.object({});
+  var CsPingParamsSchema = external_exports.object({});
+  var CsPingReturnSchema = external_exports.object({
+    ok: external_exports.literal(true)
+  });
+  var CsSnapshotParamsSchema = external_exports.object({
+    max_nodes: external_exports.number().optional()
+  });
+  var CsSnapshotReturnSchema = external_exports.object({
+    text: external_exports.string(),
+    nodes: external_exports.array(
+      external_exports.object({
+        refId: external_exports.number(),
+        role: external_exports.string(),
+        tag: external_exports.string(),
+        name: external_exports.string().optional()
+      })
+    ),
+    url: external_exports.string(),
+    title: external_exports.string(),
+    viewport: external_exports.object({
+      width: external_exports.number(),
+      height: external_exports.number()
+    })
+  });
+  var CsFetchParamsSchema = external_exports.object({
+    url: external_exports.string(),
+    method: external_exports.string().optional(),
+    headers: external_exports.record(external_exports.unknown()).optional(),
+    body: external_exports.unknown().optional(),
+    timeout: external_exports.number().optional()
+  });
+  var CsFetchReturnSchema = external_exports.object({
+    status: external_exports.number(),
+    ok: external_exports.boolean(),
+    headers: external_exports.record(external_exports.string()),
+    body: external_exports.string()
+  });
+  var CsInternalPingParamsSchema = external_exports.object({});
+  var CsInternalPingReturnSchema = external_exports.object({
+    ready: external_exports.literal(true),
+    version: external_exports.string(),
+    toolsHash: external_exports.string()
+  });
+  var CsToolDocsParamsSchema = external_exports.object({});
+  var CsToolDocsReturnSchema = external_exports.array(external_exports.unknown());
+
+  // crates/extension-lua/js/src/content-script/handlers.ts
   var CONTENT_SCRIPT_VERSION = "1.0.0";
-  var csRegistry = /* @__PURE__ */ new Map();
-  var contentScriptDocsByPublicName = /* @__PURE__ */ new Map();
-  var contentScriptDocsByAction = /* @__PURE__ */ new Map();
-  function _registerContentScriptTool(tool) {
-    const key = tool.localName ?? tool.action;
-    csRegistry.set(key, tool);
-    if (tool.action !== key) {
-      csRegistry.set(tool.action, tool);
-    }
-    const doc = {
-      action: tool.action,
-      namespace: tool.namespace,
-      name: tool.name,
-      publicName: tool.publicName,
-      localName: tool.localName,
-      source: tool.source,
-      transport: tool.transport,
-      description: tool.description,
-      params: tool.paramTypes,
-      returns: {
-        type: tool.returnType ?? "unknown",
-        description: tool.returnDoc
-      },
-      errorCode: tool.errorCode,
-      errorCategory: tool.errorCategory
-    };
-    contentScriptDocsByPublicName.set(tool.publicName, doc);
-    contentScriptDocsByAction.set(tool.action, doc);
-  }
-  function makeToolDefinition(action, params, returns, doc, handler) {
-    return {
-      action,
-      namespace: doc.namespace,
-      name: doc.name,
-      publicName: doc.publicName,
-      localName: doc.localName,
-      source: doc.source,
-      transport: doc.transport,
-      description: doc.description,
-      params,
-      returns,
-      handler,
-      paramDocs: Object.fromEntries(
-        (doc.params ?? []).map((param) => [param.name, param.description])
-      ),
-      paramTypes: doc.params ?? [],
-      returnType: doc.returnType,
-      returnDoc: doc.returnDoc ?? "",
-      errorCode: doc.errorCode ?? "E_CONTENT_SCRIPT",
-      errorCategory: doc.errorCategory ?? "content_script"
-    };
-  }
-  function register(action, params, returns, doc, handler) {
-    const tool = makeToolDefinition(action, params, returns, doc, handler);
-    _registerContentScriptTool(tool);
-  }
-  function listLocalToolDocs() {
-    return Array.from(contentScriptDocsByAction.values());
-  }
-  function computeToolsHash() {
-    const names = Array.from(csRegistry.values()).map((t) => t.publicName).sort();
-    let hash = 5381;
-    const str = names.join("|");
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) + hash + str.charCodeAt(i);
-    }
-    return (hash >>> 0).toString(16).padStart(8, "0");
-  }
+  var csDocBase = {
+    source: "content_script",
+    transport: "active_tab_content_script",
+    errorCode: "E_CONTENT_SCRIPT",
+    errorCategory: "content_script"
+  };
   register(
     "page_click",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      label: external_exports.string().optional()
-    }),
+    CsClickParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "click",
       publicName: "page.click",
       localName: "click",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Click a DOM element",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        },
-        {
-          name: "label",
-          type: "string",
-          required: false,
-          description: "Element label"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" },
+        { name: "label", type: "string", required: false, description: "Element label" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, label } = params;
@@ -4368,44 +4487,22 @@
   );
   register(
     "page_fill",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      label: external_exports.string().optional(),
-      value: external_exports.string().optional()
-    }),
+    CsFillParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "fill",
       publicName: "page.fill",
       localName: "fill",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Fill a DOM input",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        },
-        {
-          name: "label",
-          type: "string",
-          required: false,
-          description: "Element label"
-        },
-        {
-          name: "value",
-          type: "string",
-          required: false,
-          description: "Value to fill"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" },
+        { name: "label", type: "string", required: false, description: "Element label" },
+        { name: "value", type: "string", required: false, description: "Value to fill" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, label, value = "" } = params;
@@ -4431,44 +4528,22 @@
   );
   register(
     "page_type",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      label: external_exports.string().optional(),
-      text: external_exports.string().optional()
-    }),
+    CsTypeParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "type",
       publicName: "page.type",
       localName: "type",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Type text into a DOM input",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        },
-        {
-          name: "label",
-          type: "string",
-          required: false,
-          description: "Element label"
-        },
-        {
-          name: "text",
-          type: "string",
-          required: false,
-          description: "Text to type"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" },
+        { name: "label", type: "string", required: false, description: "Element label" },
+        { name: "text", type: "string", required: false, description: "Text to type" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, label, text = "" } = params;
@@ -4494,44 +4569,22 @@
   );
   register(
     "page_append",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      label: external_exports.string().optional(),
-      text: external_exports.string().optional()
-    }),
+    CsAppendParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "append",
       publicName: "page.append",
       localName: "append",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Append text to a DOM input",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        },
-        {
-          name: "label",
-          type: "string",
-          required: false,
-          description: "Element label"
-        },
-        {
-          name: "text",
-          type: "string",
-          required: false,
-          description: "Text to append"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" },
+        { name: "label", type: "string", required: false, description: "Element label" },
+        { name: "text", type: "string", required: false, description: "Text to append" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, label, text = "" } = params;
@@ -4557,28 +4610,20 @@
   );
   register(
     "page_press",
-    external_exports.object({ key: external_exports.string() }),
+    CsPressParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "press",
       publicName: "page.press",
       localName: "press",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Press a keyboard key",
       params: [
-        {
-          name: "key",
-          type: "string",
-          required: true,
-          description: "Key to press"
-        }
+        { name: "key", type: "string", required: true, description: "Key to press" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { key = "" } = params;
@@ -4591,37 +4636,21 @@
   );
   register(
     "page_select",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      value: external_exports.string().optional()
-    }),
+    CsSelectParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "select",
       publicName: "page.select",
       localName: "select",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Select an option in a DOM select",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        },
-        {
-          name: "value",
-          type: "string",
-          required: false,
-          description: "Option value to select"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" },
+        { name: "value", type: "string", required: false, description: "Option value to select" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, value = "" } = params;
@@ -4636,37 +4665,21 @@
   );
   register(
     "page_check",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      checked: external_exports.boolean().optional()
-    }),
+    CsCheckParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "check",
       publicName: "page.check",
       localName: "check",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Check or uncheck a checkbox",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        },
-        {
-          name: "checked",
-          type: "boolean",
-          required: false,
-          description: "Whether to check the checkbox"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" },
+        { name: "checked", type: "boolean", required: false, description: "Whether to check the checkbox" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, checked = true } = params;
@@ -4681,28 +4694,20 @@
   );
   register(
     "page_hover",
-    external_exports.object({ refId: external_exports.string().optional() }),
+    CsHoverParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "hover",
       publicName: "page.hover",
       localName: "hover",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Hover over a DOM element",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId" }
       ],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId } = params;
@@ -4715,21 +4720,18 @@
   );
   register(
     "page_unhover",
-    external_exports.object({}),
+    CsUnhoverParamsSchema,
     external_exports.null(),
     {
       namespace: "page",
       name: "unhover",
       publicName: "page.unhover",
       localName: "unhover",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Unhover from the document body",
       params: [],
       returnType: "null",
       returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     () => {
       const ev = new MouseEvent("mouseleave", { bubbles: true });
@@ -4739,44 +4741,22 @@
   );
   register(
     "page_scroll",
-    external_exports.object({
-      direction: external_exports.string().optional(),
-      amount: external_exports.number().optional(),
-      refId: external_exports.string().optional()
-    }),
+    CsScrollParamsSchema,
     external_exports.boolean(),
     {
       namespace: "page",
       name: "scroll",
       publicName: "page.scroll",
       localName: "scroll",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Scroll the page or an element",
       params: [
-        {
-          name: "direction",
-          type: "string",
-          required: false,
-          description: "Scroll direction (up or down)"
-        },
-        {
-          name: "amount",
-          type: "number",
-          required: false,
-          description: "Pixels to scroll"
-        },
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId to scroll within"
-        }
+        { name: "direction", type: "string", required: false, description: "Scroll direction (up or down)" },
+        { name: "amount", type: "number", required: false, description: "Pixels to scroll" },
+        { name: "refId", type: "string", required: false, description: "Element refId to scroll within" }
       ],
       returnType: "boolean",
       returnDoc: "true if scrolled",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { direction = "down", amount = 300, refId } = params;
@@ -4816,125 +4796,23 @@
     }
   );
   register(
-    "page_dblclick",
-    external_exports.object({ refId: external_exports.string().optional() }),
-    external_exports.null(),
-    {
-      namespace: "page",
-      name: "dblclick",
-      publicName: "page.dblclick",
-      localName: "dblclick",
-      source: "content_script",
-      transport: "active_tab_content_script",
-      description: "Double-click a DOM element",
-      params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId"
-        }
-      ],
-      returnType: "null",
-      returnDoc: "None",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
-    },
-    (params) => {
-      const { refId } = params;
-      const el = refId ? getElementByRefId(refId) : null;
-      if (!el) throw new Error(`Element ${refId} not found`);
-      const ev = new MouseEvent("dblclick", { bubbles: true });
-      el.dispatchEvent(ev);
-      return null;
-    }
-  );
-  register(
-    "page_forward",
-    external_exports.object({}),
-    external_exports.boolean(),
-    {
-      namespace: "page",
-      name: "forward",
-      publicName: "page.forward",
-      localName: "forward",
-      source: "content_script",
-      transport: "active_tab_content_script",
-      description: "Navigate forward in history",
-      params: [],
-      returnType: "boolean",
-      returnDoc: "true if navigated",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
-    },
-    () => {
-      window.history.forward();
-      return true;
-    }
-  );
-  register(
-    "page_reload",
-    external_exports.object({}),
-    external_exports.boolean(),
-    {
-      namespace: "page",
-      name: "reload",
-      publicName: "page.reload",
-      localName: "reload",
-      source: "content_script",
-      transport: "active_tab_content_script",
-      description: "Reload the page",
-      params: [],
-      returnType: "boolean",
-      returnDoc: "true if reloaded",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
-    },
-    () => {
-      window.location.reload();
-      return true;
-    }
-  );
-  register(
     "page_scroll_to",
-    external_exports.object({
-      refId: external_exports.string().optional(),
-      x: external_exports.number().optional(),
-      y: external_exports.number().optional()
-    }),
+    CsScrollToParamsSchema,
     external_exports.boolean(),
     {
       namespace: "page",
       name: "scrollTo",
       publicName: "page.scrollTo",
       localName: "scrollTo",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Scroll to coordinates or an element",
       params: [
-        {
-          name: "refId",
-          type: "string",
-          required: false,
-          description: "Element refId to scroll to"
-        },
-        {
-          name: "x",
-          type: "number",
-          required: false,
-          description: "X coordinate"
-        },
-        {
-          name: "y",
-          type: "number",
-          required: false,
-          description: "Y coordinate"
-        }
+        { name: "refId", type: "string", required: false, description: "Element refId to scroll to" },
+        { name: "x", type: "number", required: false, description: "X coordinate" },
+        { name: "y", type: "number", required: false, description: "Y coordinate" }
       ],
       returnType: "boolean",
       returnDoc: "true if scrolled",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { refId, x = 0, y = 0 } = params;
@@ -4948,29 +4826,87 @@
     }
   );
   register(
+    "page_dblclick",
+    CsDblClickParamsSchema,
+    external_exports.null(),
+    {
+      namespace: "page",
+      name: "dblclick",
+      publicName: "page.dblclick",
+      localName: "dblclick",
+      description: "Double-click a DOM element",
+      params: [
+        { name: "refId", type: "string", required: false, description: "Element refId" }
+      ],
+      returnType: "null",
+      returnDoc: "None",
+      ...csDocBase
+    },
+    (params) => {
+      const { refId } = params;
+      const el = refId ? getElementByRefId(refId) : null;
+      if (!el) throw new Error(`Element ${refId} not found`);
+      const ev = new MouseEvent("dblclick", { bubbles: true });
+      el.dispatchEvent(ev);
+      return null;
+    }
+  );
+  register(
+    "page_forward",
+    CsForwardParamsSchema,
+    external_exports.boolean(),
+    {
+      namespace: "page",
+      name: "forward",
+      publicName: "page.forward",
+      localName: "forward",
+      description: "Navigate forward in history",
+      params: [],
+      returnType: "boolean",
+      returnDoc: "true if navigated",
+      ...csDocBase
+    },
+    () => {
+      window.history.forward();
+      return true;
+    }
+  );
+  register(
+    "page_reload",
+    CsReloadParamsSchema,
+    external_exports.boolean(),
+    {
+      namespace: "page",
+      name: "reload",
+      publicName: "page.reload",
+      localName: "reload",
+      description: "Reload the page",
+      params: [],
+      returnType: "boolean",
+      returnDoc: "true if reloaded",
+      ...csDocBase
+    },
+    () => {
+      window.location.reload();
+      return true;
+    }
+  );
+  register(
     "page_evaluate",
-    external_exports.object({ code: external_exports.string().optional() }),
+    CsEvaluateParamsSchema,
     external_exports.unknown(),
     {
       namespace: "page",
       name: "evaluate",
       publicName: "page.evaluate",
       localName: "evaluate",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Evaluate JavaScript in the page context",
       params: [
-        {
-          name: "code",
-          type: "string",
-          required: false,
-          description: "JavaScript code to evaluate"
-        }
+        { name: "code", type: "string", required: false, description: "JavaScript code to evaluate" }
       ],
       returnType: "unknown",
       returnDoc: "Result of evaluated JavaScript",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     (params) => {
       const { code = "" } = params;
@@ -4982,21 +4918,18 @@
   );
   register(
     "page_back",
-    external_exports.object({}),
+    CsBackParamsSchema,
     external_exports.boolean(),
     {
       namespace: "page",
       name: "back",
       publicName: "page.back",
       localName: "back",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Navigate back in history",
       params: [],
       returnType: "boolean",
       returnDoc: "true if navigated",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     () => {
       window.history.back();
@@ -5005,21 +4938,18 @@
   );
   register(
     "page_ping",
-    external_exports.object({}),
-    external_exports.object({ ok: external_exports.literal(true) }),
+    CsPingParamsSchema,
+    CsPingReturnSchema,
     {
       namespace: "page",
       name: "ping",
       publicName: "page.ping",
       localName: "ping",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Ping the content script",
       params: [],
       returnType: "object",
       returnDoc: "Ping response",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     () => {
       return { ok: true };
@@ -5027,44 +4957,20 @@
   );
   register(
     "page_snapshot",
-    external_exports.object({ max_nodes: external_exports.number().optional() }),
-    external_exports.object({
-      text: external_exports.string(),
-      nodes: external_exports.array(
-        external_exports.object({
-          refId: external_exports.number(),
-          role: external_exports.string(),
-          tag: external_exports.string(),
-          name: external_exports.string().optional()
-        })
-      ),
-      url: external_exports.string(),
-      title: external_exports.string(),
-      viewport: external_exports.object({
-        width: external_exports.number(),
-        height: external_exports.number()
-      })
-    }),
+    CsSnapshotParamsSchema,
+    CsSnapshotReturnSchema,
     {
       namespace: "page",
       name: "snapshot",
       publicName: "page.snapshot",
       localName: "snapshot",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Take a DOM snapshot",
       params: [
-        {
-          name: "max_nodes",
-          type: "number",
-          required: false,
-          description: "Maximum number of nodes to include"
-        }
+        { name: "max_nodes", type: "number", required: false, description: "Maximum number of nodes to include" }
       ],
       returnType: "object",
       returnDoc: "DOM snapshot result",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     async (params) => {
       const { max_nodes = 500 } = params;
@@ -5081,63 +4987,24 @@
   );
   register(
     "page_fetch",
-    external_exports.object({
-      url: external_exports.string(),
-      method: external_exports.string().optional(),
-      headers: external_exports.record(external_exports.unknown()).optional(),
-      body: external_exports.unknown().optional(),
-      timeout: external_exports.number().optional()
-    }),
-    external_exports.object({
-      status: external_exports.number(),
-      ok: external_exports.boolean(),
-      headers: external_exports.record(external_exports.string()),
-      body: external_exports.string()
-    }),
+    CsFetchParamsSchema,
+    CsFetchReturnSchema,
     {
       namespace: "page",
       name: "fetch",
       publicName: "page.fetch",
       localName: "fetch",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Fetch a URL from the page context",
       params: [
-        {
-          name: "url",
-          type: "string",
-          required: true,
-          description: "URL to fetch"
-        },
-        {
-          name: "method",
-          type: "string",
-          required: false,
-          description: "HTTP method"
-        },
-        {
-          name: "headers",
-          type: "object",
-          required: false,
-          description: "Request headers"
-        },
-        {
-          name: "body",
-          type: "any",
-          required: false,
-          description: "Request body"
-        },
-        {
-          name: "timeout",
-          type: "number",
-          required: false,
-          description: "Timeout in milliseconds"
-        }
+        { name: "url", type: "string", required: true, description: "URL to fetch" },
+        { name: "method", type: "string", required: false, description: "HTTP method" },
+        { name: "headers", type: "object", required: false, description: "Request headers" },
+        { name: "body", type: "any", required: false, description: "Request body" },
+        { name: "timeout", type: "number", required: false, description: "Timeout in milliseconds" }
       ],
       returnType: "object",
       returnDoc: "HTTP response",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     async (params) => {
       const {
@@ -5175,25 +5042,18 @@
   );
   register(
     "__content_script_ping",
-    external_exports.object({}),
-    external_exports.object({
-      ready: external_exports.literal(true),
-      version: external_exports.string(),
-      toolsHash: external_exports.string()
-    }),
+    CsInternalPingParamsSchema,
+    CsInternalPingReturnSchema,
     {
       namespace: "__internal",
       name: "ping",
       publicName: "__internal.content_script.ping",
       localName: "__ping",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "Ping the content script for readiness",
       params: [],
       returnType: "object",
       returnDoc: "Readiness metadata with version and tools hash",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     () => {
       return {
@@ -5205,125 +5065,124 @@
   );
   register(
     "__content_script_tool_docs",
-    external_exports.object({}),
-    external_exports.array(external_exports.unknown()),
+    CsToolDocsParamsSchema,
+    CsToolDocsReturnSchema,
     {
       namespace: "__internal",
       name: "tool_docs",
       publicName: "__internal.content_script.tool_docs",
       localName: "__tool_docs",
-      source: "content_script",
-      transport: "active_tab_content_script",
       description: "List all content script tool documentation",
       params: [],
       returnType: "array",
       returnDoc: "Array of ToolDoc for all registered content script tools",
-      errorCode: "E_CONTENT_SCRIPT",
-      errorCategory: "content_script"
+      ...csDocBase
     },
     () => {
       return listLocalToolDocs();
     }
   );
-  chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-    if (typeof request !== "object" || request === null || request.channel !== "piccolo-tool" || request.version !== 1) {
-      const reqId = typeof request?.requestId === "string" ? request.requestId : "unknown";
-      sendResponse({
-        channel: "piccolo-tool",
-        version: 1,
-        requestId: reqId,
-        error: "Malformed message: expected PiccoloToolRequest envelope with channel='piccolo-tool' and version=1"
-      });
-      return true;
-    }
-    const { requestId, action, params } = request;
-    if (typeof action !== "string" || typeof requestId !== "string") {
-      sendResponse({
-        channel: "piccolo-tool",
-        version: 1,
-        requestId: requestId || "unknown",
-        error: "Malformed message: expected action and requestId strings"
-      });
-      return true;
-    }
-    logger.debug("[content-script] received action:", action, "params:", params);
-    const tool = csRegistry.get(action);
-    if (!tool) {
-      logger.debug("[content-script] no handler for action:", action);
-      sendResponse({
-        channel: "piccolo-tool",
-        version: 1,
-        requestId,
-        error: `Unknown content script action: ${action}`
-      });
-      return true;
-    }
-    const parsed = tool.params.safeParse(params ?? {});
-    if (!parsed.success) {
-      logger.debug(
-        "[content-script] invalid params for action:",
-        action,
-        parsed.error.message
-      );
-      sendResponse({
-        channel: "piccolo-tool",
-        version: 1,
-        requestId,
-        error: `Invalid params: ${parsed.error.message}`
-      });
-      return true;
-    }
-    try {
-      const result = tool.handler(parsed.data);
-      if (result instanceof Promise) {
-        result.then((value) => {
-          logger.debug(
-            "[content-script] async response for",
-            action,
-            ":",
-            typeof value
-          );
-          sendResponse({
-            channel: "piccolo-tool",
-            version: 1,
-            requestId,
-            value
-          });
-        }).catch((err) => {
-          const msg = err instanceof Error ? err.message : String(err);
-          logger.error(`[ContentScript] ${action} failed:`, msg);
-          sendResponse({
-            channel: "piccolo-tool",
-            version: 1,
-            requestId,
-            error: msg
-          });
+
+  // crates/extension-lua/js/src/content-script/message-router.ts
+  function setupMessageRouter() {
+    chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+      if (typeof request !== "object" || request === null || request.channel !== "piccolo-tool" || request.version !== 1) {
+        const reqId = typeof request?.requestId === "string" ? request.requestId : "unknown";
+        sendResponse({
+          channel: "piccolo-tool",
+          version: 1,
+          requestId: reqId,
+          error: "Malformed message: expected PiccoloToolRequest envelope with channel='piccolo-tool' and version=1"
         });
         return true;
       }
-      logger.debug(
-        "[content-script] sync response for",
-        action,
-        ":",
-        typeof result
-      );
-      sendResponse({
-        channel: "piccolo-tool",
-        version: 1,
-        requestId,
-        value: result
-      });
-      return false;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.error(`[ContentScript] ${action} failed:`, msg);
-      sendResponse({
-        channel: "piccolo-tool",
-        version: 1,
-        requestId,
-        error: msg
-      });
-      return false;
-    }
-  });
+      const { requestId, action, params } = request;
+      if (typeof action !== "string" || typeof requestId !== "string") {
+        sendResponse({
+          channel: "piccolo-tool",
+          version: 1,
+          requestId: requestId || "unknown",
+          error: "Malformed message: expected action and requestId strings"
+        });
+        return true;
+      }
+      logger.debug("[content-script] received action:", action, "params:", params);
+      const dispatchResult = dispatchLocalTool(action, params ?? {});
+      if (!dispatchResult.ok) {
+        logger.debug("[content-script] no handler for action:", action);
+        sendResponse({
+          channel: "piccolo-tool",
+          version: 1,
+          requestId,
+          error: dispatchResult.error
+        });
+        return true;
+      }
+      const { tool, parsed } = dispatchResult;
+      try {
+        const result = tool.handler(parsed);
+        if (result instanceof Promise) {
+          result.then((value) => {
+            logger.debug(
+              "[content-script] async response for",
+              action,
+              ":",
+              typeof value
+            );
+            sendResponse({
+              channel: "piccolo-tool",
+              version: 1,
+              requestId,
+              value
+            });
+          }).catch((err) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            logger.error(`[ContentScript] ${action} failed:`, msg);
+            sendResponse({
+              channel: "piccolo-tool",
+              version: 1,
+              requestId,
+              error: msg
+            });
+          });
+          return true;
+        }
+        logger.debug(
+          "[content-script] sync response for",
+          action,
+          ":",
+          typeof result
+        );
+        sendResponse({
+          channel: "piccolo-tool",
+          version: 1,
+          requestId,
+          value: result
+        });
+        return false;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`[ContentScript] ${action} failed:`, msg);
+        sendResponse({
+          channel: "piccolo-tool",
+          version: 1,
+          requestId,
+          error: msg
+        });
+        return false;
+      }
+    });
+  }
+
+  // crates/extension-lua/js/src/content-script/index.ts
+  if (window.__luaNotebookContentScriptInjected) {
+    throw new Error("Content script already injected");
+  }
+  window.__luaNotebookContentScriptInjected = true;
+  var __LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 };
+  window.__luaNotebookSetLogLevel = (level) => {
+    const numeric = __LOG_LEVELS[level] ?? 3;
+    if (numeric <= 0) console.log("[cs] log level set to", level);
+  };
+  setupMessageRouter();
 })();

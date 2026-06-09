@@ -36,7 +36,9 @@ Piccolo Notebook — a browser-based Jupyter-style notebook for Lua scripting, p
 |------|----------|-------|
 | Modify Lua runtime / session logic | `crates/web-lua-core/src/` | Fuel system, host APIs, tsify types |
 | Modify main-thread WASM bindings | `crates/web-lua/src/` + `crates/web-lua/js/` | wasm-bindgen wrapper, browser APIs |
-| Modify extension WASM bindings | `crates/extension-lua/src/` + `crates/extension-lua/js/` | Worker, content-script, Chrome APIs |
+| Modify extension WASM bindings | `crates/extension-lua/src/` + `crates/extension-lua/js/src/` | Worker, content-script, Chrome APIs |
+| Modify extension tool registry | `crates/extension-lua/js/src/shared/` | Shared registry consumed by web-lua |
+| Add extension registry tests | `crates/extension-lua/js/test/registry/` | dispatch, routes, integrity tests |
 | Modify vendored Lua VM | `crates/piccolo/src/` | Stackless execution, GC arena, fuel |
 | Modify UI / notebook | `web/src/` | Preact components, CodeMirror, hooks |
 | Add E2E tests | `web/tests/e2e/*.spec.ts` | Numbered test names, use helpers.ts |

@@ -53,3 +53,37 @@ jobs:
 
       - name: Build WASM targets
         run: node scripts/build.js
+
+  extension-lua-test:
+    name: Extension Lua JS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: cd crates/extension-lua/js && npm ci
+
+      - name: Run extension-lua tests
+        run: cd crates/extension-lua/js && npm test
+
+  extension-lua-doctest:
+    name: Extension Lua Doctest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: cd crates/extension-lua/js && npm ci
+
+      - name: Run doctests
+        run: cd crates/extension-lua/js && npm run test:doctest

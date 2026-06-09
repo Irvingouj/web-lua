@@ -5,6 +5,11 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./shared": "./dist/src/shared/index.js",
+    "./shared/*": "./dist/src/shared/*"
+  },
   "files": [
     "dist",
     "README.md"
@@ -12,7 +17,8 @@
   "scripts": {
     "build": "node ../../../scripts/build-npm.js extension",
     "prepublishOnly": "npm run build && cd ../../../ && node scripts/build.js extension",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:doctest": "vitest run --config vitest.doctest.config.ts"
   },
   "dependencies": {
     "@pi-oxide/dom-semantic-tree": "^0.1.0",

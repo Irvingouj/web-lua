@@ -23,12 +23,14 @@ import {
   type ToolTransport,
   clearRegistry,
   dispatchTool,
+  freezeRegistry,
   getTool,
+  isRegistryFrozen,
   listTools,
   register,
   registerHostHandlers,
   registerTool,
-} from "./registry.js";
+} from "@pi-oxide/extension-lua/shared";
 
 export type {
   AsyncError,
@@ -79,15 +81,15 @@ export interface LuaApiDoc {
   transport: string;
 }
 
-function convertLuaApiDocToToolDoc(doc: LuaApiDoc): import("./registry.js").ToolDoc {
+function convertLuaApiDocToToolDoc(doc: LuaApiDoc): ToolDoc {
   return {
     action: doc.action ?? `${doc.namespace}_${doc.name}`,
     namespace: doc.namespace,
     name: doc.name,
     publicName: doc.public_name,
     localName: doc.local_name ?? undefined,
-    source: doc.source as import("./registry.js").ToolSource,
-    transport: doc.transport as import("./registry.js").ToolTransport,
+    source: doc.source as ToolSource,
+    transport: doc.transport as ToolTransport,
     description: doc.description,
     params: doc.params.map((p) => ({
       name: p.name,
@@ -113,15 +115,32 @@ export const mergedDocRegistry = new MergedDocRegistry();
 
 // Register runtime doc provider host handlers.
 // These are called by the Rust __runtime_* actions via execute_host_call.
-registerHostHandler("runtime_docs", async () => mergedDocRegistry.list());
-registerHostHandler(
-  "runtime_get_doc",
-  async (params: { query: string }) => mergedDocRegistry.get(params.query) ?? null,
-);
-registerHostHandler(
-  "runtime_search_docs",
-  async (params: { query: string }) => mergedDocRegistry.search(params.query),
-);
+function runtimeDocsHandler() {
+  return mergedDocRegistry.list();
+}
+
+function runtimeGetDocHandler(params: unknown) {
+  const { query } = params as { query: string };
+  return mergedDocRegistry.get(query) ?? null;
+}
+
+function runtimeSearchDocsHandler(params: unknown) {
+  const { query } = params as { query: string };
+  return mergedDocRegistry.search(query);
+}
+
+registerHostHandler("runtime_docs", runtimeDocsHandler);
+registerHostHandler("runtime_get_doc", runtimeGetDocHandler);
+registerHostHandler("runtime_search_docs", runtimeSearchDocsHandler);
+
+function syncHostHandlersToWindow(): void {
+  const win = window as unknown as Record<string, unknown>;
+  win.__hostHandlers = {
+    runtime_docs: runtimeDocsHandler,
+    runtime_get_doc: runtimeGetDocHandler,
+    runtime_search_docs: runtimeSearchDocsHandler,
+  };
+}
 
 export class WebSession {
   private raw: RawWebSession;
@@ -138,6 +157,16 @@ export class WebSession {
     const docsJson = getApiDocsJson();
     const docs: LuaApiDoc[] = JSON.parse(docsJson);
     mergedDocRegistry.setStaticDocs(docs.map(convertLuaApiDocToToolDoc));
+
+    // Mirror JS-registered host handlers to window.__hostHandlers
+    // so Rust WASM execute_host_call can find them.
+    syncHostHandlersToWindow();
+
+    // Freeze the registry so no further tools can be registered
+    // after initialization.
+    if (!isRegistryFrozen()) {
+      freezeRegistry();
+    }
 
     return [session, Promise.resolve()];
   }
